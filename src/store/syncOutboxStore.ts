@@ -14,6 +14,7 @@ const outboxStorageKey = `consumption_outbox_v1:${VENUE_ID}`;
 // dead-letter table so other devices/admin can see and resolve it.
 const MAX_RETRIES = 6;
 const STALE_AGE_MS = 5 * 60 * 1000;
+const MAX_BATCH_SIZE = 10;
 
 /**
  * Combine RPC error code with optional structured detail into a single,
@@ -91,12 +92,14 @@ export const useSyncOutboxStore = create<SyncOutboxState>((set, get) => ({
     try {
       let events = [...get().events];
       let escalated = 0;
-      while (events.length > 0) {
+      let processed = 0;
+      while (events.length > 0 && processed < MAX_BATCH_SIZE) {
         const [head, ...tail] = events;
         const delay = head.retries > 0 ? Math.min(60_000, 400 * Math.pow(2, head.retries)) : 0;
         if (delay > 0) await new Promise((r) => setTimeout(r, delay));
 
         const res = await finalizeOrderConsumption(head.payload);
+        processed++;
         if (res.ok) {
           events = tail;
           set({ events });

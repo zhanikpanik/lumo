@@ -129,7 +129,9 @@ const syncOrderItems = async (orderId: string, items: OrderItem[]) => {
         // 23503 — FK violation (например, product_id больше нет в products после правок в админке).
         // Инвалидируем кэш меню — далее пользователь увидит свежие позиции.
         if (itemsError.code === '23503') {
-          useMenuStore.getState().fetchMenu(true).catch(() => {});
+          useMenuStore.getState().fetchMenu(true).catch((err: any) => {
+            logger.error('orderStore.syncOrderItems.menuReload', err);
+          });
         }
         return; // без order_items нет смысла пытаться вставлять модификаторы
       }
@@ -156,7 +158,9 @@ const syncOrderItems = async (orderId: string, items: OrderItem[]) => {
           if (modError.code === '23503') {
             // FK на modifier_id отвалился — кэш меню устарел (модификаторы пересоздали в админке).
             // Принудительно обновляем — на следующей попытке клиент возьмёт актуальные UUID.
-            useMenuStore.getState().fetchMenu(true).catch(() => {});
+            useMenuStore.getState().fetchMenu(true).catch((err: any) => {
+              logger.error('orderStore.syncOrderItems.modifierReload', err);
+            });
           }
         }
       }
@@ -350,6 +354,8 @@ interface OrderStoreState {
   setActiveModifierGroup: (groupId: string) => void;
   toggleModifier: (modifier: Modifier) => void;
   setItemComment: (itemId: string, comment: string) => void;
+  lastSyncError: string | null;
+  clearSyncError: () => void;
 }
 
 export const useOrderStore = create<OrderStoreState>((set, get) => ({
@@ -363,6 +369,8 @@ export const useOrderStore = create<OrderStoreState>((set, get) => ({
   activeAction: null,
   activeCategoryId: '',
   activeModifierGroupId: 'filling',
+  lastSyncError: null,
+  clearSyncError: () => set({ lastSyncError: null }),
 
   flushPendingItemsToServer: async () => {
     await flushPendingSyncAwait();
@@ -481,6 +489,9 @@ export const useOrderStore = create<OrderStoreState>((set, get) => ({
       await flushPendingSyncAwait();
     } catch (e) {
       logger.error('orderStore.flushPendingItemsToServer', e);
+      // Don't close the order if we couldn't sync items — data would be lost.
+      // The order stays open. User can retry by pressing close again.
+      return;
     }
 
     if (!state.currentOrderId) {

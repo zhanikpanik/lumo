@@ -1,3 +1,4 @@
+// TODO: Make venue dynamic — load from venueStore/Supabase for multi-venue support
 export const VENUE_ID = '00000000-0000-0000-0000-000000000010';
 
 // Turn on after applying migration with `pos_refund_order` RPC in the active Supabase project.

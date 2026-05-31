@@ -1,9 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 
-const fallbackUrl = 'https://gmigxjrvypqjakvualil.supabase.co';
-const fallbackKey = 'sb_publishable_bNXLWbJVGS5Dp2FUPywFkQ_9Cg_mPTu';
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || fallbackUrl;
-const supabaseKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || fallbackKey;
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error(
+    'Supabase credentials missing. Set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY in .env',
+  );
+}
 
 export const supabase = createClient(supabaseUrl, supabaseKey);

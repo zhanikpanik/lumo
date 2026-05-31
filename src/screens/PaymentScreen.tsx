@@ -4,10 +4,10 @@ import { theme } from '../theme/colors';
 import { useOrderStore } from '../store/orderStore';
 import { useShiftStore } from '../store/shiftStore';
 import { useSyncOutboxStore, formatRpcError } from '../store/syncOutboxStore';
-import { supabase } from '../utils/supabase';
-import { VENUE_ID } from '../config';
 import { can } from '../utils/permissions';
 import { finalizeOrderConsumption } from '../api/inventory';
+import { insertPayment } from '../api/payments';
+import { VENUE_ID } from '../config';
 import { saleConsumptionIdempotencyKey } from '../types/inventory';
 import { logger } from '../utils/logger';
 import type { Order } from '../types';
@@ -92,34 +92,22 @@ export const PaymentScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
       // Стабильный ключ повторного нажатия / сетевого retry в рамках сессии экрана.
       const idempotencyKey = `${currentOrderId}:${method}:${paymentAttemptId.current}`;
 
-      const { error: payError } = await supabase.from('payments').insert({
-        order_id: currentOrderId,
-        venue_id: VENUE_ID,
-        shift_id: shiftId,
-        method: method === 'none' ? 'none' : method,
+      const payResult = await insertPayment({
+        orderId: currentOrderId,
+        shiftId,
+        method,
         amount: total,
-        change_amount: method === 'cash' ? Math.max(0, cashAmount - total) : 0,
-        close_reason: method === 'none' ? (closeReason ?? '') : null,
-        idempotency_key: idempotencyKey,
+        cashAmount,
+        closeReason,
+        idempotencyKey,
       });
 
-      // 23505 — unique violation. Убеждаемся, что это именно наш индекс
-      // idempotency_key, а не какой-то другой constraint, который может
-      // появиться в будущем. Если наш — трактуем как «оплата уже прошла».
-      const isIdempotencyConflict =
-        payError?.code === '23505' &&
-        /payments_idempotency_key_venue_uidx/i.test(
-          `${payError?.message ?? ''} ${(payError as any)?.details ?? ''}`,
-        );
-      if (payError && !isIdempotencyConflict) {
-        logger.error('payment.insert', payError, {
-          orderId: currentOrderId,
-          method,
-          code: payError.code,
-        });
-        Alert.alert('Ошибка оплаты', payError.message);
+      if (!payResult.ok && !payResult.isIdempotencyConflict) {
+        Alert.alert('Ошибка оплаты', payResult.error ?? 'Неизвестная ошибка');
         return;
       }
+
+      const isIdempotencyConflict = payResult.isIdempotencyConflict ?? false;
 
       if (method !== 'none' && !isIdempotencyConflict) {
         useShiftStore.getState().recordPayment(method, total);

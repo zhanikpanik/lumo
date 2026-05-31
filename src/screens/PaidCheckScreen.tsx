@@ -5,11 +5,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { theme } from '../theme/colors';
 import { useOrderStore } from '../store/orderStore';
 import { useShiftStore } from '../store/shiftStore';
-import { supabase } from '../utils/supabase';
 import { Order, OrderItem } from '../types';
 import { can } from '../utils/permissions';
-import { VENUE_ID } from '../config';
 import { cancelRefund, refundOrder } from '../api/inventory';
+import { fetchActiveRefunds, fetchPaymentForOrder } from '../api/payments';
+import { VENUE_ID } from '../config';
 import { logger } from '../utils/logger';
 
 const GAP = 8;
@@ -71,16 +71,7 @@ export const PaidCheckScreen: React.FC<{ navigation?: any }> = ({ navigation }) 
   const [refundedOrderIds, setRefundedOrderIds] = useState<Set<string>>(new Set());
 
   const reloadActiveRefunds = async (shiftId: string) => {
-    const { data, error } = await supabase.rpc('pos_active_refunds_for_shift', {
-      p_venue_id: VENUE_ID,
-      p_shift_id: shiftId,
-    });
-    if (error) {
-      logger.error('paidCheck.reloadActiveRefunds', error.message);
-      return;
-    }
-    const rows = (data ?? []) as Array<{ order_id: string }>;
-    setRefundedOrderIds(new Set(rows.map((r) => r.order_id)));
+    setRefundedOrderIds(await fetchActiveRefunds(shiftId));
   };
 
   useEffect(() => {
@@ -122,15 +113,10 @@ export const PaidCheckScreen: React.FC<{ navigation?: any }> = ({ navigation }) 
     if (!selectedOrder) return;
     setLoadingPayment(true);
     setPayment(null);
-    supabase
-      .from('payments')
-      .select('method, amount, change_amount, close_reason')
-      .eq('order_id', selectedOrder.id)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data) setPayment(data as Payment);
-        setLoadingPayment(false);
-      });
+    fetchPaymentForOrder(selectedOrder.id).then((data) => {
+      if (data) setPayment(data as Payment);
+      setLoadingPayment(false);
+    });
   }, [selectedOrder?.id]);
 
   const isRefundedSelected = !!selectedOrder && refundedOrderIds.has(selectedOrder.id);

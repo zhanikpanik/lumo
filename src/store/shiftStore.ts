@@ -131,8 +131,7 @@ export const useShiftStore = create<ShiftStoreState>()(
       logout: () => set({ currentUser: null, currentShift: null }),
 
       openShift: (startingCash: number) => {
-        const { currentUser, currentShift } = get();
-        if (currentShift) return;
+        if (get().currentShift) return;
 
         // Per-venue model: if another device already has an open shift, attach to it.
         supabase
@@ -151,14 +150,14 @@ export const useShiftStore = create<ShiftStoreState>()(
             }
 
             if (data) {
-              set({ currentShift: mapSupabaseShift(data, currentUser?.name), lastSyncError: null, isSyncing: false });
+              set({ currentShift: mapSupabaseShift(data, get().currentUser?.name), lastSyncError: null, isSyncing: false });
               void get().refreshShiftCashSummary();
               return;
             }
 
             const shift: Shift = {
               id: generateId(),
-              cashier: currentUser?.name || 'Неизвестный',
+              cashier: get().currentUser?.name || 'Неизвестный',
               openedAt: new Date(),
               startingCash,
               totalOrders: 0,
@@ -179,7 +178,7 @@ export const useShiftStore = create<ShiftStoreState>()(
               .insert({
                 id: shift.id,
                 venue_id: VENUE_ID,
-                cashier_id: currentUser?.id || null,
+                cashier_id: get().currentUser?.id || null,
                 opened_at: shift.openedAt.toISOString(),
                 starting_cash: startingCash,
               })
@@ -225,9 +224,10 @@ export const useShiftStore = create<ShiftStoreState>()(
           otherTotal: Number(payload.other_total ?? currentShift.otherTotal),
         };
 
+        const MAX_HISTORY = 50;
         set((state) => ({
           currentShift: null,
-          shiftHistory: [...state.shiftHistory, closedShift],
+          shiftHistory: [...state.shiftHistory, closedShift].slice(-MAX_HISTORY),
         }));
         set({ lastSyncError: null, isSyncing: false });
 

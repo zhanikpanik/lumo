@@ -60,7 +60,10 @@ export const LockScreen: React.FC<Props> = ({ navigation, route }) => {
         } else {
           // Check shift optimistically: navigate immediately, verify in background.
           // If no shift is found, the App-level useEffect will redirect to OpenShift.
-          useShiftStore.getState().fetchOpenShift().catch(() => {});
+          useShiftStore.getState().fetchOpenShift().catch(() => {
+            // App-level guard in App.tsx will redirect to OpenShift if no shift found.
+            // The user briefly sees Orders, then gets redirected — acceptable UX.
+          });
           navigation.replace('Orders');
         }
       } else {
