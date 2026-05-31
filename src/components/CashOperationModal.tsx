@@ -48,22 +48,26 @@ export const CashOperationModal: React.FC<Props> = ({
 }) => {
   const [amountInput, setAmountInput] = useState('');
   const [note, setNote] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
     setAmountInput('');
     setNote('');
+    setSubmitting(false);
   }, [visible]);
 
   const cfg = CONFIG[mode];
 
   const handleConfirm = async () => {
+    if (submitting) return;
     const raw = amountInput.replace(/\s/g, '').replace(',', '.').trim();
     const amount = Number(raw);
     if (!raw || Number.isNaN(amount) || amount <= 0) {
       Alert.alert('Ошибка', 'Введите корректную сумму.');
       return;
     }
+    setSubmitting(true);
     await onConfirm(amount, note.trim() || undefined);
   };
 

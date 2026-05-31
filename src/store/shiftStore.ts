@@ -70,9 +70,9 @@ const toShift = (raw: any): Shift => ({
   otherTotal: raw.otherTotal || 0,
 });
 
-const mapSupabaseShift = (row: any): Shift => ({
+const mapSupabaseShift = (row: any, cashierName?: string): Shift => ({
   id: row.id,
-  cashier: 'Кассир',
+  cashier: cashierName || 'Кассир',
   openedAt: new Date(row.opened_at),
   startingCash: Number(row.starting_cash),
   totalOrders: row.total_orders || 0,
@@ -151,7 +151,7 @@ export const useShiftStore = create<ShiftStoreState>()(
             }
 
             if (data) {
-              set({ currentShift: mapSupabaseShift(data), lastSyncError: null, isSyncing: false });
+              set({ currentShift: mapSupabaseShift(data, currentUser?.name), lastSyncError: null, isSyncing: false });
               void get().refreshShiftCashSummary();
               return;
             }

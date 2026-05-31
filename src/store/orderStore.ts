@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import * as Crypto from 'expo-crypto';
 import { Product, OrderItem, Modifier, ActiveAction, Order } from '../types';
 import { supabase } from '../utils/supabase';
 import { useShiftStore } from './shiftStore';
@@ -6,13 +7,7 @@ import { useMenuStore } from './menuStore';
 import { VENUE_ID } from '../config';
 import { logger } from '../utils/logger';
 
-const generateId = () => {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-};
+const generateId = () => Crypto.randomUUID();
 
 const now = () => new Date().toISOString();
 

@@ -22,17 +22,4 @@ export async function safeRpc<T = any>(
   }
 }
 
-/**
- * Parse a Supabase row (snake_case) into a typed object.
- * Converts string numbers, ISO dates, and nulls safely.
- */
-export function parseSupabaseRow<T extends Record<string, unknown>>(
-  row: Record<string, any>,
-  mapping: Record<keyof T, (val: any) => any>,
-): T {
-  const result: any = {};
-  for (const [key, transform] of Object.entries(mapping)) {
-    result[key] = transform(row[key]);
-  }
-  return result as T;
-}
+
