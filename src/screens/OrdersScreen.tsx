@@ -10,8 +10,7 @@ import { SegmentedSwitcher } from '../components/SegmentedSwitcher';
 import { FunctionsModal } from '../components/FunctionsModal';
 import { SalesReportModal } from '../components/SalesReportModal';
 import { CloseShiftModal } from '../components/CloseShiftModal';
-import { CashCollectionModal } from '../components/CashCollectionModal';
-import { CashTransactionModal } from '../components/CashTransactionModal';
+import { CashOperationModal } from '../components/CashOperationModal';
 import { CashModal } from '../components/CashModal';
 import { useShiftStore } from '../store/shiftStore';
 import { useOrderStore } from '../store/orderStore';
@@ -69,9 +68,8 @@ export const OrdersScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const setStatusFilter = useOrdersUiStore((s) => s.setStatusFilter);
   const [reportVisible, setReportVisible] = useState(false);
   const [closeShiftVisible, setCloseShiftVisible] = useState(false);
-  const [cashCollectionVisible, setCashCollectionVisible] = useState(false);
-  const [cashInVisible, setCashInVisible] = useState(false);
-  const [cashOutVisible, setCashOutVisible] = useState(false);
+  const [cashOpVisible, setCashOpVisible] = useState(false);
+  const [cashOpMode, setCashOpMode] = useState<'collection' | 'in' | 'out'>('collection');
   const [cashModalVisible, setCashModalVisible] = useState(false);
   const [searchActive, setSearchActive] = useState(false);
   const sortMode = useOrdersUiStore((s) => s.sortMode);
@@ -430,17 +428,17 @@ export const OrdersScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           }}
           onCashCollection={() => {
             void refreshShiftCashSummary();
-            setCashCollectionVisible(true);
+            setCashOpMode('collection'); setCashOpVisible(true);
           }}
           onCashIn={() => {
             if (!canCashTransaction) return;
             void refreshShiftCashSummary();
-            setCashInVisible(true);
+            setCashOpMode('in'); setCashOpVisible(true);
           }}
           onCashOut={() => {
             if (!canCashTransaction) return;
             void refreshShiftCashSummary();
-            setCashOutVisible(true);
+            setCashOpMode('out'); setCashOpVisible(true);
           }}
           canCloseShift={canCloseShift}
           canCashTransaction={canCashTransaction}
@@ -456,13 +454,13 @@ export const OrdersScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
           role={currentUser?.role ?? null}
           onCashIn={() => {
             if (!canCashTransaction) return;
-            setCashInVisible(true);
+            setCashOpMode('in'); setCashOpVisible(true);
           }}
           onCashOut={() => {
             if (!canCashTransaction) return;
-            setCashOutVisible(true);
+            setCashOpMode('out'); setCashOpVisible(true);
           }}
-          onCashCollection={() => setCashCollectionVisible(true)}
+          onCashCollection={() => { setCashOpMode('collection'); setCashOpVisible(true); }}
         />
         <CloseShiftModal
           visible={closeShiftVisible}
@@ -479,34 +477,22 @@ export const OrdersScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             navigation.replace('OpenShift');
           }}
         />
-        <CashCollectionModal
-          visible={cashCollectionVisible}
-          onClose={() => setCashCollectionVisible(false)}
+        <CashOperationModal
+          visible={cashOpVisible}
+          mode={cashOpMode}
+          onClose={() => setCashOpVisible(false)}
           onConfirm={async (amount, note) => {
-            const res = await addCashCollection(amount, note);
-            if (!res.ok) {
-              Alert.alert('Ошибка', res.error ?? 'Не удалось провести инкассацию');
-              return;
+            if (cashOpMode === 'collection') {
+              const res = await addCashCollection(amount, note);
+              if (!res.ok) {
+                Alert.alert('Ошибка', res.error ?? 'Не удалось провести инкассацию');
+                return;
+              }
+            } else {
+              const res = await handleCashTransaction(cashOpMode, amount, note);
+              if (!res.ok) return;
             }
-            setCashCollectionVisible(false);
-          }}
-        />
-        <CashTransactionModal
-          visible={cashInVisible}
-          mode="in"
-          onClose={() => setCashInVisible(false)}
-          onConfirm={async (amount, note) => {
-            const res = await handleCashTransaction('in', amount, note);
-            if (res.ok) setCashInVisible(false);
-          }}
-        />
-        <CashTransactionModal
-          visible={cashOutVisible}
-          mode="out"
-          onClose={() => setCashOutVisible(false)}
-          onConfirm={async (amount, note) => {
-            const res = await handleCashTransaction('out', amount, note);
-            if (res.ok) setCashOutVisible(false);
+            setCashOpVisible(false);
           }}
         />
       </View>

@@ -1,0 +1,2685 @@
+{
+  "statistics": {
+    "detectionDate": "2026-05-31T13:31:03.326Z",
+    "formats": {
+      "typescript": {
+        "sources": {
+          "src/utils/supabase.ts": {
+            "lines": 8,
+            "tokens": 83,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/utils/permissions.ts": {
+            "lines": 13,
+            "tokens": 132,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/utils/notificationSound.ts": {
+            "lines": 54,
+            "tokens": 473,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/utils/network.ts": {
+            "lines": 49,
+            "tokens": 481,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/utils/logger.ts": {
+            "lines": 50,
+            "tokens": 423,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/types/svg.d.ts": {
+            "lines": 5,
+            "tokens": 54,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/types/inventory.ts": {
+            "lines": 99,
+            "tokens": 817,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/types/index.ts": {
+            "lines": 101,
+            "tokens": 704,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/theme/colors.ts": {
+            "lines": 34,
+            "tokens": 233,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/store/venueStore.ts": {
+            "lines": 127,
+            "tokens": 1303,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/store/syncOutboxStore.ts": {
+            "lines": 174,
+            "tokens": 1715,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/store/shiftStore.ts": {
+            "lines": 452,
+            "tokens": 4822,
+            "sources": 1,
+            "clones": 10,
+            "duplicatedLines": 130,
+            "duplicatedTokens": 1327,
+            "percentage": 28.76,
+            "percentageTokens": 27.52,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/store/ordersUiStore.ts": {
+            "lines": 31,
+            "tokens": 294,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/store/orderStore.ts": {
+            "lines": 751,
+            "tokens": 8323,
+            "sources": 1,
+            "clones": 7,
+            "duplicatedLines": 88,
+            "duplicatedTokens": 932,
+            "percentage": 11.72,
+            "percentageTokens": 11.2,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/store/notificationStore.ts": {
+            "lines": 56,
+            "tokens": 573,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/store/menuStore.ts": {
+            "lines": 126,
+            "tokens": 1331,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/store/deadLetterStore.ts": {
+            "lines": 62,
+            "tokens": 636,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/hooks/useOrderRealtime.ts": {
+            "lines": 136,
+            "tokens": 1289,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/api/shift.ts": {
+            "lines": 105,
+            "tokens": 1219,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/api/inventory.ts": {
+            "lines": 137,
+            "tokens": 1180,
+            "sources": 1,
+            "clones": 5,
+            "duplicatedLines": 69,
+            "duplicatedTokens": 602,
+            "percentage": 50.36,
+            "percentageTokens": 51.02,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/api/consumption.ts": {
+            "lines": 86,
+            "tokens": 926,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 15,
+            "duplicatedTokens": 142,
+            "percentage": 17.44,
+            "percentageTokens": 15.33,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/__tests__/payment-idempotency.test.ts": {
+            "lines": 119,
+            "tokens": 895,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 8,
+            "duplicatedTokens": 95,
+            "percentage": 6.72,
+            "percentageTokens": 10.61,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/config.ts": {
+            "lines": 3,
+            "tokens": 23,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          }
+        },
+        "total": {
+          "lines": 2778,
+          "tokens": 27929,
+          "sources": 23,
+          "clones": 12,
+          "duplicatedLines": 155,
+          "duplicatedTokens": 1549,
+          "percentage": 5.58,
+          "percentageTokens": 5.55,
+          "newDuplicatedLines": 0,
+          "newClones": 0
+        }
+      },
+      "javascript": {
+        "sources": {
+          "src/screens/TablePickerScreen.tsx": {
+            "lines": 69,
+            "tokens": 730,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/screens/PosScreen.tsx": {
+            "lines": 76,
+            "tokens": 627,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/screens/PaymentScreen.tsx": {
+            "lines": 191,
+            "tokens": 1972,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/screens/PaidCheckScreen.tsx": {
+            "lines": 228,
+            "tokens": 2349,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/screens/OrdersScreen.tsx": {
+            "lines": 241,
+            "tokens": 2299,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/screens/OpenShiftScreen.tsx": {
+            "lines": 69,
+            "tokens": 606,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/screens/LockScreen.tsx": {
+            "lines": 66,
+            "tokens": 616,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/WaiterPickerModal.tsx": {
+            "lines": 18,
+            "tokens": 225,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 12,
+            "duplicatedTokens": 140,
+            "percentage": 66.67,
+            "percentageTokens": 62.22,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/TakeoverLock.tsx": {
+            "lines": 50,
+            "tokens": 532,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/SegmentedSwitcher.tsx": {
+            "lines": 10,
+            "tokens": 123,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/SearchMode.tsx": {
+            "lines": 29,
+            "tokens": 376,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/SalesReportModal.tsx": {
+            "lines": 72,
+            "tokens": 818,
+            "sources": 1,
+            "clones": 2,
+            "duplicatedLines": 31,
+            "duplicatedTokens": 346,
+            "percentage": 43.06,
+            "percentageTokens": 42.3,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/QuantityNumpad.tsx": {
+            "lines": 44,
+            "tokens": 530,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ProductGrid.tsx": {
+            "lines": 27,
+            "tokens": 387,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/PosHeader.tsx": {
+            "lines": 101,
+            "tokens": 1020,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/OrderPanel.tsx": {
+            "lines": 101,
+            "tokens": 950,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/OrderItem.tsx": {
+            "lines": 16,
+            "tokens": 185,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/OrderCard.tsx": {
+            "lines": 152,
+            "tokens": 1487,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ModifierGrid.tsx": {
+            "lines": 75,
+            "tokens": 819,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ItemActionsMenu.tsx": {
+            "lines": 39,
+            "tokens": 481,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/Icons.tsx": {
+            "lines": 36,
+            "tokens": 362,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/FunctionsModal.tsx": {
+            "lines": 48,
+            "tokens": 371,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/FloorPlanCanvas.tsx": {
+            "lines": 36,
+            "tokens": 472,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/FloorPlan.tsx": {
+            "lines": 15,
+            "tokens": 193,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/DishCommentPanel.tsx": {
+            "lines": 42,
+            "tokens": 518,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/DeadLetterModal.tsx": {
+            "lines": 84,
+            "tokens": 989,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/CommentModal.tsx": {
+            "lines": 22,
+            "tokens": 215,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 12,
+            "duplicatedTokens": 140,
+            "percentage": 54.55,
+            "percentageTokens": 65.12,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/CloseShiftModal.tsx": {
+            "lines": 93,
+            "tokens": 1086,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/CategoryMenu.tsx": {
+            "lines": 32,
+            "tokens": 321,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/CashTransactionModal.tsx": {
+            "lines": 42,
+            "tokens": 436,
+            "sources": 1,
+            "clones": 2,
+            "duplicatedLines": 22,
+            "duplicatedTokens": 295,
+            "percentage": 52.38,
+            "percentageTokens": 67.66,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/CashModal.tsx": {
+            "lines": 80,
+            "tokens": 948,
+            "sources": 1,
+            "clones": 3,
+            "duplicatedLines": 52,
+            "duplicatedTokens": 745,
+            "percentage": 65,
+            "percentageTokens": 78.59,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/CashCollectionModal.tsx": {
+            "lines": 36,
+            "tokens": 377,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 21,
+            "duplicatedTokens": 216,
+            "percentage": 58.33,
+            "percentageTokens": 57.29,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/BottomTabBar.tsx": {
+            "lines": 34,
+            "tokens": 347,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          }
+        },
+        "total": {
+          "lines": 2274,
+          "tokens": 23767,
+          "sources": 33,
+          "clones": 5,
+          "duplicatedLines": 75,
+          "duplicatedTokens": 941,
+          "percentage": 3.3,
+          "percentageTokens": 3.96,
+          "newDuplicatedLines": 0,
+          "newClones": 0
+        }
+      },
+      "tsx": {
+        "sources": {
+          "src/screens/TablePickerScreen.tsx": {
+            "lines": 187,
+            "tokens": 1905,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 10,
+            "duplicatedTokens": 92,
+            "percentage": 5.35,
+            "percentageTokens": 4.83,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/screens/PosScreen.tsx": {
+            "lines": 226,
+            "tokens": 2042,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/screens/PaymentScreen.tsx": {
+            "lines": 704,
+            "tokens": 6129,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/screens/PaidCheckScreen.tsx": {
+            "lines": 724,
+            "tokens": 7681,
+            "sources": 1,
+            "clones": 3,
+            "duplicatedLines": 30,
+            "duplicatedTokens": 286,
+            "percentage": 4.14,
+            "percentageTokens": 3.72,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/screens/OrdersScreen.tsx": {
+            "lines": 614,
+            "tokens": 6548,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 14,
+            "duplicatedTokens": 170,
+            "percentage": 2.28,
+            "percentageTokens": 2.6,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/screens/OpenShiftScreen.tsx": {
+            "lines": 238,
+            "tokens": 1868,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 19,
+            "duplicatedTokens": 110,
+            "percentage": 7.98,
+            "percentageTokens": 5.89,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/screens/LockScreen.tsx": {
+            "lines": 297,
+            "tokens": 2453,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 19,
+            "duplicatedTokens": 110,
+            "percentage": 6.4,
+            "percentageTokens": 4.48,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/WaiterPickerModal.tsx": {
+            "lines": 108,
+            "tokens": 953,
+            "sources": 1,
+            "clones": 3,
+            "duplicatedLines": 46,
+            "duplicatedTokens": 321,
+            "percentage": 42.59,
+            "percentageTokens": 33.68,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/TakeoverLock.tsx": {
+            "lines": 177,
+            "tokens": 1733,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/SegmentedSwitcher.tsx": {
+            "lines": 70,
+            "tokens": 541,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/SearchMode.tsx": {
+            "lines": 123,
+            "tokens": 1179,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/SalesReportModal.tsx": {
+            "lines": 289,
+            "tokens": 2623,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 15,
+            "duplicatedTokens": 89,
+            "percentage": 5.19,
+            "percentageTokens": 3.39,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/QuantityNumpad.tsx": {
+            "lines": 174,
+            "tokens": 1573,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ProductGrid.tsx": {
+            "lines": 119,
+            "tokens": 1365,
+            "sources": 1,
+            "clones": 5,
+            "duplicatedLines": 48,
+            "duplicatedTokens": 555,
+            "percentage": 40.34,
+            "percentageTokens": 40.66,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/PosHeader.tsx": {
+            "lines": 283,
+            "tokens": 2448,
+            "sources": 1,
+            "clones": 3,
+            "duplicatedLines": 42,
+            "duplicatedTokens": 476,
+            "percentage": 14.84,
+            "percentageTokens": 19.44,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/OrderPanel.tsx": {
+            "lines": 305,
+            "tokens": 2702,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/OrderItem.tsx": {
+            "lines": 84,
+            "tokens": 709,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/OrderCard.tsx": {
+            "lines": 344,
+            "tokens": 3161,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ModifierGrid.tsx": {
+            "lines": 203,
+            "tokens": 2178,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/ItemActionsMenu.tsx": {
+            "lines": 129,
+            "tokens": 1360,
+            "sources": 1,
+            "clones": 3,
+            "duplicatedLines": 36,
+            "duplicatedTokens": 312,
+            "percentage": 27.91,
+            "percentageTokens": 22.94,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/Icons.tsx": {
+            "lines": 48,
+            "tokens": 467,
+            "sources": 1,
+            "clones": 4,
+            "duplicatedLines": 20,
+            "duplicatedTokens": 328,
+            "percentage": 41.67,
+            "percentageTokens": 70.24,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/FunctionsModal.tsx": {
+            "lines": 283,
+            "tokens": 2123,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/FloorPlanCanvas.tsx": {
+            "lines": 115,
+            "tokens": 1243,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/FloorPlan.tsx": {
+            "lines": 75,
+            "tokens": 781,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/DishCommentPanel.tsx": {
+            "lines": 188,
+            "tokens": 1690,
+            "sources": 1,
+            "clones": 2,
+            "duplicatedLines": 44,
+            "duplicatedTokens": 322,
+            "percentage": 23.4,
+            "percentageTokens": 19.05,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/DeadLetterModal.tsx": {
+            "lines": 291,
+            "tokens": 2685,
+            "sources": 1,
+            "clones": 3,
+            "duplicatedLines": 84,
+            "duplicatedTokens": 512,
+            "percentage": 28.87,
+            "percentageTokens": 19.07,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/CommentModal.tsx": {
+            "lines": 117,
+            "tokens": 987,
+            "sources": 1,
+            "clones": 2,
+            "duplicatedLines": 31,
+            "duplicatedTokens": 234,
+            "percentage": 26.5,
+            "percentageTokens": 23.71,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/CloseShiftModal.tsx": {
+            "lines": 324,
+            "tokens": 2889,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/CategoryMenu.tsx": {
+            "lines": 115,
+            "tokens": 1147,
+            "sources": 1,
+            "clones": 4,
+            "duplicatedLines": 56,
+            "duplicatedTokens": 565,
+            "percentage": 48.7,
+            "percentageTokens": 49.26,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/CashTransactionModal.tsx": {
+            "lines": 201,
+            "tokens": 1631,
+            "sources": 1,
+            "clones": 7,
+            "duplicatedLines": 107,
+            "duplicatedTokens": 816,
+            "percentage": 53.23,
+            "percentageTokens": 50.03,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/CashModal.tsx": {
+            "lines": 273,
+            "tokens": 2345,
+            "sources": 1,
+            "clones": 1,
+            "duplicatedLines": 15,
+            "duplicatedTokens": 89,
+            "percentage": 5.49,
+            "percentageTokens": 3.8,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/CashCollectionModal.tsx": {
+            "lines": 170,
+            "tokens": 1395,
+            "sources": 1,
+            "clones": 7,
+            "duplicatedLines": 142,
+            "duplicatedTokens": 1047,
+            "percentage": 83.53,
+            "percentageTokens": 75.05,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          },
+          "src/components/BottomTabBar.tsx": {
+            "lines": 112,
+            "tokens": 929,
+            "sources": 1,
+            "clones": 0,
+            "duplicatedLines": 0,
+            "duplicatedTokens": 0,
+            "percentage": 0,
+            "percentageTokens": 0,
+            "newDuplicatedLines": 0,
+            "newClones": 0
+          }
+        },
+        "total": {
+          "lines": 7710,
+          "tokens": 71463,
+          "sources": 33,
+          "clones": 26,
+          "duplicatedLines": 389,
+          "duplicatedTokens": 3217,
+          "percentage": 5.05,
+          "percentageTokens": 4.5,
+          "newDuplicatedLines": 0,
+          "newClones": 0
+        }
+      }
+    },
+    "total": {
+      "lines": 12762,
+      "tokens": 123159,
+      "sources": 89,
+      "clones": 43,
+      "duplicatedLines": 619,
+      "duplicatedTokens": 5707,
+      "percentage": 4.85,
+      "percentageTokens": 4.63,
+      "newDuplicatedLines": 0,
+      "newClones": 0
+    }
+  },
+  "duplicates": [
+    {
+      "format": "typescript",
+      "lines": 11,
+      "fragment": ";\n        }\n        set((state) => {\n          if (!state.currentShift || state.currentShift.id !== shift.id) return state;\n          return {\n            ...state,\n            currentShift: applySummaryToShift(state.currentShift, res.summary),\n            lastSyncError: null,\n          };\n        });\n        return",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/store/shiftStore.ts",
+        "start": 313,
+        "end": 323,
+        "startLoc": {
+          "line": 313,
+          "column": 47,
+          "position": 3435
+        },
+        "endLoc": {
+          "line": 323,
+          "column": 15,
+          "position": 3524
+        }
+      },
+      "secondFile": {
+        "name": "src/store/shiftStore.ts",
+        "start": 293,
+        "end": 303,
+        "startLoc": {
+          "line": 293,
+          "column": 17,
+          "position": 3165
+        },
+        "endLoc": {
+          "line": 303,
+          "column": 8,
+          "position": 3254
+        }
+      }
+    },
+    {
+      "format": "typescript",
+      "lines": 14,
+      "fragment": "};\n        }\n        set((state) => {\n          if (!state.currentShift || state.currentShift.id !== shift.id) return state;\n          return {\n            ...state,\n            currentShift: applySummaryToShift(state.currentShift, res.summary),\n            lastSyncError: null,\n          };\n        });\n        return { ok: true };\n      },\n\n      isShiftOpen",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/store/shiftStore.ts",
+        "start": 353,
+        "end": 366,
+        "startLoc": {
+          "line": 353,
+          "column": 66,
+          "position": 3803
+        },
+        "endLoc": {
+          "line": 366,
+          "column": 18,
+          "position": 3911
+        }
+      },
+      "secondFile": {
+        "name": "src/store/shiftStore.ts",
+        "start": 313,
+        "end": 326,
+        "startLoc": {
+          "line": 313,
+          "column": 46,
+          "position": 3434
+        },
+        "endLoc": {
+          "line": 326,
+          "column": 25,
+          "position": 3542
+        }
+      }
+    },
+    {
+      "format": "typescript",
+      "lines": 25,
+      "fragment": "const shift: Shift = {\n            id: data.id,\n            cashier: 'Кассир',\n            openedAt: new Date(data.opened_at),\n            startingCash: Number(data.starting_cash),\n            totalOrders: data.total_orders || 0,\n            totalRevenue: Number(data.total_revenue) || 0,\n            cashPayments: 0,\n            cashTotal: Number(data.cash_total) || 0,\n            cardPayments: 0,\n            cardTotal: Number(data.card_total) || 0,\n            otherPayments: 0,\n            otherTotal: Number(data.other_total) || 0,\n            expectedCash: data.expected_cash_at_close != null\n              ? Number(data.expected_cash_at_close)\n              : Number(data.starting_cash) + (Number(data.cash_total) || 0),\n            cashDifference: data.cash_difference_at_close != null\n              ? Number(data.cash_difference_at_close)\n              : undefined,\n            cashCollectionsTotal: Number(data.cash_collections_total) || 0,\n          };\n\n          set({ currentShift: shift, lastSyncError: null, isSyncing: false });\n          void get().refreshShiftCashSummary();\n          return true",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/store/shiftStore.ts",
+        "start": 381,
+        "end": 405,
+        "startLoc": {
+          "line": 381,
+          "column": 11,
+          "position": 4052
+        },
+        "endLoc": {
+          "line": 405,
+          "column": 22,
+          "position": 4341
+        }
+      },
+      "secondFile": {
+        "name": "src/store/shiftStore.ts",
+        "start": 135,
+        "end": 158,
+        "startLoc": {
+          "line": 135,
+          "column": 15,
+          "position": 1506
+        },
+        "endLoc": {
+          "line": 158,
+          "column": 22,
+          "position": 1793
+        }
+      }
+    },
+    {
+      "format": "typescript",
+      "lines": 10,
+      "fragment": "supabase\n          .from('shifts')\n          .update({\n            total_orders: shift.totalOrders,\n            total_revenue: shift.totalRevenue,\n            cash_total: shift.cashTotal,\n            card_total: shift.cardTotal,\n            other_total: shift.otherTotal,\n          })\n          .eq('id', shift.id);",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/store/shiftStore.ts",
+        "start": 417,
+        "end": 426,
+        "startLoc": {
+          "line": 417,
+          "column": 33,
+          "position": 4494
+        },
+        "endLoc": {
+          "line": 426,
+          "column": 31,
+          "position": 4569
+        }
+      },
+      "secondFile": {
+        "name": "src/store/shiftStore.ts",
+        "start": 263,
+        "end": 273,
+        "startLoc": {
+          "line": 263,
+          "column": 9,
+          "position": 2848
+        },
+        "endLoc": {
+          "line": 273,
+          "column": 12,
+          "position": 2925
+        }
+      }
+    },
+    {
+      "format": "typescript",
+      "lines": 11,
+      "fragment": ";\n\nconst generateId = () => {\n  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {\n    const r = (Math.random() * 16) | 0;\n    const v = c === 'x' ? r : (r & 0x3) | 0x8;\n    return v.toString(16);\n  });\n};\n\nconst",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/store/orderStore.ts",
+        "start": 7,
+        "end": 17,
+        "startLoc": {
+          "line": 7,
+          "column": 41,
+          "position": 101
+        },
+        "endLoc": {
+          "line": 17,
+          "column": 6,
+          "position": 211
+        }
+      },
+      "secondFile": {
+        "name": "src/store/shiftStore.ts",
+        "start": 14,
+        "end": 24,
+        "startLoc": {
+          "line": 14,
+          "column": 59,
+          "position": 128
+        },
+        "endLoc": {
+          "line": 24,
+          "column": 10,
+          "position": 238
+        }
+      }
+    },
+    {
+      "format": "typescript",
+      "lines": 18,
+      "fragment": "{\n  const waiterId = useShiftStore.getState().currentUser?.id || null;\n  const { error } = await supabase.from('orders').update({\n    status: order.status,\n    guest_count: order.guestCount,\n    table_id: order.tableId || null,\n    table_number: order.tableNumber || null,\n    zone_name: order.zone,\n    total_amount: order.totalAmount,\n    is_quick_check: order.isQuickCheck || false,\n    comment: order.comment || null,\n    waiter_id: waiterId,\n    closed_at:\n      order.status === 'paid' || order.status === 'cancelled'\n        ? (order.closedAt ?? new Date().toISOString())\n        : null,\n  }).eq('id', order.id);\n  if (error) throw",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/store/orderStore.ts",
+        "start": 85,
+        "end": 102,
+        "startLoc": {
+          "line": 85,
+          "column": 54,
+          "position": 1112
+        },
+        "endLoc": {
+          "line": 102,
+          "column": 19,
+          "position": 1329
+        }
+      },
+      "secondFile": {
+        "name": "src/store/orderStore.ts",
+        "start": 62,
+        "end": 79,
+        "startLoc": {
+          "line": 62,
+          "column": 7,
+          "position": 813
+        },
+        "endLoc": {
+          "line": 79,
+          "column": 22,
+          "position": 1030
+        }
+      }
+    },
+    {
+      "format": "typescript",
+      "lines": 11,
+      "fragment": "const id = generateId();\n    const currentUser = useShiftStore.getState().currentUser;\n\n    const newOrder: Order = {\n      id,\n      number: getNextOrderNumber(state.orders),\n      status: 'active',\n      source: 'pos',\n      waiter: currentUser?.name || 'Иванов',\n      openedAt: now(),\n      zone:",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/store/orderStore.ts",
+        "start": 429,
+        "end": 439,
+        "startLoc": {
+          "line": 429,
+          "column": 5,
+          "position": 4804
+        },
+        "endLoc": {
+          "line": 439,
+          "column": 12,
+          "position": 4899
+        }
+      },
+      "secondFile": {
+        "name": "src/store/orderStore.ts",
+        "start": 393,
+        "end": 403,
+        "startLoc": {
+          "line": 393,
+          "column": 5,
+          "position": 4553
+        },
+        "endLoc": {
+          "line": 403,
+          "column": 12,
+          "position": 4648
+        }
+      }
+    },
+    {
+      "format": "typescript",
+      "lines": 13,
+      "fragment": "=>\n      o.id === state.currentOrderId\n        ? {\n            ...o,\n            items: state.items,\n            totalAmount: total,\n            tableNumber: state.tableNumber,\n            tableId: state.tableId,\n            isQuickCheck: state.isQuickCheck,\n            status:\n              o.status === 'paid' || o.status === 'cancelled'\n                ? o.status\n                : total",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/store/orderStore.ts",
+        "start": 504,
+        "end": 516,
+        "startLoc": {
+          "line": 504,
+          "column": 48,
+          "position": 5438
+        },
+        "endLoc": {
+          "line": 516,
+          "column": 24,
+          "position": 5537
+        }
+      },
+      "secondFile": {
+        "name": "src/store/orderStore.ts",
+        "start": 303,
+        "end": 312,
+        "startLoc": {
+          "line": 303,
+          "column": 38,
+          "position": 3570
+        },
+        "endLoc": {
+          "line": 312,
+          "column": 81,
+          "position": 3666
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 11,
+      "fragment": "(res.error));\n        return;\n      }\n\n      await fetchOpenShift();\n      await refreshShiftCashSummary();\n      await useOrderStore.getState().fetchOrders();\n      await reloadActiveRefunds(currentShift.id);\n    } catch (e) {\n      const msg = e instanceof Error ? e.message : 'unknown_error';\n      logger.error('paidCheck.cancelRefund'",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/screens/PaidCheckScreen.tsx",
+        "start": 260,
+        "end": 270,
+        "startLoc": {
+          "line": 260,
+          "column": 70,
+          "position": 2688
+        },
+        "endLoc": {
+          "line": 270,
+          "column": 44,
+          "position": 2785
+        }
+      },
+      "secondFile": {
+        "name": "src/screens/PaidCheckScreen.tsx",
+        "start": 222,
+        "end": 232,
+        "startLoc": {
+          "line": 222,
+          "column": 58,
+          "position": 2326
+        },
+        "endLoc": {
+          "line": 232,
+          "column": 38,
+          "position": 2423
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 11,
+      "fragment": "},\n  backBtn: {\n    height: 44,\n    paddingHorizontal: 16,\n    backgroundColor: theme.colors.surfaceLight,\n    justifyContent: 'center',\n    alignItems: 'center',\n    borderRadius: theme.borderRadius,\n  },\n  backText: { color: theme.colors.textPrimary, fontSize: 17, fontWeight: '600' },\n  headerTitle",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/screens/PaidCheckScreen.tsx",
+        "start": 584,
+        "end": 594,
+        "startLoc": {
+          "line": 584,
+          "column": 28,
+          "position": 5908
+        },
+        "endLoc": {
+          "line": 594,
+          "column": 14,
+          "position": 6000
+        }
+      },
+      "secondFile": {
+        "name": "src/screens/TablePickerScreen.tsx",
+        "start": 138,
+        "end": 149,
+        "startLoc": {
+          "line": 138,
+          "column": 3,
+          "position": 1455
+        },
+        "endLoc": {
+          "line": 149,
+          "column": 15,
+          "position": 1548
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 20,
+      "fragment": ">\n        </View>\n      </View>\n    </SafeAreaView>\n  );\n};\n\nconst styles = StyleSheet.create({\n  safeArea: {\n    flex: 1,\n    backgroundColor: theme.colors.background,\n  },\n  container: {\n    flex: 1,\n    justifyContent: 'center',\n    alignItems: 'center',\n  },\n  content: {\n    alignItems: 'center',\n  }",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/screens/LockScreen.tsx",
+        "start": 185,
+        "end": 204,
+        "startLoc": {
+          "line": 185,
+          "column": 17,
+          "position": 1719
+        },
+        "endLoc": {
+          "line": 204,
+          "column": 4,
+          "position": 1829
+        }
+      },
+      "secondFile": {
+        "name": "src/screens/OpenShiftScreen.tsx",
+        "start": 129,
+        "end": 148,
+        "startLoc": {
+          "line": 129,
+          "column": 29,
+          "position": 1151
+        },
+        "endLoc": {
+          "line": 148,
+          "column": 10,
+          "position": 1261
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 15,
+      "fragment": "<View style={styles.container}>\n      <View style={styles.leftSection}>\n        <TouchableOpacity style={styles.backButton} onPress={onBack}>\n          <Text style={styles.backText}>Назад</Text>\n        </TouchableOpacity>\n\n        {!isTakeaway && (\n          <TouchableOpacity style={styles.metaBtn} onPress={onTablePress} activeOpacity={0.7}>\n            <Text style={styles.metaBtnText} numberOfLines={1}>\n              {tableNumber ? `Стол ${tableNumber}` : 'Назначить стол'}\n            </Text>\n          </TouchableOpacity>\n        )}\n\n        {",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/components/PosHeader.tsx",
+        "start": 80,
+        "end": 94,
+        "startLoc": {
+          "line": 80,
+          "column": 5,
+          "position": 836
+        },
+        "endLoc": {
+          "line": 94,
+          "column": 10,
+          "position": 989
+        }
+      },
+      "secondFile": {
+        "name": "src/components/PosHeader.tsx",
+        "start": 39,
+        "end": 52,
+        "startLoc": {
+          "line": 39,
+          "column": 7,
+          "position": 474
+        },
+        "endLoc": {
+          "line": 52,
+          "column": 11,
+          "position": 626
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 15,
+      "fragment": "{currentUser && (\n          <View style={styles.userChip}>\n            <View style={[styles.onlineDot, { backgroundColor: '#4CAF50' }]} />\n            <Text style={styles.userChipText} numberOfLines={1}>{currentUser.name}</Text>\n          </View>\n        )}\n\n        <TouchableOpacity style={styles.iconButton}>\n          <NotificationIcon size={22} color={theme.colors.textPrimary} />\n        </TouchableOpacity>\n\n        <TouchableOpacity style={styles.iconButton} onPress={onSearchOpen}>\n          <SearchIcon size={22} color={theme.colors.textPrimary} />\n        </TouchableOpacity>\n      </",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/components/PosHeader.tsx",
+        "start": 121,
+        "end": 135,
+        "startLoc": {
+          "line": 121,
+          "column": 9,
+          "position": 1296
+        },
+        "endLoc": {
+          "line": 135,
+          "column": 9,
+          "position": 1466
+        }
+      },
+      "secondFile": {
+        "name": "src/screens/OrdersScreen.tsx",
+        "start": 328,
+        "end": 342,
+        "startLoc": {
+          "line": 328,
+          "column": 15,
+          "position": 3965
+        },
+        "endLoc": {
+          "line": 342,
+          "column": 14,
+          "position": 4159
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 8,
+      "fragment": "[][] = [];\n  for (let r = 0; r < ROWS; r++) {\n    rows.push(cells.slice(r * COLS, r * COLS + COLS));\n  }\n\n  return (\n    <View style={styles.container}>\n      <",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/components/ItemActionsMenu.tsx",
+        "start": 36,
+        "end": 43,
+        "startLoc": {
+          "line": 36,
+          "column": 26,
+          "position": 427
+        },
+        "endLoc": {
+          "line": 43,
+          "column": 8,
+          "position": 516
+        }
+      },
+      "secondFile": {
+        "name": "src/components/ProductGrid.tsx",
+        "start": 36,
+        "end": 43,
+        "startLoc": {
+          "line": 36,
+          "column": 19,
+          "position": 501
+        },
+        "endLoc": {
+          "line": 43,
+          "column": 8,
+          "position": 590
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 10,
+      "fragment": ",\n    marginBottom: GAP,\n  },\n  headerText: { color: theme.colors.textPrimary, fontSize: 18, fontWeight: '600' },\n\n  grid: { flex: 1 },\n  row: { flex: 1, flexDirection: 'row' },\n  cellWrap: { flex: 1 },\n\n  actionBtn",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/components/ItemActionsMenu.tsx",
+        "start": 101,
+        "end": 110,
+        "startLoc": {
+          "line": 101,
+          "column": 47,
+          "position": 1112
+        },
+        "endLoc": {
+          "line": 110,
+          "column": 12,
+          "position": 1206
+        }
+      },
+      "secondFile": {
+        "name": "src/components/ProductGrid.tsx",
+        "start": 85,
+        "end": 94,
+        "startLoc": {
+          "line": 85,
+          "column": 42,
+          "position": 1079
+        },
+        "endLoc": {
+          "line": 94,
+          "column": 13,
+          "position": 1173
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 6,
+      "fragment": ": React.FC<IconProps> = ({ size = 24, color = '#fff' }) => (\n  <Svg width={size} height={size} viewBox=\"0 0 150 150\" fill=\"none\">\n    <Path\n      fillRule=\"evenodd\"\n      clipRule=\"evenodd\"\n      d=\"M91.8827 118.716L70.9865 128.767L58.7896 110.674C58.7896 110.674 38.1386 120.269 27 107.906C27 107.906 43.7789 100.909 47.2767 86.7711C54.4141 57.9729 69.3215 43.5999 91.4052 49.2003C113.489 54.8007 119.026 74.7088 111.85 103.664C108.352 117.776 119 130.465 119 130.465C99.6397 136.287 91.8827 118.716 91.8827 118.716ZM91.2116 41.8767L93.7929 18L111.191 21.7858L99.5752 44.5137L91.2116 41.8767Z",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/components/Icons.tsx",
+        "start": 20,
+        "end": 25,
+        "startLoc": {
+          "line": 20,
+          "column": 30,
+          "position": 163
+        },
+        "endLoc": {
+          "line": 25,
+          "column": 404,
+          "position": 245
+        }
+      },
+      "secondFile": {
+        "name": "src/components/Icons.tsx",
+        "start": 9,
+        "end": 14,
+        "startLoc": {
+          "line": 9,
+          "column": 22,
+          "position": 56
+        },
+        "endLoc": {
+          "line": 14,
+          "column": 656,
+          "position": 138
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 6,
+      "fragment": ": React.FC<IconProps> = ({ size = 24, color = '#fff' }) => (\n  <Svg width={size} height={size} viewBox=\"0 0 150 150\" fill=\"none\">\n    <Path\n      fillRule=\"evenodd\"\n      clipRule=\"evenodd\"\n      d=\"M90.8032 118.231L83.0512 101.995L102.799 93.5934L111.117 109.386C116.515 122.227 95.6015 129.936 90.8032 118.231ZM61.3005 29.1503C104.632 11.0754 132.313 75.9045 89.9884 93.5593C43.6577 112.895 17.7876 47.3047 61.3005 29.1503ZM64.8652 37.6655C32.737 51.0741 51.8057 99.4973 86.0502 85.2144C117.307 72.1691 96.8803 24.3023 64.8652 37.6655Z",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/components/Icons.tsx",
+        "start": 40,
+        "end": 45,
+        "startLoc": {
+          "line": 40,
+          "column": 24,
+          "position": 368
+        },
+        "endLoc": {
+          "line": 45,
+          "column": 348,
+          "position": 450
+        }
+      },
+      "secondFile": {
+        "name": "src/components/Icons.tsx",
+        "start": 9,
+        "end": 14,
+        "startLoc": {
+          "line": 9,
+          "column": 22,
+          "position": 56
+        },
+        "endLoc": {
+          "line": 14,
+          "column": 656,
+          "position": 138
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 21,
+      "fragment": ")\n            }\n          </View>\n        ))}\n      </View>\n    </View>\n  );\n};\n\nconst styles = StyleSheet.create({\n  container: { flex: 1 },\n  header: {\n    height: 44,\n    justifyContent: 'center',\n    alignItems: 'center',\n    backgroundColor: theme.colors.surfaceLight,\n    marginBottom: GAP,\n  },\n  headerText: {\n    color: theme.colors.textPrimary,\n    fontSize: 15",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/components/DishCommentPanel.tsx",
+        "start": 110,
+        "end": 130,
+        "startLoc": {
+          "line": 110,
+          "column": 16,
+          "position": 1154
+        },
+        "endLoc": {
+          "line": 130,
+          "column": 17,
+          "position": 1283
+        }
+      },
+      "secondFile": {
+        "name": "src/components/ItemActionsMenu.tsx",
+        "start": 87,
+        "end": 104,
+        "startLoc": {
+          "line": 87,
+          "column": 14,
+          "position": 1019
+        },
+        "endLoc": {
+          "line": 104,
+          "column": 62,
+          "position": 1144
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 16,
+      "fragment": "</View>\n        </View>\n      </View>\n    </Modal>\n  );\n};\n\nconst styles = StyleSheet.create({\n  overlay: {\n    flex: 1,\n    backgroundColor: 'rgba(0,0,0,0.6)',\n    justifyContent: 'center',\n    alignItems: 'center',\n  },\n  modal: {\n    width: '60%'",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/components/DeadLetterModal.tsx",
+        "start": 156,
+        "end": 171,
+        "startLoc": {
+          "line": 156,
+          "column": 11,
+          "position": 1704
+        },
+        "endLoc": {
+          "line": 171,
+          "column": 17,
+          "position": 1791
+        }
+      },
+      "secondFile": {
+        "name": "src/components/WaiterPickerModal.tsx",
+        "start": 51,
+        "end": 66,
+        "startLoc": {
+          "line": 51,
+          "column": 11,
+          "position": 578
+        },
+        "endLoc": {
+          "line": 66,
+          "column": 17,
+          "position": 665
+        }
+      }
+    },
+    {
+      "format": "javascript",
+      "lines": 13,
+      "fragment": "={visible} transparent animationType=\"fade\">\n      <View style={styles.overlay}>\n        <View style={styles.modal}>\n          <View style={styles.header}>\n            <Text style={styles.title}>Комментарий</Text>\n            <TouchableOpacity onPress={onClose}>\n              <Feather name=\"x\" size={22} color={theme.colors.textSecondary} />\n            </TouchableOpacity>\n          </View>\n\n          <View style={styles.body}>\n            <TextInput\n              style={styles",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/components/CommentModal.tsx",
+        "start": 32,
+        "end": 44,
+        "startLoc": {
+          "line": 32,
+          "column": 19,
+          "position": 350
+        },
+        "endLoc": {
+          "line": 44,
+          "column": 28,
+          "position": 490
+        }
+      },
+      "secondFile": {
+        "name": "src/components/WaiterPickerModal.tsx",
+        "start": 28,
+        "end": 41,
+        "startLoc": {
+          "line": 28,
+          "column": 19,
+          "position": 327
+        },
+        "endLoc": {
+          "line": 41,
+          "column": 23,
+          "position": 481
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 12,
+      "fragment": "} : o\n      ),\n    }));\n    onClose();\n  };\n\n  return (\n    <Modal visible={visible} transparent animationType=\"fade\">\n      <View style={styles.overlay}>\n        <View style={styles.modal}>\n          <View style={styles.header}>\n            <Text style={styles.title}>Комментарий",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/components/CommentModal.tsx",
+        "start": 25,
+        "end": 36,
+        "startLoc": {
+          "line": 25,
+          "column": 57,
+          "position": 313
+        },
+        "endLoc": {
+          "line": 36,
+          "column": 51,
+          "position": 415
+        }
+      },
+      "secondFile": {
+        "name": "src/components/WaiterPickerModal.tsx",
+        "start": 21,
+        "end": 32,
+        "startLoc": {
+          "line": 21,
+          "column": 56,
+          "position": 290
+        },
+        "endLoc": {
+          "line": 32,
+          "column": 48,
+          "position": 392
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 21,
+      "fragment": ",\n    backgroundColor: theme.colors.surface,\n    borderRadius: 12,\n    overflow: 'hidden',\n  },\n  header: {\n    flexDirection: 'row',\n    justifyContent: 'space-between',\n    alignItems: 'center',\n    paddingHorizontal: 20,\n    paddingVertical: 16,\n  },\n  title: {\n    fontSize: 18,\n    fontWeight: '600',\n    color: theme.colors.textPrimary,\n  },\n  body: {\n    padding: 20,\n    paddingTop: 0,\n  }",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/components/CommentModal.tsx",
+        "start": 74,
+        "end": 94,
+        "startLoc": {
+          "line": 74,
+          "column": 18,
+          "position": 687
+        },
+        "endLoc": {
+          "line": 94,
+          "column": 4,
+          "position": 819
+        }
+      },
+      "secondFile": {
+        "name": "src/components/WaiterPickerModal.tsx",
+        "start": 68,
+        "end": 88,
+        "startLoc": {
+          "line": 68,
+          "column": 18,
+          "position": 680
+        },
+        "endLoc": {
+          "line": 88,
+          "column": 8,
+          "position": 812
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 11,
+      "fragment": "// Build rows\n  const rows: Cell[][] = [];\n  for (let r = 0; r < ROWS; r++) {\n    rows.push(cells.slice(r * COLS, r * COLS + COLS));\n  }\n\n  return (\n    <View style={styles.container}>\n      {/* Header */}\n      <View style={styles.header}>\n        <Text style={styles.headerText}>Меню",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/components/CategoryMenu.tsx",
+        "start": 32,
+        "end": 42,
+        "startLoc": {
+          "line": 32,
+          "column": 3,
+          "position": 384
+        },
+        "endLoc": {
+          "line": 42,
+          "column": 45,
+          "position": 511
+        }
+      },
+      "secondFile": {
+        "name": "src/components/ProductGrid.tsx",
+        "start": 35,
+        "end": 45,
+        "startLoc": {
+          "line": 35,
+          "column": 3,
+          "position": 492
+        },
+        "endLoc": {
+          "line": 45,
+          "column": 42,
+          "position": 619
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 10,
+      "fragment": "</Text>\n      </View>\n\n      {/* Grid */}\n      <View style={styles.grid}>\n        {rows.map((row, ri) => (\n          <View key={ri} style={[styles.row, ri < rows.length - 1 && { marginBottom: GAP }]}>\n            {row.map((cell, ci) => (\n              <View key={ci} style={[styles.cellWrap, ci < COLS - 1 && { marginRight: GAP }]}>\n                {cell.kind === 'category'",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/components/CategoryMenu.tsx",
+        "start": 42,
+        "end": 51,
+        "startLoc": {
+          "line": 42,
+          "column": 45,
+          "position": 512
+        },
+        "endLoc": {
+          "line": 51,
+          "column": 42,
+          "position": 662
+        }
+      },
+      "secondFile": {
+        "name": "src/components/ProductGrid.tsx",
+        "start": 45,
+        "end": 54,
+        "startLoc": {
+          "line": 45,
+          "column": 55,
+          "position": 622
+        },
+        "endLoc": {
+          "line": 54,
+          "column": 41,
+          "position": 772
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 14,
+      "fragment": "</TouchableOpacity>\n                )}\n                {cell.kind === 'empty' && <View style={styles.emptyCell} />}\n              </View>\n            ))}\n          </View>\n        ))}\n      </View>\n    </View>\n  );\n};\n\nconst styles = StyleSheet.create({\n  container: { flex: 1 }",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/components/CategoryMenu.tsx",
+        "start": 69,
+        "end": 82,
+        "startLoc": {
+          "line": 69,
+          "column": 19,
+          "position": 765
+        },
+        "endLoc": {
+          "line": 82,
+          "column": 25,
+          "position": 860
+        }
+      },
+      "secondFile": {
+        "name": "src/components/ProductGrid.tsx",
+        "start": 67,
+        "end": 80,
+        "startLoc": {
+          "line": 67,
+          "column": 19,
+          "position": 939
+        },
+        "endLoc": {
+          "line": 80,
+          "column": 24,
+          "position": 1033
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 25,
+      "fragment": "</View>\n            ))}\n          </View>\n        ))}\n      </View>\n    </View>\n  );\n};\n\nconst styles = StyleSheet.create({\n  container: { flex: 1 },\n  header: {\n    height: 44,\n    justifyContent: 'center',\n    alignItems: 'center',\n    backgroundColor: theme.colors.surfaceLight,\n    marginBottom: GAP,\n  },\n  headerText: { color: theme.colors.textPrimary, fontSize: 18, fontWeight: '600' },\n\n  grid: { flex: 1 },\n  row: { flex: 1, flexDirection: 'row' },\n  cellWrap: { flex: 1 },\n\n  categoryBtn",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/components/CategoryMenu.tsx",
+        "start": 72,
+        "end": 96,
+        "startLoc": {
+          "line": 72,
+          "column": 15,
+          "position": 800
+        },
+        "endLoc": {
+          "line": 96,
+          "column": 14,
+          "position": 993
+        }
+      },
+      "secondFile": {
+        "name": "src/components/DishCommentPanel.tsx",
+        "start": 109,
+        "end": 94,
+        "startLoc": {
+          "line": 109,
+          "column": 17,
+          "position": 1148
+        },
+        "endLoc": {
+          "line": 94,
+          "column": 13,
+          "position": 1173
+        }
+      }
+    },
+    {
+      "format": "javascript",
+      "lines": 11,
+      "fragment": "}>\n      <View style={styles.overlay}>\n        <View style={styles.modal}>\n          <View style={styles.header}>\n            <Text style={styles.title}>{cfg.title}</Text>\n            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>\n              <Feather name=\"x\" size={22} color={theme.colors.textSecondary} />\n            </TouchableOpacity>\n          </View>\n\n          <View style={styles.body",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/components/CashTransactionModal.tsx",
+        "start": 61,
+        "end": 71,
+        "startLoc": {
+          "line": 61,
+          "column": 86,
+          "position": 559
+        },
+        "endLoc": {
+          "line": 71,
+          "column": 35,
+          "position": 689
+        }
+      },
+      "secondFile": {
+        "name": "src/components/SalesReportModal.tsx",
+        "start": 83,
+        "end": 95,
+        "startLoc": {
+          "line": 83,
+          "column": 28,
+          "position": 918
+        },
+        "endLoc": {
+          "line": 95,
+          "column": 38,
+          "position": 1066
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 18,
+      "fragment": "</Text>\n            </TouchableOpacity>\n          </View>\n        </View>\n      </View>\n    </Modal>\n  );\n};\n\nconst styles = StyleSheet.create({\n  overlay: {\n    flex: 1,\n    backgroundColor: 'rgba(0,0,0,0.6)',\n    justifyContent: 'center',\n    alignItems: 'center',\n  },\n  modal: {\n    width: '34%'",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/components/CashTransactionModal.tsx",
+        "start": 103,
+        "end": 120,
+        "startLoc": {
+          "line": 103,
+          "column": 57,
+          "position": 985
+        },
+        "endLoc": {
+          "line": 120,
+          "column": 17,
+          "position": 1082
+        }
+      },
+      "secondFile": {
+        "name": "src/components/DeadLetterModal.tsx",
+        "start": 154,
+        "end": 66,
+        "startLoc": {
+          "line": 154,
+          "column": 55,
+          "position": 1694
+        },
+        "endLoc": {
+          "line": 66,
+          "column": 17,
+          "position": 665
+        }
+      }
+    },
+    {
+      "format": "javascript",
+      "lines": 13,
+      "fragment": "={visible} transparent animationType=\"fade\" onRequestClose={onClose}>\n      <View style={styles.overlay}>\n        <View style={styles.modal}>\n          <View style={styles.header}>\n            <Text style={styles.title}>Касса</Text>\n            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>\n              <Feather name=\"x\" size={22} color={theme.colors.textSecondary} />\n            </TouchableOpacity>\n          </View>\n\n          <View style={styles.body}>\n            {!currentShift ? (\n              <Text style={styles.empty",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/components/CashModal.tsx",
+        "start": 58,
+        "end": 70,
+        "startLoc": {
+          "line": 58,
+          "column": 19,
+          "position": 510
+        },
+        "endLoc": {
+          "line": 70,
+          "column": 40,
+          "position": 675
+        }
+      },
+      "secondFile": {
+        "name": "src/components/CashTransactionModal.tsx",
+        "start": 61,
+        "end": 72,
+        "startLoc": {
+          "line": 61,
+          "column": 19,
+          "position": 542
+        },
+        "endLoc": {
+          "line": 72,
+          "column": 38,
+          "position": 702
+        }
+      }
+    },
+    {
+      "format": "javascript",
+      "lines": 21,
+      "fragment": "}>{formatAmount(currentShift.startingCash)}</Text>\n                </View>\n                <View style={styles.infoRow}>\n                  <Text style={styles.label}>Поступления наличными</Text>\n                  <Text style={styles.value}>{formatAmount(currentShift.cashTotal)}</Text>\n                </View>\n                <View style={styles.infoRow}>\n                  <Text style={styles.label}>Внесения</Text>\n                  <Text style={styles.value}>{formatAmount(currentShift.cashFloatIn ?? 0)}</Text>\n                </View>\n                <View style={styles.infoRow}>\n                  <Text style={styles.label}>Изъятия</Text>\n                  <Text style={styles.value}>{formatAmount(currentShift.cashFloatOut ?? 0)}</Text>\n                </View>\n                <View style={styles.infoRow}>\n                  <Text style={styles.label}>Инкассация</Text>\n                  <Text style={styles.value}>{formatAmount(currentShift.cashCollectionsTotal ?? 0)}</Text>\n                </View>\n\n                {refreshing ? (\n                  <Text style={styles.refreshing",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/components/CashModal.tsx",
+        "start": 82,
+        "end": 102,
+        "startLoc": {
+          "line": 82,
+          "column": 44,
+          "position": 821
+        },
+        "endLoc": {
+          "line": 102,
+          "column": 49,
+          "position": 1111
+        }
+      },
+      "secondFile": {
+        "name": "src/components/CashModal.tsx",
+        "start": 78,
+        "end": 92,
+        "startLoc": {
+          "line": 78,
+          "column": 44,
+          "position": 772
+        },
+        "endLoc": {
+          "line": 92,
+          "column": 44,
+          "position": 974
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 16,
+      "fragment": "</View>\n      </View>\n    </Modal>\n  );\n};\n\nconst styles = StyleSheet.create({\n  overlay: {\n    flex: 1,\n    backgroundColor: 'rgba(0,0,0,0.6)',\n    justifyContent: 'center',\n    alignItems: 'center',\n  },\n  modal: {\n    width: '40%',\n    maxWidth: 520",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/components/CashModal.tsx",
+        "start": 140,
+        "end": 155,
+        "startLoc": {
+          "line": 140,
+          "column": 9,
+          "position": 1480
+        },
+        "endLoc": {
+          "line": 155,
+          "column": 18,
+          "position": 1569
+        }
+      },
+      "secondFile": {
+        "name": "src/components/SalesReportModal.tsx",
+        "start": 158,
+        "end": 173,
+        "startLoc": {
+          "line": 158,
+          "column": 9,
+          "position": 1756
+        },
+        "endLoc": {
+          "line": 173,
+          "column": 18,
+          "position": 1845
+        }
+      }
+    },
+    {
+      "format": "javascript",
+      "lines": 22,
+      "fragment": "={visible} transparent animationType=\"fade\">\n      <View style={styles.overlay}>\n        <View style={styles.modal}>\n          <View style={styles.header}>\n            <Text style={styles.title}>Инкассация</Text>\n            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>\n              <Feather name=\"x\" size={22} color={theme.colors.textSecondary} />\n            </TouchableOpacity>\n          </View>\n\n          <View style={styles.body}>\n            <Text style={styles.label}>Сумма</Text>\n            <TextInput\n              style={styles.input}\n              value={amountInput}\n              onChangeText={setAmountInput}\n              placeholder=\"0\"\n              placeholderTextColor={theme.colors.textSecondary}\n              keyboardType=\"decimal-pad\"\n            />\n\n            <Text style={styles.label",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/components/CashCollectionModal.tsx",
+        "start": 41,
+        "end": 62,
+        "startLoc": {
+          "line": 41,
+          "column": 19,
+          "position": 400
+        },
+        "endLoc": {
+          "line": 62,
+          "column": 38,
+          "position": 616
+        }
+      },
+      "secondFile": {
+        "name": "src/components/SalesReportModal.tsx",
+        "start": 83,
+        "end": 82,
+        "startLoc": {
+          "line": 83,
+          "column": 19,
+          "position": 915
+        },
+        "endLoc": {
+          "line": 82,
+          "column": 49,
+          "position": 776
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 16,
+      "fragment": "import React, { useEffect, useState } from 'react';\nimport {\n  Alert,\n  Modal,\n  StyleSheet,\n  Text,\n  TextInput,\n  TouchableOpacity,\n  View,\n} from 'react-native';\nimport { Feather } from '@expo/vector-icons';\nimport { theme } from '../theme/colors';\n\ninterface Props {\n  visible: boolean;\n  onClose",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/components/CashCollectionModal.tsx",
+        "start": 1,
+        "end": 16,
+        "startLoc": {
+          "line": 1,
+          "column": 1,
+          "position": 0
+        },
+        "endLoc": {
+          "line": 16,
+          "column": 10,
+          "position": 99
+        }
+      },
+      "secondFile": {
+        "name": "src/components/CashTransactionModal.tsx",
+        "start": 1,
+        "end": 16,
+        "startLoc": {
+          "line": 1,
+          "column": 1,
+          "position": 0
+        },
+        "endLoc": {
+          "line": 16,
+          "column": 7,
+          "position": 99
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 11,
+      "fragment": ", onClose, onConfirm }) => {\n  const [amountInput, setAmountInput] = useState('');\n  const [note, setNote] = useState('');\n\n  useEffect(() => {\n    if (!visible) return;\n    setAmountInput('');\n    setNote('');\n  }, [visible]);\n\n  const handleConfirm",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/components/CashCollectionModal.tsx",
+        "start": 20,
+        "end": 30,
+        "startLoc": {
+          "line": 20,
+          "column": 63,
+          "position": 163
+        },
+        "endLoc": {
+          "line": 30,
+          "column": 22,
+          "position": 263
+        }
+      },
+      "secondFile": {
+        "name": "src/components/CashTransactionModal.tsx",
+        "start": 38,
+        "end": 48,
+        "startLoc": {
+          "line": 38,
+          "column": 70,
+          "position": 291
+        },
+        "endLoc": {
+          "line": 48,
+          "column": 12,
+          "position": 391
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 7,
+      "fragment": ";\n\n  const handleConfirm = async () => {\n    const raw = amountInput.replace(/\\s/g, '').replace(',', '.').trim();\n    const amount = Number(raw);\n    if (!raw || Number.isNaN(amount) || amount <= 0) {\n      Alert.alert('Ошибка', 'Введите корректную сумму инкассации.'",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/components/CashCollectionModal.tsx",
+        "start": 28,
+        "end": 34,
+        "startLoc": {
+          "line": 28,
+          "column": 16,
+          "position": 257
+        },
+        "endLoc": {
+          "line": 34,
+          "column": 67,
+          "position": 354
+        }
+      },
+      "secondFile": {
+        "name": "src/components/CashTransactionModal.tsx",
+        "start": 48,
+        "end": 54,
+        "startLoc": {
+          "line": 48,
+          "column": 27,
+          "position": 399
+        },
+        "endLoc": {
+          "line": 54,
+          "column": 56,
+          "position": 496
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 16,
+      "fragment": "</Text>\n            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>\n              <Feather name=\"x\" size={22} color={theme.colors.textSecondary} />\n            </TouchableOpacity>\n          </View>\n\n          <View style={styles.body}>\n            <Text style={styles.label}>Сумма</Text>\n            <TextInput\n              style={styles.input}\n              value={amountInput}\n              onChangeText={setAmountInput}\n              placeholder=\"0\"\n              placeholderTextColor={theme.colors.textSecondary}\n              keyboardType=\"decimal-pad\"\n            ",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/components/CashCollectionModal.tsx",
+        "start": 45,
+        "end": 60,
+        "startLoc": {
+          "line": 45,
+          "column": 50,
+          "position": 466
+        },
+        "endLoc": {
+          "line": 60,
+          "column": 13,
+          "position": 603
+        }
+      },
+      "secondFile": {
+        "name": "src/components/CashTransactionModal.tsx",
+        "start": 65,
+        "end": 80,
+        "startLoc": {
+          "line": 65,
+          "column": 51,
+          "position": 618
+        },
+        "endLoc": {
+          "line": 80,
+          "column": 15,
+          "position": 755
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 53,
+      "fragment": "</Text>\n            </TouchableOpacity>\n          </View>\n        </View>\n      </View>\n    </Modal>\n  );\n};\n\nconst styles = StyleSheet.create({\n  overlay: {\n    flex: 1,\n    backgroundColor: 'rgba(0,0,0,0.6)',\n    justifyContent: 'center',\n    alignItems: 'center',\n  },\n  modal: {\n    width: '34%',\n    minWidth: 360,\n    maxWidth: 460,\n    backgroundColor: theme.colors.surface,\n    borderRadius: 12,\n    overflow: 'hidden',\n  },\n  header: {\n    flexDirection: 'row',\n    alignItems: 'center',\n    justifyContent: 'space-between',\n    paddingHorizontal: 20,\n    paddingVertical: 16,\n  },\n  title: {\n    color: theme.colors.textPrimary,\n    fontSize: 18,\n    fontWeight: '700',\n  },\n  closeBtn: {\n    width: 36,\n    height: 36,\n    justifyContent: 'center',\n    alignItems: 'center',\n  },\n  body: {\n    paddingHorizontal: 20,\n    paddingBottom: 8,\n  },\n  label: {\n    color: theme.colors.textSecondary,\n    fontSize: 13,\n    marginBottom: 6,\n    marginTop: 8,\n  },\n  input",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/components/CashCollectionModal.tsx",
+        "start": 77,
+        "end": 129,
+        "startLoc": {
+          "line": 77,
+          "column": 64,
+          "position": 784
+        },
+        "endLoc": {
+          "line": 129,
+          "column": 8,
+          "position": 1112
+        }
+      },
+      "secondFile": {
+        "name": "src/components/DeadLetterModal.tsx",
+        "start": 154,
+        "end": 155,
+        "startLoc": {
+          "line": 154,
+          "column": 55,
+          "position": 1694
+        },
+        "endLoc": {
+          "line": 155,
+          "column": 7,
+          "position": 1313
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 30,
+      "fragment": ",\n  },\n  input: {\n    height: 46,\n    borderRadius: 10,\n    backgroundColor: theme.colors.surfaceLight,\n    color: theme.colors.textPrimary,\n    paddingHorizontal: 12,\n    fontSize: 17,\n  },\n  inputNote: {\n    fontSize: 15,\n  },\n  actions: {\n    flexDirection: 'row',\n    gap: 12,\n    padding: 20,\n  },\n  cancelBtn: {\n    flex: 1,\n    height: 48,\n    backgroundColor: theme.colors.surfaceLight,\n    borderRadius: 10,\n    justifyContent: 'center',\n    alignItems: 'center',\n  },\n  confirmBtn: {\n    flex: 1.6,\n    height: 48,\n    backgroundColor",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/components/CashCollectionModal.tsx",
+        "start": 127,
+        "end": 156,
+        "startLoc": {
+          "line": 127,
+          "column": 17,
+          "position": 1105
+        },
+        "endLoc": {
+          "line": 156,
+          "column": 20,
+          "position": 1296
+        }
+      },
+      "secondFile": {
+        "name": "src/components/CashTransactionModal.tsx",
+        "start": 159,
+        "end": 188,
+        "startLoc": {
+          "line": 159,
+          "column": 20,
+          "position": 1348
+        },
+        "endLoc": {
+          "line": 188,
+          "column": 17,
+          "position": 1539
+        }
+      }
+    },
+    {
+      "format": "tsx",
+      "lines": 16,
+      "fragment": ",\n    borderRadius: 10,\n    justifyContent: 'center',\n    alignItems: 'center',\n  },\n  cancelText: {\n    color: theme.colors.textPrimary,\n    fontWeight: '600',\n    fontSize: 15,\n  },\n  confirmText: {\n    color: '#fff',\n    fontWeight: '700',\n    fontSize: 15,\n  },\n});",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/components/CashCollectionModal.tsx",
+        "start": 156,
+        "end": 171,
+        "startLoc": {
+          "line": 156,
+          "column": 31,
+          "position": 1300
+        },
+        "endLoc": {
+          "line": 171,
+          "column": 4,
+          "position": 1395
+        }
+      },
+      "secondFile": {
+        "name": "src/components/CashTransactionModal.tsx",
+        "start": 187,
+        "end": 202,
+        "startLoc": {
+          "line": 187,
+          "column": 15,
+          "position": 1536
+        },
+        "endLoc": {
+          "line": 202,
+          "column": 4,
+          "position": 1631
+        }
+      }
+    },
+    {
+      "format": "typescript",
+      "lines": 13,
+      "fragment": ",\n  });\n\n  if (error) {\n    return { ok: false, error: error.message };\n  }\n\n  const raw = data as {\n    ok?: boolean;\n    duplicate?: boolean;\n    error?: string;\n    detail?: Record<string, unknown>;\n    payment_method",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/api/inventory.ts",
+        "start": 63,
+        "end": 75,
+        "startLoc": {
+          "line": 63,
+          "column": 66,
+          "position": 543
+        },
+        "endLoc": {
+          "line": 75,
+          "column": 19,
+          "position": 637
+        }
+      },
+      "secondFile": {
+        "name": "src/api/inventory.ts",
+        "start": 28,
+        "end": 40,
+        "startLoc": {
+          "line": 28,
+          "column": 34,
+          "position": 188
+        },
+        "endLoc": {
+          "line": 40,
+          "column": 4,
+          "position": 282
+        }
+      }
+    },
+    {
+      "format": "typescript",
+      "lines": 16,
+      "fragment": "?? null,\n    p_occurred_at: payload.occurredAt ?? new Date().toISOString(),\n  });\n\n  if (error) {\n    return { ok: false, error: error.message };\n  }\n\n  const raw = data as {\n    ok?: boolean;\n    duplicate?: boolean;\n    error?: string;\n    detail?: Record<string, unknown>;\n    payment_method?: string;\n    payment_amount?: number;\n    restored_movements",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/api/inventory.ts",
+        "start": 105,
+        "end": 120,
+        "startLoc": {
+          "line": 105,
+          "column": 42,
+          "position": 903
+        },
+        "endLoc": {
+          "line": 120,
+          "column": 23,
+          "position": 1039
+        }
+      },
+      "secondFile": {
+        "name": "src/api/inventory.ts",
+        "start": 62,
+        "end": 77,
+        "startLoc": {
+          "line": 62,
+          "column": 30,
+          "position": 517
+        },
+        "endLoc": {
+          "line": 77,
+          "column": 23,
+          "position": 653
+        }
+      }
+    },
+    {
+      "format": "typescript",
+      "lines": 16,
+      "fragment": ",\n  });\n\n  if (error) {\n    return { ok: false, error: error.message };\n  }\n\n  const raw = data as {\n    ok?: boolean;\n    duplicate?: boolean;\n    error?: string;\n    detail?: Record<string, unknown>;\n  } | null;\n\n  if (raw && raw.ok === false) {\n    return { ok: false, error: raw.error ?? 'retry_dead_letter_failed'",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/api/consumption.ts",
+        "start": 49,
+        "end": 64,
+        "startLoc": {
+          "line": 49,
+          "column": 38,
+          "position": 503
+        },
+        "endLoc": {
+          "line": 64,
+          "column": 71,
+          "position": 645
+        }
+      },
+      "secondFile": {
+        "name": "src/api/inventory.ts",
+        "start": 28,
+        "end": 45,
+        "startLoc": {
+          "line": 28,
+          "column": 34,
+          "position": 188
+        },
+        "endLoc": {
+          "line": 45,
+          "column": 60,
+          "position": 332
+        }
+      }
+    },
+    {
+      "format": "typescript",
+      "lines": 9,
+      "fragment": "{\n  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {\n    const r = (Math.random() * 16) | 0;\n    const v = c === 'x' ? r : (r & 0x3) | 0x8;\n    return v.toString(16);\n  });\n}\n\nfunction",
+      "tokens": 0,
+      "firstFile": {
+        "name": "src/__tests__/payment-idempotency.test.ts",
+        "start": 10,
+        "end": 18,
+        "startLoc": {
+          "line": 10,
+          "column": 45,
+          "position": 15
+        },
+        "endLoc": {
+          "line": 18,
+          "column": 9,
+          "position": 110
+        }
+      },
+      "secondFile": {
+        "name": "src/store/shiftStore.ts",
+        "start": 16,
+        "end": 22,
+        "startLoc": {
+          "line": 16,
+          "column": 26,
+          "position": 142
+        },
+        "endLoc": {
+          "line": 22,
+          "column": 3,
+          "position": 235
+        }
+      }
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Crypto from 'expo-crypto';
 import { Shift } from '../types';
 import { supabase } from '../utils/supabase';
 import { VENUE_ID } from '../config';
@@ -13,13 +14,7 @@ import {
 import { logger } from '../utils/logger';
 import { useNotificationStore } from './notificationStore';
 
-const generateId = () => {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === 'x' ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-};
+const generateId = () => Crypto.randomUUID();
 
 interface CurrentUser {
   id: string;
@@ -73,6 +68,30 @@ const toShift = (raw: any): Shift => ({
   cardTotal: raw.cardTotal || 0,
   otherPayments: raw.otherPayments || 0,
   otherTotal: raw.otherTotal || 0,
+});
+
+const mapSupabaseShift = (row: any): Shift => ({
+  id: row.id,
+  cashier: 'Кассир',
+  openedAt: new Date(row.opened_at),
+  startingCash: Number(row.starting_cash),
+  totalOrders: row.total_orders || 0,
+  totalRevenue: Number(row.total_revenue) || 0,
+  cashPayments: 0,
+  cashTotal: Number(row.cash_total) || 0,
+  cardPayments: 0,
+  cardTotal: Number(row.card_total) || 0,
+  otherPayments: 0,
+  otherTotal: Number(row.other_total) || 0,
+  expectedCash:
+    row.expected_cash_at_close != null
+      ? Number(row.expected_cash_at_close)
+      : Number(row.starting_cash) + (Number(row.cash_total) || 0),
+  cashDifference:
+    row.cash_difference_at_close != null
+      ? Number(row.cash_difference_at_close)
+      : undefined,
+  cashCollectionsTotal: Number(row.cash_collections_total) || 0,
 });
 
 const applySummaryToShift = (shift: Shift, summary?: any): Shift => {
@@ -132,28 +151,7 @@ export const useShiftStore = create<ShiftStoreState>()(
             }
 
             if (data) {
-              const shift: Shift = {
-                id: data.id,
-                cashier: 'Кассир',
-                openedAt: new Date(data.opened_at),
-                startingCash: Number(data.starting_cash),
-                totalOrders: data.total_orders || 0,
-                totalRevenue: Number(data.total_revenue) || 0,
-                cashPayments: 0,
-                cashTotal: Number(data.cash_total) || 0,
-                cardPayments: 0,
-                cardTotal: Number(data.card_total) || 0,
-                otherPayments: 0,
-                otherTotal: Number(data.other_total) || 0,
-                expectedCash: data.expected_cash_at_close != null
-                  ? Number(data.expected_cash_at_close)
-                  : Number(data.starting_cash) + (Number(data.cash_total) || 0),
-                cashDifference: data.cash_difference_at_close != null
-                  ? Number(data.cash_difference_at_close)
-                  : undefined,
-                cashCollectionsTotal: Number(data.cash_collections_total) || 0,
-              };
-              set({ currentShift: shift, lastSyncError: null, isSyncing: false });
+              set({ currentShift: mapSupabaseShift(data), lastSyncError: null, isSyncing: false });
               void get().refreshShiftCashSummary();
               return;
             }
@@ -378,29 +376,7 @@ export const useShiftStore = create<ShiftStoreState>()(
 
           if (error || !data) return false;
 
-          const shift: Shift = {
-            id: data.id,
-            cashier: 'Кассир',
-            openedAt: new Date(data.opened_at),
-            startingCash: Number(data.starting_cash),
-            totalOrders: data.total_orders || 0,
-            totalRevenue: Number(data.total_revenue) || 0,
-            cashPayments: 0,
-            cashTotal: Number(data.cash_total) || 0,
-            cardPayments: 0,
-            cardTotal: Number(data.card_total) || 0,
-            otherPayments: 0,
-            otherTotal: Number(data.other_total) || 0,
-            expectedCash: data.expected_cash_at_close != null
-              ? Number(data.expected_cash_at_close)
-              : Number(data.starting_cash) + (Number(data.cash_total) || 0),
-            cashDifference: data.cash_difference_at_close != null
-              ? Number(data.cash_difference_at_close)
-              : undefined,
-            cashCollectionsTotal: Number(data.cash_collections_total) || 0,
-          };
-
-          set({ currentShift: shift, lastSyncError: null, isSyncing: false });
+          set({ currentShift: mapSupabaseShift(data), lastSyncError: null, isSyncing: false });
           void get().refreshShiftCashSummary();
           return true;
         } catch (e: any) {
