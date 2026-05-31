@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar } from 'react-native';
 import { theme } from '../theme/colors';
 import { PosHeader } from '../components/PosHeader';
@@ -8,8 +8,10 @@ import { ProductGrid } from '../components/ProductGrid';
 import { ItemActionsMenu } from '../components/ItemActionsMenu';
 import { ModifierGrid } from '../components/ModifierGrid';
 import { SearchMode } from '../components/SearchMode';
+import { TakeoverLock } from '../components/TakeoverLock';
 import { useOrderStore } from '../store/orderStore';
-import { TablePickerModal } from '../components/TablePickerModal';
+import { useShiftStore } from '../store/shiftStore';
+import { useVenueStore } from '../store/venueStore';
 import { CommentModal } from '../components/CommentModal';
 
 const GAP = 8;
@@ -17,18 +19,27 @@ const COL_GAP = 8;
 const PADDING = 8;
 
 export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
-  const { selectedItemId, items, getTotal, closeOrder, deleteOrder, tableNumber, currentOrderId } = useOrderStore();
+  const { selectedItemId, items, getTotal, closeOrder, deleteOrder, tableNumber, currentOrderId, updateOrderMeta } = useOrderStore();
   const currentOrder = useOrderStore((s) => s.orders.find(o => o.id === s.currentOrderId));
   const selectedItem = items.find(i => i.id === selectedItemId);
   const isItemSelected = !!selectedItem;
   const total = getTotal();
+  const currentUser = useShiftStore((s) => s.currentUser);
   const [searchMode, setSearchMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [tablePickerVisible, setTablePickerVisible] = useState(false);
   const [commentVisible, setCommentVisible] = useState(false);
+  const isTakeaway = useVenueStore((s) => s.venueType === 'takeaway');
+
+  // Lock: waiter viewing someone else's order
+  const isLocked = useMemo(() => {
+    if (!currentUser || !currentOrder) return false;
+    if (currentUser.role !== 'waiter') return false;
+    if (isTakeaway) return false;
+    return currentOrder.waiter !== currentUser.name;
+  }, [currentUser, currentOrder, isTakeaway]);
 
   const handleBack = () => {
-    const comment = (currentOrder as any)?.comment || '';
+    const comment = currentOrder?.comment || '';
     const isEmpty = items.length === 0 && !tableNumber && !comment;
     if (isEmpty && currentOrderId) {
       deleteOrder(currentOrderId);
@@ -61,7 +72,11 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
           onSearchOpen={handleSearchOpen}
           onSearchClose={handleSearchClose}
           tableNumber={tableNumber}
-          onTablePress={() => setTablePickerVisible(true)}
+          isTakeaway={isTakeaway}
+          onTablePress={() => {
+            if (isTakeaway) return;
+            navigation?.navigate('TablePicker');
+          }}
         />
 
         {/* ═══ MAIN CONTENT ═══ */}
@@ -71,20 +86,30 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
             <View style={styles.orderPanelWrap}>
               <OrderPanel onCommentPress={() => setCommentVisible(true)} />
             </View>
-            <View style={styles.paymentRow}>
-              <TouchableOpacity style={styles.precheckBtn}>
-                <Text style={styles.precheckText}>Пречек</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.paymentBtn} onPress={() => navigation?.navigate('Payment')}>
-                <Text style={styles.paymentLabel}>Оплата</Text>
-                <Text style={styles.paymentAmount}>{formatAmount(total)} ₽</Text>
-              </TouchableOpacity>
-            </View>
+            {!isLocked && (
+              <View style={styles.paymentRow}>
+                <TouchableOpacity style={styles.precheckBtn}>
+                  <Text style={styles.precheckText}>Пречек</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.paymentBtn} onPress={() => navigation?.navigate('Payment')}>
+                  <Text style={styles.paymentLabel}>Оплата</Text>
+                  <Text style={styles.paymentAmount}>{formatAmount(total)} ₽</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
 
           <View style={{ width: COL_GAP }} />
 
-          {searchMode ? (
+          {isLocked ? (
+            <View style={styles.takeoverCol}>
+              <TakeoverLock
+                onTakeover={(waiterName) => {
+                  updateOrderMeta({ waiter: waiterName });
+                }}
+              />
+            </View>
+          ) : searchMode ? (
             <View style={styles.searchRightCol}>
               <SearchMode
                 searchQuery={searchQuery}
@@ -109,10 +134,6 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
         </View>
       </View>
 
-      <TablePickerModal
-        visible={tablePickerVisible}
-        onClose={() => setTablePickerVisible(false)}
-      />
       <CommentModal
         visible={commentVisible}
         onClose={() => setCommentVisible(false)}
@@ -124,12 +145,13 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
 const formatAmount = (n: number) => n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, minHeight: 0, overflow: 'hidden', backgroundColor: '#1A1A1A' },
-  root: { flex: 1, minHeight: 0, overflow: 'hidden', backgroundColor: '#1A1A1A' },
+  safeArea: { flex: 1, minHeight: 0, minWidth: 0, overflow: 'hidden', backgroundColor: '#1A1A1A' },
+  root: { flex: 1, minHeight: 0, minWidth: 0, overflow: 'hidden', backgroundColor: '#1A1A1A' },
 
   mainRow: {
     flex: 1,
     minHeight: 0,
+    minWidth: 0,
     flexDirection: 'row',
     paddingHorizontal: PADDING,
     paddingBottom: COL_GAP,
@@ -163,6 +185,11 @@ const styles = StyleSheet.create({
   },
   searchRightCol: {
     flex: 0.65,
+  },
+  takeoverCol: {
+    flex: 0.65,
+    overflow: 'hidden',
+    borderRadius: theme.borderRadius,
   },
 
   paymentBtn: {

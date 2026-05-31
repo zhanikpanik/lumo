@@ -1,4 +1,6 @@
 import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../utils/supabase';
 
 export interface VenueTable {
@@ -8,7 +10,9 @@ export interface VenueTable {
   capacity: number;
   col: number;
   row: number;
-  size: 'small' | 'regular' | 'wide' | 'tall' | 'bar' | 'square';
+  colSpan: number;
+  rowSpan: number;
+  size: string;
 }
 
 export interface VenueZone {
@@ -19,51 +23,59 @@ export interface VenueZone {
   rows: number;
 }
 
+export type VenueType = 'restaurant' | 'takeaway';
+
 interface VenueStoreState {
   venueId: string;
   zones: VenueZone[];
   waiters: { id: string; name: string; pin: string; role: string }[];
+  venueType: VenueType;
+  trackGuests: boolean;
   isLoading: boolean;
   error: string | null;
-  fetchVenue: () => Promise<void>;
+  lastFetchedAt: number;
+  fetchVenue: (force?: boolean) => Promise<void>;
 }
 
-const VENUE_ID = '00000000-0000-0000-0000-000000000010'; // MVP: hardcoded
+import { VENUE_ID } from '../config';
+const VENUE_TTL = 10 * 60 * 1000; // 10 minutes
 
-export const useVenueStore = create<VenueStoreState>((set) => ({
+export const useVenueStore = create<VenueStoreState>()(
+  persist(
+    (set, get) => ({
   venueId: VENUE_ID,
   zones: [],
   waiters: [],
+  venueType: 'restaurant',
+  trackGuests: false,
   isLoading: false,
   error: null,
+  lastFetchedAt: 0,
 
-  fetchVenue: async () => {
+  fetchVenue: async (force = false) => {
+    const now = Date.now();
+    if (!force && now - get().lastFetchedAt < VENUE_TTL && get().zones.length > 0) return;
     set({ isLoading: true, error: null });
 
     try {
-      // Fetch zones
-      const { data: zoneData, error: zoneError } = await supabase
-        .from('zones')
-        .select('id, name, grid_cols, grid_rows, sort_order')
-        .eq('venue_id', VENUE_ID)
-        .order('sort_order');
+      // Fetch all 4 tables in parallel
+      const [
+        { data: venueData },
+        { data: zoneData, error: zoneError },
+        { data: tableData, error: tableError },
+        { data: userData, error: userError },
+      ] = await Promise.all([
+        supabase.from('venues').select('track_guests, venue_type').eq('id', VENUE_ID).single(),
+        supabase.from('zones').select('id, name, grid_cols, grid_rows, sort_order').eq('venue_id', VENUE_ID).order('sort_order'),
+        supabase.from('tables').select('id, zone_id, number, capacity, col, row, col_span, row_span, size').eq('venue_id', VENUE_ID),
+        supabase.from('users').select('id, name, pin, role, user_venues!inner(venue_id)').eq('user_venues.venue_id', VENUE_ID),
+      ]);
+
+      const trackGuests = venueData?.track_guests ?? false;
+      const venueType: VenueType = venueData?.venue_type === 'takeaway' ? 'takeaway' : 'restaurant';
 
       if (zoneError) throw zoneError;
-
-      // Fetch tables
-      const { data: tableData, error: tableError } = await supabase
-        .from('tables')
-        .select('id, zone_id, number, capacity, col, row, size')
-        .eq('venue_id', VENUE_ID);
-
       if (tableError) throw tableError;
-
-      // Fetch waiters (users for this venue)
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('id, name, pin, role, user_venues!inner(venue_id)')
-        .eq('user_venues.venue_id', VENUE_ID);
-
       if (userError) throw userError;
 
       // Build zones with tables
@@ -81,7 +93,9 @@ export const useVenueStore = create<VenueStoreState>((set) => ({
             capacity: t.capacity,
             col: t.col,
             row: t.row,
-            size: t.size,
+            colSpan: t.col_span || 2,
+            rowSpan: t.row_span || 2,
+            size: t.size || 'square',
           })),
       }));
 
@@ -92,10 +106,23 @@ export const useVenueStore = create<VenueStoreState>((set) => ({
         role: u.role,
       }));
 
-      set({ zones, waiters, isLoading: false });
+      set({ zones, waiters, venueType, trackGuests, isLoading: false, lastFetchedAt: Date.now() });
     } catch (err: any) {
       console.error('Failed to fetch venue:', err.message);
       set({ error: err.message, isLoading: false });
     }
   },
-}));
+    }),
+    {
+      name: 'venue-store',
+      storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => ({
+        zones: state.zones,
+        waiters: state.waiters,
+        venueType: state.venueType,
+        trackGuests: state.trackGuests,
+        lastFetchedAt: state.lastFetchedAt,
+      }),
+    },
+  ),
+);

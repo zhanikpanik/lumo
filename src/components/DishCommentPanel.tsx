@@ -32,8 +32,17 @@ export const DishCommentPanel: React.FC = () => {
 
   if (!selectedItem) return null;
 
+  const tokens = text
+    .split(',')
+    .map((t) => t.trim())
+    .filter(Boolean);
+  const activePresets = new Set(tokens.filter((t) => PRESETS.includes(t)));
+
   const handlePreset = (preset: string) => {
-    const newText = text ? `${text}, ${preset}` : preset;
+    const next = activePresets.has(preset)
+      ? tokens.filter((t) => t !== preset)
+      : [...tokens, preset];
+    const newText = next.join(', ');
     setText(newText);
     setItemComment(selectedItem.id, newText);
   };
@@ -79,17 +88,20 @@ export const DishCommentPanel: React.FC = () => {
       <View style={styles.presetsGrid}>
         {rows.map((row, ri) => (
           <View key={ri} style={[styles.presetRow, ri < rows.length - 1 && { marginBottom: GAP }]}>
-            {row.map((preset, ci) => (
-              <View key={preset} style={[styles.presetWrap, ci < COLS - 1 && { marginRight: GAP }]}>
-                <TouchableOpacity
-                  style={styles.presetBtn}
-                  onPress={() => handlePreset(preset)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.presetText}>{preset}</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
+            {row.map((preset, ci) => {
+              const isActive = activePresets.has(preset);
+              return (
+                <View key={preset} style={[styles.presetWrap, ci < COLS - 1 && { marginRight: GAP }]}>
+                  <TouchableOpacity
+                    style={[styles.presetBtn, isActive && styles.presetBtnActive]}
+                    onPress={() => handlePreset(preset)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.presetText, isActive && styles.presetTextActive]}>{preset}</Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
             {row.length < COLS &&
               Array.from({ length: COLS - row.length }).map((_, i) => (
                 <View key={`empty-${i}`} style={[styles.presetWrap, { marginRight: i < COLS - row.length - 1 ? GAP : 0 }]}>
@@ -157,11 +169,18 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surfaceLight,
     paddingHorizontal: 4,
   },
+  presetBtnActive: {
+    backgroundColor: theme.colors.accent,
+  },
   presetText: {
     color: theme.colors.textPrimary,
     fontSize: 14,
     fontWeight: '500',
     textAlign: 'center',
+  },
+  presetTextActive: {
+    color: '#fff',
+    fontWeight: '600',
   },
   emptyCell: {
     flex: 1,

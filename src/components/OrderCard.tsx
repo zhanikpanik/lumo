@@ -1,21 +1,35 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, Easing, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Feather } from '@expo/vector-icons';
 import { SomIcon } from './Icons';
 import { theme } from '../theme/colors';
 import { Order } from '../types';
+import YandexIcon from '../assets/icons/yandex.svg';
+import { useNotificationStore } from '../store/notificationStore';
+import { useVenueStore } from '../store/venueStore';
 
 const formatAmount = (amount: number): string => {
   return amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 };
 
-const formatTime = (iso: string): string => {
+const formatRelativeTime = (iso: string): string => {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return iso;
-  return d.toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' });
+  const mins = Math.max(0, Math.round((Date.now() - d.getTime()) / 60_000));
+  if (mins < 1) return 'только что';
+  if (mins < 60) return `${mins} мин`;
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  if (m === 0) return `${h} ч`;
+  return `${h} ч ${m} мин`;
 };
 
-
+const getElapsedMinutes = (iso: string): number => {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return 0;
+  return Math.max(0, Math.round((Date.now() - d.getTime()) / 60_000));
+};
 
 interface Props {
   order: Order;
@@ -23,68 +37,198 @@ interface Props {
   scale?: number;
 }
 
+const ICON_COLOR = '#fff';
+
 export const OrderCard: React.FC<Props> = ({ order, onPress, scale = 1 }) => {
-  // Build dish preview string
+  const isTakeaway = useVenueStore((s) => s.venueType === 'takeaway');
+  const [, setTick] = useState(0);
+
+  // Update relative time every 30 seconds
+  useEffect(() => {
+    const timer = setInterval(() => setTick((t) => t + 1), 30_000);
+    return () => clearInterval(timer);
+  }, []);
+
   const dishPreview = order.items
     .map(item => item.product.name)
-    .filter((name, idx, arr) => arr.indexOf(name) === idx) // unique names
+    .filter((name, idx, arr) => arr.indexOf(name) === idx)
     .join(', ');
 
+  const elapsed = getElapsedMinutes(order.openedAt);
+
   const getBackgroundColor = () => {
-    switch (order.status) {
-      case 'active': return theme.colors.orderDefault;
-      case 'paid': return theme.colors.orderActive;
-      case 'alert': return theme.colors.orderAlert;
-      case 'cancelled': return '#4A0A0A';
-      default: return theme.colors.orderDefault;
-    }
+    if (order.status === 'paid') return theme.colors.orderActive;
+    if (order.status === 'cancelled') return '#4A0A0A';
+    if (order.status === 'alert') return theme.colors.orderAlert;
+    // active — heat map
+    if (elapsed > 60) return '#4A1A0A'; // hot
+    if (elapsed > 30) return '#4A3A00'; // warm
+    return theme.colors.orderDefault;    // normal
   };
 
-  return (
-    <TouchableOpacity
-      style={[styles.card, { backgroundColor: getBackgroundColor() }]}
-      onPress={onPress}
-      activeOpacity={0.8}
-    >
-      {/* Top: number + amount */}
-      <View style={styles.mainRow}>
-        <Text style={[styles.number, { fontSize: 28, lineHeight: 32 }]}>
-          {order.number}
-        </Text>
-        <View style={styles.amountRow}>
-          <Text style={styles.amount}>
-            {formatAmount(order.totalAmount)}
-          </Text>
-          <SomIcon size={8} color="#fff" />
+  const bgColor = getBackgroundColor();
+
+  // ── Top line: table + waiter, or quick check, or delivery, or cancel reason ──
+  const renderTopLine = () => {
+    if (order.status === 'cancelled' && order.closeReason) {
+      return (
+        <View style={styles.topLine}>
+          <Feather name="alert-triangle" size={14} color="#FF8A80" />
+          <Text style={styles.closeReason} numberOfLines={1}>{order.closeReason}</Text>
         </View>
-      </View>
+      );
+    }
+    if (order.isQuickCheck && !isTakeaway) {
+      return (
+        <View style={styles.topLine}>
+          <Text style={styles.topText}>Быстрый чек</Text>
+        </View>
+      );
+    }
+    if (order.tableNumber) {
+      return (
+        <View style={styles.topLine}>
+          {order.waiter ? (
+            <>
+              <Text style={styles.topText}>{order.waiter}</Text>
+              <Text style={styles.topDivider}>·</Text>
+            </>
+          ) : null}
+          <Text style={styles.topText}>Стол {order.tableNumber}</Text>
+        </View>
+      );
+    }
+    // Delivery / marketplace — no table, show source badge
+    if (order.source === 'yandex_eda') {
+      return (
+        <View style={styles.topLine}>
+          <YandexIcon width={14} height={14} />
+          <Text style={styles.topText}>Доставка</Text>
+        </View>
+      );
+    }
+    if (order.source === 'glovo') {
+      return (
+        <View style={styles.topLine}>
+          <Feather name="truck" size={12} color={ICON_COLOR} />
+          <Text style={styles.topText}>Glovo</Text>
+        </View>
+      );
+    }
+    // Takeaway — clock
+    if (isTakeaway) {
+      return (
+        <View style={styles.topLine}>
+          <Feather name="clock" size={12} color={ICON_COLOR} />
+          <Text style={styles.topText}>{formatRelativeTime(order.openedAt)}</Text>
+        </View>
+      );
+    }
+    return null;
+  };
 
-      {/* Spacer */}
-      <View style={{ flex: 1 }} />
+  // ── Marketplace notification pulse ──
+  const isMarketplace = order.source === 'glovo' || order.source === 'yandex_eda';
+  const isUnseen = useNotificationStore((s) =>
+    isMarketplace ? s.unseenIds.has(order.id) : false,
+  );
+  const pulse = useRef(new Animated.Value(1)).current;
 
-      {/* Bottom group: table, dishes, waiter */}
-      <View>
-        {order.status === 'cancelled' && order.closeReason ? (
-          <Text style={styles.closeReason}>{order.closeReason}</Text>
-        ) : order.tableNumber ? (
-          <Text style={styles.middle}>Стол {order.tableNumber}</Text>
-        ) : null}
-        {dishPreview ? (
-          <View style={styles.dishPreviewWrap}>
-            <Text style={styles.dishPreview} numberOfLines={1}>{dishPreview}</Text>
+  useEffect(() => {
+    if (!isUnseen) {
+      pulse.stopAnimation();
+      pulse.setValue(1);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 0.92,
+          duration: 600,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 600,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [isUnseen, pulse]);
+
+  return (
+    <Animated.View
+      style={{
+        flex: 1,
+        transform: [{ scale: pulse }],
+        opacity: pulse,
+      }}
+    >
+      <TouchableOpacity
+        style={[styles.card, { backgroundColor: bgColor }]}
+        onPress={onPress}
+        activeOpacity={0.8}
+      >
+        {/* ── TOP: table / waiter ── */}
+        {renderTopLine()}
+
+        {/* Spacer */}
+        <View style={{ flex: 1 }} />
+
+        {/* ── MIDDLE: comment + dishes ── */}
+        {order.comment ? (
+          <View style={styles.commentWrap}>
+            <Text style={styles.comment} numberOfLines={1}>{order.comment}</Text>
             <LinearGradient
-              colors={['transparent', getBackgroundColor()]}
+              colors={['transparent', bgColor]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.dishFade}
             />
           </View>
         ) : null}
+
+        {dishPreview ? (
+          <View style={styles.dishPreviewWrap}>
+            <Text style={styles.dishPreview} numberOfLines={2}>{dishPreview}</Text>
+            <LinearGradient
+              colors={['transparent', bgColor]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.dishFade}
+            />
+          </View>
+        ) : null}
+
+        {/* ── BOTTOM: time · order # · amount ── */}
         <View style={styles.bottomRow}>
-          <Text style={styles.details}>{formatTime(order.openedAt)}</Text>
+          <View style={styles.bottomLeft}>
+            {order.status === 'active' ? (
+              <>
+                <Feather name="clock" size={12} color={elapsed > 30 ? '#FFB74D' : 'rgba(255,255,255,0.5)'} />
+                <Text style={[styles.bottomTime, elapsed > 60 && styles.bottomTimeHot]}>
+                  {formatRelativeTime(order.openedAt)}
+                </Text>
+              </>
+            ) : order.status === 'cancelled' ? (
+              <Text style={styles.bottomStatus}>Отменён</Text>
+            ) : (
+              <Text style={styles.bottomStatus}>Закрыт</Text>
+            )}
+            <Text style={styles.bottomDivider}>·</Text>
+            <Text style={styles.bottomOrderNum}>№{order.number}</Text>
+          </View>
+          <View style={styles.bottomAmount}>
+            <Text style={styles.bottomAmountText}>{formatAmount(order.totalAmount)}</Text>
+            <SomIcon size={8} color="#fff" />
+          </View>
         </View>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </Animated.View>
   );
 };
 
@@ -93,46 +237,55 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: theme.borderRadius,
     justifyContent: 'space-between',
-    padding: 14,
+    padding: 12,
   },
-  mainRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  number: {
-    color: theme.colors.textPrimary,
-    fontWeight: 'bold',
-  },
-  amountRow: {
+
+  // ── Top line ──
+  topLine: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 5,
   },
-  amount: {
-    color: theme.colors.textPrimary,
-    fontWeight: 'bold',
+  topText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    opacity: 0.85,
   },
-  middle: {
-    color: theme.colors.textPrimary,
-    opacity: 0.8,
-    fontWeight: '500',
-    fontSize: 14,
+  topDivider: {
+    color: 'rgba(255,255,255,0.35)',
+    fontSize: 16,
+    fontWeight: '600',
   },
   closeReason: {
     color: '#FF8A80',
     fontWeight: '600',
     fontSize: 13,
+    flexShrink: 1,
   },
+
+  // ── Middle: dishes ──
   dishPreviewWrap: {
     overflow: 'hidden',
-    marginTop: 2,
     position: 'relative',
+    marginBottom: 2,
   },
   dishPreview: {
-    color: theme.colors.textPrimary,
-    opacity: 0.5,
+    color: '#EAE6E5',
     fontSize: 14,
+    fontWeight: '500',
+    lineHeight: 18,
+  },
+  commentWrap: {
+    overflow: 'hidden',
+    position: 'relative',
+    marginBottom: 2,
+  },
+  comment: {
+    color: 'rgba(255,255,255,0.55)',
+    fontSize: 15,
+    fontStyle: 'italic',
+    flexShrink: 1,
   },
   dishFade: {
     position: 'absolute',
@@ -141,15 +294,52 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: 50,
   },
+
+  // ── Bottom row ──
   bottomRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 4,
+    alignItems: 'center',
+    marginTop: 6,
   },
-  details: {
-    color: theme.colors.textPrimary,
-    opacity: 0.6,
-    fontWeight: '400',
+  bottomLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flexShrink: 1,
+  },
+  bottomTime: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  bottomTimeHot: {
+    color: '#FF8A65',
+    fontWeight: '500',
+  },
+  bottomDivider: {
+    color: 'rgba(255,255,255,0.25)',
+    fontSize: 13,
+  },
+  bottomOrderNum: {
+    color: 'rgba(255,255,255,0.4)',
     fontSize: 14,
+    fontWeight: '400',
+  },
+  bottomStatus: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 14,
+    fontWeight: '400',
+  },
+  bottomAmount: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    flexShrink: 0,
+  },
+  bottomAmountText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

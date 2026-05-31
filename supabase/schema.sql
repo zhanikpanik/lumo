@@ -20,6 +20,8 @@ create table venues (
   name            text not null,
   address         text,
   currency        text default 'сом',
+  venue_type      text not null default 'restaurant'
+                  check (venue_type in ('restaurant', 'takeaway')),
   -- eKassa
   ekassa_token    text,
   ekassa_cashbox_id text,
@@ -33,7 +35,7 @@ create table venues (
 -- 2. USERS & ACCESS
 -- ═══════════════════════════════════════════════
 
-create type user_role as enum ('owner', 'manager', 'cashier');
+create type user_role as enum ('owner', 'manager', 'cashier', 'waiter');
 
 create table users (
   id              uuid primary key default gen_random_uuid(),
@@ -112,6 +114,9 @@ create table modifiers (
   modifier_group_id uuid not null references modifier_groups(id) on delete cascade,
   name              text not null,
   price             numeric(10,2) default 0,
+  ingredient_id     uuid references products(id),
+  quantity          numeric(10,3),
+  unit              text not null default 'мл' check (unit in ('г', 'кг', 'мл', 'л', 'шт')),
   sort_order        int default 0,
   is_active         boolean default true,
   created_at        timestamptz default now()
@@ -123,7 +128,7 @@ create table recipe_items (
   product_id    uuid not null references products(id) on delete cascade, -- the dish
   ingredient_id uuid not null references products(id),                   -- the ingredient
   quantity      numeric(10,3) not null, -- weight/amount
-  unit          text default 'г',       -- г, мл, шт
+  unit          text not null default 'г' check (unit in ('г', 'кг', 'мл', 'л', 'шт')),
   created_at    timestamptz default now()
 );
 
@@ -170,6 +175,10 @@ create table shifts (
   cash_total      numeric(10,2) default 0,
   card_total      numeric(10,2) default 0,
   other_total     numeric(10,2) default 0,
+  counted_cash    numeric(10,2),
+  expected_cash_at_close numeric(10,2),
+  cash_difference_at_close numeric(10,2),
+  cash_collections_total numeric(10,2) not null default 0,
   created_at      timestamptz default now()
 );
 
@@ -193,6 +202,9 @@ create table orders (
   order_type      text default 'Общий',
   comment         text,
   is_quick_check  boolean default false,
+  order_source    text not null default 'pos',
+  external_order_id text,
+  integration_metadata jsonb not null default '{}'::jsonb,
   opened_at       timestamptz default now(),
   closed_at       timestamptz,
   total_amount    numeric(10,2) default 0,
@@ -222,8 +234,55 @@ create table order_item_modifiers (
   modifier_price  numeric(10,2) default 0
 );
 
+create table marketplace_store_bindings (
+  id                uuid primary key default gen_random_uuid(),
+  venue_id          uuid not null references venues(id) on delete cascade,
+  provider          text not null check (provider in ('glovo', 'yandex_eda')),
+  external_store_id text not null,
+  enabled           boolean not null default true,
+  created_at        timestamptz not null default now(),
+  unique(provider, external_store_id),
+  unique(venue_id, provider)
+);
+
+create table marketplace_inbound_events (
+  id                uuid primary key default gen_random_uuid(),
+  provider          text not null check (provider in ('glovo', 'yandex_eda')),
+  external_event_id text,
+  event_type        text not null,
+  venue_id          uuid references venues(id) on delete set null,
+  external_order_id text,
+  payload           jsonb not null,
+  received_at       timestamptz not null default now(),
+  processed_at      timestamptz,
+  processing_error  text,
+  linked_order_id   uuid references orders(id) on delete set null
+);
+
+create table marketplace_api_clients (
+  id                  uuid primary key default gen_random_uuid(),
+  provider            text not null check (provider in ('yandex_eda')),
+  client_id           text not null,
+  client_secret_hash  text not null,
+  client_secret_salt  text not null,
+  organization_id     uuid not null references organizations(id) on delete cascade,
+  scopes              text[] not null default array['read']::text[],
+  enabled             boolean not null default true,
+  created_at          timestamptz not null default now(),
+  unique(provider, client_id)
+);
+
+create table marketplace_access_tokens (
+  token_hash    text primary key,
+  client_uuid   uuid not null references marketplace_api_clients(id) on delete cascade,
+  scopes        text[] not null,
+  issued_at     timestamptz not null default now(),
+  expires_at    timestamptz not null
+);
+
 create type payment_method as enum ('cash', 'card', 'qr', 'other', 'none');
 create type fiscal_status as enum ('pending', 'sent', 'failed', 'skipped');
+create type cash_movement_type as enum ('sale', 'refund', 'collection', 'float_in', 'float_out');
 
 create table payments (
   id              uuid primary key default gen_random_uuid(),
@@ -239,7 +298,85 @@ create table payments (
   fiscal_response jsonb,
   -- Close without payment
   close_reason    text, -- 'За счёт заведения', 'Ошибка', etc.
+  -- Refund audit (phase 1, without fiscal/terminal integration)
+  refunded_at     timestamptz,
+  refunded_by     uuid references users(id),
+  refund_reason   text,
+  refund_shift_id uuid references shifts(id),
+  refund_metadata jsonb,
+  -- Client-generated idempotency key. Unique per venue to make POS payment
+  -- inserts safe against double-tap, network retries and offline replay.
+  idempotency_key text not null,
   created_at      timestamptz default now()
+);
+create unique index payments_idempotency_key_venue_uidx
+  on payments (venue_id, idempotency_key);
+
+create table pos_order_refunds (
+  order_id           uuid primary key references orders(id) on delete cascade,
+  venue_id           uuid not null references venues(id),
+  refund_shift_id    uuid references shifts(id),
+  actor_user_id      uuid references users(id),
+  reason             text,
+  payment_method     payment_method,
+  payment_amount     numeric(10,2),
+  refunded_at        timestamptz not null default now(),
+  -- Snapshot of order state at refund time. Used by pos_cancel_refund to detect
+  -- post-refund edits and refuse cancel when the chek was modified.
+  order_closed_at    timestamptz,
+  order_total_amount numeric(10,2),
+  items_count        int,
+  items_signature    text,
+  cancelled_at       timestamptz,
+  cancelled_by       uuid references users(id),
+  cancel_metadata    jsonb
+);
+
+create table cash_movements (
+  id            uuid primary key default gen_random_uuid(),
+  venue_id      uuid not null references venues(id),
+  shift_id      uuid not null references shifts(id) on delete cascade,
+  movement_type cash_movement_type not null,
+  amount        numeric(10,2) not null check (amount > 0),
+  payment_id    uuid references payments(id) on delete set null,
+  order_id      uuid references orders(id) on delete set null,
+  note          text,
+  occurred_at   timestamptz not null default now(),
+  created_at    timestamptz not null default now()
+);
+
+-- Admin-facing journal (r_keeper-admin /cash-shifts, /transactions). POS mirrors
+-- float in/out and collection here via pos_record_cash_transaction / pos_record_cash_collection.
+create table cash_transactions (
+  id               uuid primary key default gen_random_uuid(),
+  venue_id         uuid not null references venues(id) on delete cascade,
+  shift_id         uuid not null references shifts(id) on delete cascade,
+  type             text not null,
+  payment_method   text not null default 'cash',
+  amount           numeric(14,2) not null check (amount > 0),
+  transaction_at   timestamptz not null default now(),
+  note             text,
+  category_id      uuid,
+  created_at       timestamptz not null default now()
+);
+
+-- Dead-letter queue for stock consumption events that failed retries on the
+-- client. Visible from admin / other devices so issues are not hidden inside a
+-- single POS device's local AsyncStorage.
+create table pos_consumption_dead_letters (
+  idempotency_key text primary key,
+  venue_id        uuid not null references venues(id),
+  order_id        uuid references orders(id) on delete set null,
+  shift_id        uuid references shifts(id) on delete set null,
+  payload         jsonb not null,
+  retries         int not null default 0,
+  last_error      text,
+  status          text not null default 'open'
+                  check (status in ('open', 'acknowledged', 'resolved')),
+  resolved_by     uuid references users(id),
+  resolved_at     timestamptz,
+  created_at      timestamptz not null default now(),
+  last_seen_at    timestamptz not null default now()
 );
 
 -- ═══════════════════════════════════════════════
@@ -261,7 +398,7 @@ create table stock_items (
   warehouse_id  uuid not null references warehouses(id),
   product_id    uuid not null references products(id),
   quantity      numeric(10,3) default 0,
-  unit          text default 'шт',
+  unit          text not null default 'шт' check (unit in ('г', 'кг', 'мл', 'л', 'шт')),
   updated_at    timestamptz default now()
 );
 
@@ -307,12 +444,29 @@ create index idx_products_category on products(category_id);
 create index idx_orders_venue on orders(venue_id);
 create index idx_orders_shift on orders(shift_id);
 create index idx_orders_status on orders(venue_id, status);
+create unique index orders_venue_source_external_uidx
+  on orders(venue_id, order_source, external_order_id)
+  where external_order_id is not null;
 create index idx_order_items_order on order_items(order_id);
 create index idx_payments_order on payments(order_id);
 create index idx_payments_fiscal on payments(fiscal_status) where fiscal_status = 'pending';
+create index idx_cash_movements_shift_occurred on cash_movements(shift_id, occurred_at desc);
+create unique index cash_movements_payment_type_uidx on cash_movements(payment_id, movement_type) where payment_id is not null;
+create index idx_cash_transactions_venue_at on cash_transactions(venue_id, transaction_at desc);
+create index idx_cash_transactions_shift_at on cash_transactions(shift_id, transaction_at desc);
 create index idx_shifts_venue on shifts(venue_id);
 create index idx_tables_zone on tables(zone_id);
 create index idx_stock_items_warehouse on stock_items(warehouse_id);
+create index idx_marketplace_inbound_events_provider_received
+  on marketplace_inbound_events(provider, received_at desc);
+create index idx_marketplace_inbound_events_venue
+  on marketplace_inbound_events(venue_id, received_at desc);
+create unique index marketplace_inbound_events_provider_external_uidx
+  on marketplace_inbound_events(provider, external_event_id)
+  where external_event_id is not null;
+create index idx_marketplace_api_clients_org on marketplace_api_clients (organization_id);
+create index idx_marketplace_access_tokens_expires_at on marketplace_access_tokens (expires_at);
+create index idx_marketplace_access_tokens_client_uuid on marketplace_access_tokens (client_uuid);
 
 -- Migration lookups
 create index idx_products_external on products(external_id, external_source);
@@ -338,7 +492,13 @@ alter table shifts enable row level security;
 alter table orders enable row level security;
 alter table order_items enable row level security;
 alter table order_item_modifiers enable row level security;
+alter table marketplace_store_bindings enable row level security;
+alter table marketplace_inbound_events enable row level security;
+alter table marketplace_api_clients enable row level security;
+alter table marketplace_access_tokens enable row level security;
 alter table payments enable row level security;
+alter table cash_movements enable row level security;
+alter table cash_transactions enable row level security;
 alter table warehouses enable row level security;
 alter table stock_items enable row level security;
 alter table suppliers enable row level security;

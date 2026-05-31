@@ -3,8 +3,7 @@ import { View, Text, TouchableOpacity, TextInput, StyleSheet, ScrollView } from 
 import { theme } from '../theme/colors';
 import { OrderSetting } from './OrderSettingsMenu';
 import { useOrderStore } from '../store/orderStore';
-
-const WAITERS = ['Иванов', 'Петров', 'Сидоров', 'Козлов'];
+import { useVenueStore } from '../store/venueStore';
 const ORDER_TYPES = ['Общий', 'Раздельный', 'Банкет'];
 
 // Simple table list for picking
@@ -82,20 +81,21 @@ export const OrderSettingsDetail: React.FC<Props> = ({ setting }) => {
   }
 
   if (setting === 'waiter') {
+    const waiters = useVenueStore((s) => s.waiters);
     return (
       <View style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.headerText}>Официант</Text>
         </View>
         <View style={styles.list}>
-          {WAITERS.map((w) => (
+          {waiters.map((w) => (
             <TouchableOpacity
-              key={w}
+              key={w.id}
               style={styles.listItem}
-              onPress={() => updateOrder({ waiter: w })}
+              onPress={() => updateOrder({ waiter: w.name })}
               activeOpacity={0.7}
             >
-              <Text style={styles.listItemText}>{w}</Text>
+              <Text style={styles.listItemText}>{w.name}</Text>
             </TouchableOpacity>
           ))}
         </View>

@@ -77,7 +77,7 @@ export const ProductGrid: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.surface },
+  container: { flex: 1, backgroundColor: '#1A1A1A' },
   header: {
     height: 44,
     justifyContent: 'center',

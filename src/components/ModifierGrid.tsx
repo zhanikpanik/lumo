@@ -3,29 +3,28 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { theme } from '../theme/colors';
 import { useOrderStore } from '../store/orderStore';
-import { modifierGroups } from '../mocks/menuData';
 import { Modifier } from '../types';
 import { QuantityNumpad } from './QuantityNumpad';
-import { GuestPicker } from './GuestPicker';
 import { DishCommentPanel } from './DishCommentPanel';
+import { useMenuStore } from '../store/menuStore';
 
 const COLS = 3;
+// Сетка из 5 рядов: 4 ряда модификаторов + последний ряд занимает кнопка «Готово»
+// (на всю ширину). Высота ряда совпадает с ItemActionsMenu, поэтому кнопки в обоих
+// гридах оказываются на одной горизонтали.
 const ROWS = 5;
+const MODIFIER_ROWS = ROWS - 1;
+const MODIFIER_CELLS = COLS * MODIFIER_ROWS;
 const GAP = 2;
-const TOTAL_CELLS = COLS * ROWS;
 
 export const ModifierGrid: React.FC = () => {
-  const { items, selectedItemId, activeAction, activeModifierGroupId, setActiveModifierGroup, toggleModifier } = useOrderStore();
+  const { items, selectedItemId, activeAction, activeModifierGroupId, setActiveModifierGroup, toggleModifier, selectItem } = useOrderStore();
+  const modifierGroups = useMenuStore((s) => s.modifierGroups);
   const selectedItem = items.find(i => i.id === selectedItemId);
 
   // Quantity mode → numpad
   if (activeAction === 'quantity' && selectedItem) {
     return <QuantityNumpad />;
-  }
-
-  // Guest mode → guest picker
-  if (activeAction === 'guest' && selectedItem) {
-    return <GuestPicker />;
   }
 
   // Comment mode → dish comment panel
@@ -35,33 +34,81 @@ export const ModifierGrid: React.FC = () => {
 
   // Modifier mode
   const isModifiers = activeAction === 'modifiers' && !!selectedItem;
-  const activeGroup = modifierGroups.find(g => g.id === activeModifierGroupId) || modifierGroups[0];
-  const currentGroupIdx = modifierGroups.findIndex(g => g.id === activeGroup.id);
-  const modifiers = isModifiers ? activeGroup.modifiers : [];
-  const headerTitle = isModifiers ? activeGroup.name : '';
+  const availableGroups = selectedItem
+    ? modifierGroups.filter(g => g.productIds.includes(selectedItem.product.id))
+    : [];
+  const activeGroup = availableGroups.find(g => g.id === activeModifierGroupId) || availableGroups[0];
+  const currentGroupIdx = activeGroup ? availableGroups.findIndex(g => g.id === activeGroup.id) : -1;
+  const modifiers = isModifiers && activeGroup ? activeGroup.modifiers : [];
+  const headerTitle = isModifiers && activeGroup ? activeGroup.name : '';
   const itemModifierIds = selectedItem?.modifiers.map(m => m.id) || [];
 
   const handlePrevGroup = () => {
     if (currentGroupIdx > 0) {
-      setActiveModifierGroup(modifierGroups[currentGroupIdx - 1].id);
+      setActiveModifierGroup(availableGroups[currentGroupIdx - 1].id);
     }
   };
 
   const handleNextGroup = () => {
-    if (currentGroupIdx < modifierGroups.length - 1) {
-      setActiveModifierGroup(modifierGroups[currentGroupIdx + 1].id);
+    if (currentGroupIdx < availableGroups.length - 1) {
+      setActiveModifierGroup(availableGroups[currentGroupIdx + 1].id);
     }
   };
 
-  // Build cells
+  // Build cells (только для модификаторных рядов — последний ряд занимает кнопка «Готово»)
   type Cell = { kind: 'modifier'; mod: Modifier } | { kind: 'empty' };
   const cells: Cell[] = modifiers.map(m => ({ kind: 'modifier' as const, mod: m }));
-  while (cells.length < TOTAL_CELLS) cells.push({ kind: 'empty' });
+  while (cells.length < MODIFIER_CELLS) cells.push({ kind: 'empty' });
 
   const rows: Cell[][] = [];
-  for (let r = 0; r < ROWS; r++) {
+  for (let r = 0; r < MODIFIER_ROWS; r++) {
     rows.push(cells.slice(r * COLS, r * COLS + COLS));
   }
+
+  const renderDoneRow = () => (
+    <View style={styles.doneRow}>
+      <TouchableOpacity
+        style={styles.doneBtn}
+        onPress={() => selectItem(null)}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.doneText}>Готово</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  // Заглушки для рендера пустых рядов в empty-state (когда у блюда нет групп модификаторов),
+  // чтобы общая высота правой колонки не менялась.
+  const emptyRows: Cell[][] = [];
+  for (let r = 0; r < MODIFIER_ROWS; r++) {
+    emptyRows.push(Array.from({ length: COLS }, () => ({ kind: 'empty' as const })));
+  }
+
+  const renderModifierRows = (source: Cell[][]) =>
+    source.map((row, ri) => (
+      <View key={ri} style={[styles.row, { marginBottom: GAP }]}>
+        {row.map((cell, ci) => (
+          <View key={ci} style={[styles.cellWrap, ci < COLS - 1 && { marginRight: GAP }]}>
+            {cell.kind === 'modifier' ? (
+              <TouchableOpacity
+                style={[styles.modBtn, itemModifierIds.includes(cell.mod.id) && styles.modActive]}
+                onPress={() => toggleModifier(cell.mod)}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[styles.modText, itemModifierIds.includes(cell.mod.id) && styles.modTextActive]}
+                  numberOfLines={2}
+                >
+                  {cell.mod.name}
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.emptyCell} />
+            )}
+          </View>
+        ))}
+      </View>
+    ));
 
   // No modifier panel needed — show empty state
   if (!isModifiers) {
@@ -72,7 +119,10 @@ export const ModifierGrid: React.FC = () => {
           <Text style={styles.headerText}>{selectedItem?.product.name || ''}</Text>
           <View style={styles.headerBack} />
         </View>
-        <View style={[styles.grid, { justifyContent: 'center', alignItems: 'center' }]} />
+        <View style={styles.grid}>
+          {renderModifierRows(emptyRows)}
+          {renderDoneRow()}
+        </View>
       </View>
     );
   }
@@ -85,37 +135,15 @@ export const ModifierGrid: React.FC = () => {
         </TouchableOpacity>
         <Text style={styles.headerText}>{headerTitle}</Text>
         <TouchableOpacity style={styles.headerBack} onPress={handleNextGroup}>
-          {currentGroupIdx < modifierGroups.length - 1 && (
+          {currentGroupIdx < availableGroups.length - 1 && (
             <Feather name="chevron-right" size={22} color={theme.colors.textPrimary} />
           )}
         </TouchableOpacity>
       </View>
 
       <View style={styles.grid}>
-        {rows.map((row, ri) => (
-          <View key={ri} style={[styles.row, ri < ROWS - 1 && { marginBottom: GAP }]}>
-            {row.map((cell, ci) => (
-              <View key={ci} style={[styles.cellWrap, ci < COLS - 1 && { marginRight: GAP }]}>
-                {cell.kind === 'modifier' ? (
-                  <TouchableOpacity
-                    style={[styles.modBtn, itemModifierIds.includes(cell.mod.id) && styles.modActive]}
-                    onPress={() => toggleModifier(cell.mod)}
-                    activeOpacity={0.7}
-                  >
-                    <Text
-                      style={[styles.modText, itemModifierIds.includes(cell.mod.id) && styles.modTextActive]}
-                      numberOfLines={2}
-                    >
-                      {cell.mod.name}
-                    </Text>
-                  </TouchableOpacity>
-                ) : (
-                  <View style={styles.emptyCell} />
-                )}
-              </View>
-            ))}
-          </View>
-        ))}
+        {renderModifierRows(rows)}
+        {renderDoneRow()}
       </View>
     </View>
   );
@@ -157,4 +185,20 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   emptyCell: { flex: 1, backgroundColor: theme.colors.surfaceLight },
+
+  // Ряд оставляем размером с обычный, чтобы общая высота сетки совпадала с ItemActionsMenu,
+  // а саму кнопку прижимаем к низу — над ней получается «воздух».
+  doneRow: { flex: 1, justifyContent: 'flex-end' },
+  doneBtn: {
+    height: 56,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#00C853',
+    borderRadius: theme.borderRadius,
+  },
+  doneText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
 });

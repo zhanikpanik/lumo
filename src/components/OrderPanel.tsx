@@ -13,8 +13,11 @@ interface Props {
 }
 
 export const OrderPanel: React.FC<Props> = ({ onCommentPress }) => {
-  const { items, selectedItemId, selectItem, getTotal } = useOrderStore();
-  const comment = useOrderStore((s) => (s.orders.find(o => o.id === s.currentOrderId) as any)?.comment || '');
+  const { items, selectedItemId, selectItem, getTotal, sendToKitchen } = useOrderStore();
+  const currentOrder = useOrderStore((s) => s.orders.find(o => o.id === s.currentOrderId));
+  const comment = currentOrder?.comment || '';
+  const sentToKitchen = currentOrder?.sentToKitchen ?? false;
+  const isEmpty = items.length === 0;
 
   const total = getTotal();
 
@@ -117,6 +120,27 @@ export const OrderPanel: React.FC<Props> = ({ onCommentPress }) => {
         </TouchableOpacity>
       </View>
 
+      {/* Send to kitchen */}
+      {!isEmpty ? (
+        <View style={styles.sendRow}>
+          <TouchableOpacity
+            style={[styles.sendBtn, sentToKitchen && styles.sendBtnDone]}
+            onPress={() => sendToKitchen()}
+            disabled={sentToKitchen}
+            activeOpacity={0.6}
+          >
+            <Feather
+              name={sentToKitchen ? 'check-circle' : 'printer'}
+              size={16}
+              color={sentToKitchen ? theme.colors.textSecondary : '#FFB74D'}
+            />
+            <Text style={[styles.sendText, sentToKitchen && styles.sendTextDone]}>
+              {sentToKitchen ? 'На кухне' : 'Отправить'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
       {/* Comment button */}
       <View style={styles.commentRow}>
         <TouchableOpacity
@@ -124,9 +148,15 @@ export const OrderPanel: React.FC<Props> = ({ onCommentPress }) => {
           onPress={onCommentPress}
           activeOpacity={0.6}
         >
-          <Text style={[styles.commentText, comment && styles.commentTextActive]} numberOfLines={1}>
+          <Text
+            style={styles.commentText}
+            numberOfLines={1}
+          >
             {comment || 'Комментарий'}
           </Text>
+          {comment ? (
+            <Feather name="edit-2" size={16} color={theme.colors.textSecondary} />
+          ) : null}
         </TouchableOpacity>
       </View>
     </View>
@@ -189,20 +219,20 @@ const styles = StyleSheet.create({
   modifierText: {
     flex: 1,
     color: theme.colors.textSecondary,
-    fontSize: 14,
+    fontSize: 16,
   },
   modifierTextSelected: {
     color: theme.colors.textPrimary,
   },
   modifierQty: {
     color: theme.colors.textSecondary,
-    fontSize: 14,
+    fontSize: 16,
     width: 30,
     textAlign: 'center',
   },
   modifierPrice: {
     color: theme.colors.textSecondary,
-    fontSize: 14,
+    fontSize: 16,
     width: 60,
     textAlign: 'right',
   },
@@ -224,6 +254,33 @@ const styles = StyleSheet.create({
   btnDisabled: {
     opacity: 0.4,
   },
+
+  // Send to kitchen
+  sendRow: {
+    height: 44,
+    marginTop: GAP,
+  },
+  sendBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    borderRadius: theme.borderRadius,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#4A3A00',
+  },
+  sendBtnDone: {
+    backgroundColor: theme.colors.surfaceLight,
+  },
+  sendText: {
+    color: '#FFB74D',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  sendTextDone: {
+    color: theme.colors.textSecondary,
+  },
+
   // Comment button
   commentRow: {
     height: 44,
@@ -232,19 +289,18 @@ const styles = StyleSheet.create({
   commentButton: {
     flex: 1,
     flexDirection: 'row',
-    backgroundColor: theme.colors.surfaceLight,
     borderRadius: theme.borderRadius,
-    justifyContent: 'center',
     alignItems: 'center',
     gap: 8,
+    backgroundColor: theme.colors.surfaceLight,
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
   },
   commentText: {
-    color: theme.colors.textPrimary,
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '500',
     flexShrink: 1,
-  },
-  commentTextActive: {
-    color: theme.colors.accent,
+    color: theme.colors.textPrimary,
+    flex: 1,
   },
 });

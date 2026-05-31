@@ -22,18 +22,30 @@ interface MenuItem {
 interface Props {
   visible: boolean;
   onClose: () => void;
-  onOpenReport: () => void;
-  onOpenShiftInfo: () => void;
+  onOpenShift: () => void;
+  onOpenChecksArchive: () => void;
+  onOpenCash: () => void;
   onCloseShift: () => void;
+  onCashCollection: () => void;
+  onCashIn: () => void;
+  onCashOut: () => void;
+  canCloseShift?: boolean;
+  canCashTransaction?: boolean;
   onLogout: () => void;
 }
 
 export const FunctionsModal: React.FC<Props> = ({
   visible,
   onClose,
-  onOpenReport,
-  onOpenShiftInfo,
+  onOpenShift,
+  onOpenChecksArchive,
+  onOpenCash,
   onCloseShift,
+  onCashCollection,
+  onCashIn,
+  onCashOut,
+  canCloseShift = true,
+  canCashTransaction = true,
   onLogout,
 }) => {
   const scaleAnim = useRef(new Animated.Value(0)).current;
@@ -88,30 +100,50 @@ export const FunctionsModal: React.FC<Props> = ({
   const groups: MenuItem[][] = [
     [
       {
-        id: 'report',
-        label: 'Отчет за смену',
-        onPress: () => { onClose(); setTimeout(onOpenReport, 200); },
+        id: 'shift',
+        label: 'Смена',
+        onPress: () => { onClose(); setTimeout(onOpenShift, 200); },
       },
       {
-        id: 'shift',
-        label: 'Текущая смена',
-        onPress: () => { onClose(); setTimeout(onOpenShiftInfo, 200); },
+        id: 'checksArchive',
+        label: 'Архив чеков',
+        onPress: () => { onClose(); setTimeout(onOpenChecksArchive, 200); },
       },
       {
         id: 'closeShift',
         label: 'Закрыть смену',
+        disabled: !canCloseShift,
         onPress: () => { onClose(); setTimeout(onCloseShift, 200); },
+      },
+    ],
+    [
+      {
+        id: 'cash',
+        label: 'Касса',
+        onPress: () => { onClose(); setTimeout(onOpenCash, 200); },
+      },
+      {
+        id: 'cashIn',
+        label: 'Внесение в кассу',
+        disabled: !canCashTransaction,
+        onPress: () => { onClose(); setTimeout(onCashIn, 200); },
+      },
+      {
+        id: 'cashOut',
+        label: 'Изъятие из кассы',
+        disabled: !canCashTransaction,
+        onPress: () => { onClose(); setTimeout(onCashOut, 200); },
+      },
+      {
+        id: 'cashDrawer',
+        label: 'Инкассация',
+        onPress: () => { onClose(); setTimeout(onCashCollection, 200); },
       },
     ],
     [
       {
         id: 'devices',
         label: 'Принтеры и устройства',
-        disabled: true,
-      },
-      {
-        id: 'cashDrawer',
-        label: 'Денежный ящик',
         disabled: true,
       },
       {

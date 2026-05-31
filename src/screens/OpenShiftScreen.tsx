@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { theme } from '../theme/colors';
 import { useShiftStore } from '../store/shiftStore';
+import { can } from '../utils/permissions';
 
 const formatAmount = (n: number): string =>
   n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
@@ -21,6 +22,7 @@ export const OpenShiftScreen: React.FC<Props> = ({ navigation }) => {
   const [amount, setAmount] = useState('0');
   const openShift = useShiftStore((s) => s.openShift);
   const currentUser = useShiftStore((s) => s.currentUser);
+  const canOpenShift = can(currentUser?.role, 'openShift');
 
   const handleDigit = (digit: string) => {
     if (amount === '0') {
@@ -41,6 +43,7 @@ export const OpenShiftScreen: React.FC<Props> = ({ navigation }) => {
   const handleClear = () => setAmount('0');
 
   const handleOpen = () => {
+    if (!canOpenShift) return;
     openShift(parseInt(amount) || 0);
     navigation.replace('Orders');
   };
@@ -98,12 +101,30 @@ export const OpenShiftScreen: React.FC<Props> = ({ navigation }) => {
           </View>
 
           {/* Open button */}
-          <TouchableOpacity style={styles.openBtn} onPress={handleOpen} activeOpacity={0.8}>
+          {!canOpenShift ? (
+            <Text style={styles.waiterHint}>
+              Официант не может открыть смену. Дождитесь кассира или менеджера.
+            </Text>
+          ) : null}
+          <TouchableOpacity
+            style={[styles.openBtn, !canOpenShift && styles.btnDisabled]}
+            onPress={handleOpen}
+            activeOpacity={0.8}
+            disabled={!canOpenShift}
+          >
             <Text style={styles.openBtnText}>Открыть смену</Text>
           </TouchableOpacity>
 
           {/* Skip */}
-          <TouchableOpacity style={styles.skipBtn} onPress={() => { openShift(0); navigation.replace('Orders'); }}>
+          <TouchableOpacity
+            style={styles.skipBtn}
+            onPress={() => {
+              if (!canOpenShift) return;
+              openShift(0);
+              navigation.replace('Orders');
+            }}
+            disabled={!canOpenShift}
+          >
             <Text style={styles.skipText}>Пропустить (0 ₽ в кассе)</Text>
           </TouchableOpacity>
         </View>
@@ -192,6 +213,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
+  },
+  btnDisabled: {
+    opacity: 0.45,
+  },
+  waiterHint: {
+    color: '#FF8A80',
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 12,
+    lineHeight: 20,
   },
   openBtnText: {
     color: '#fff',

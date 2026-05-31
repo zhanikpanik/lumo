@@ -1,12 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, ActivityIndicator, Alert, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { theme } from '../theme/colors';
 import { useOrderStore } from '../store/orderStore';
 import { useShiftStore } from '../store/shiftStore';
 import { supabase } from '../utils/supabase';
-import { Order } from '../types';
+import { Order, OrderItem } from '../types';
+import { can } from '../utils/permissions';
+import { VENUE_ID } from '../config';
+import { cancelRefund, refundOrder } from '../api/inventory';
+import { logger } from '../utils/logger';
 
 const GAP = 8;
 const COL_GAP = 8;
@@ -23,6 +27,8 @@ const formatDateTime = (iso: string) => {
 const METHOD_LABEL: Record<string, string> = {
   cash: 'Наличные',
   card: 'Карта',
+  qr: 'QR',
+  other: 'Другое',
   none: 'Без оплаты',
 };
 
@@ -39,20 +45,78 @@ const formatTime = (iso: string) => {
   return d.toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' });
 };
 
+const lineUnitPrice = (item: OrderItem) =>
+  item.product.price + item.modifiers.reduce((s, m) => s + m.price, 0);
+
+const lineTotal = (item: OrderItem) => lineUnitPrice(item) * item.quantity;
+
+const orderListPreview = (o: Order) =>
+  o.items
+    .map((i) => {
+      const modPart = i.modifiers.map((m) => m.name).join(', ');
+      return modPart ? `${i.product.name}: ${modPart}` : i.product.name;
+    })
+    .join(' · ');
+
 export const PaidCheckScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
   const { currentOrderId, orders, closeOrder } = useOrderStore();
   const currentShift = useShiftStore((s) => s.currentShift);
+  const currentUser = useShiftStore((s) => s.currentUser);
+  const fetchOpenShift = useShiftStore((s) => s.fetchOpenShift);
+  const refreshShiftCashSummary = useShiftStore((s) => s.refreshShiftCashSummary);
+  const canRefund = can(currentUser?.role, 'refund');
 
-  // All closed orders for current shift
+  // Active refunds for the current shift (not yet cancelled) — order_id -> refund_shift_id.
+  // Used to surface refunded checks in the list and offer "Отменить возврат".
+  const [refundedOrderIds, setRefundedOrderIds] = useState<Set<string>>(new Set());
+
+  const reloadActiveRefunds = async (shiftId: string) => {
+    const { data, error } = await supabase.rpc('pos_active_refunds_for_shift', {
+      p_venue_id: VENUE_ID,
+      p_shift_id: shiftId,
+    });
+    if (error) {
+      logger.error('paidCheck.reloadActiveRefunds', error.message);
+      return;
+    }
+    const rows = (data ?? []) as Array<{ order_id: string }>;
+    setRefundedOrderIds(new Set(rows.map((r) => r.order_id)));
+  };
+
+  useEffect(() => {
+    if (!currentShift) {
+      setRefundedOrderIds(new Set());
+      return;
+    }
+    void reloadActiveRefunds(currentShift.id);
+  }, [currentShift?.id]);
+
+  // Closed orders for the current shift, including those that are currently
+  // "active" only because the user refunded them (so cancel is reachable).
   const closedOrders = orders
-    .filter(o => (o.status === 'paid' || o.status === 'cancelled'))
-    .sort((a, b) => (b.closedAt ?? b.openedAt) > (a.closedAt ?? a.openedAt) ? 1 : -1);
+    .filter((o) => {
+      if (o.status === 'paid' || o.status === 'cancelled') return true;
+      return o.status === 'active' && refundedOrderIds.has(o.id);
+    })
+    .sort((a, b) => ((b.closedAt ?? b.openedAt) > (a.closedAt ?? a.openedAt) ? 1 : -1));
 
-  const initialOrder = orders.find(o => o.id === currentOrderId) ?? closedOrders[0];
+  const initialOrder = orders.find((o) => o.id === currentOrderId) ?? closedOrders[0];
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(initialOrder ?? null);
 
   const [payment, setPayment] = useState<Payment | null>(null);
   const [loadingPayment, setLoadingPayment] = useState(true);
+  const [isRefunding, setIsRefunding] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+
+  // Re-sync the selected order with the store when it gets refreshed
+  // (status flips paid <-> active after refund/cancel).
+  useEffect(() => {
+    if (!selectedOrder) return;
+    const updated = orders.find((o) => o.id === selectedOrder.id);
+    if (updated && updated !== selectedOrder) {
+      setSelectedOrder(updated);
+    }
+  }, [orders, selectedOrder?.id]);
 
   useEffect(() => {
     if (!selectedOrder) return;
@@ -69,21 +133,193 @@ export const PaidCheckScreen: React.FC<{ navigation?: any }> = ({ navigation }) 
       });
   }, [selectedOrder?.id]);
 
+  const isRefundedSelected = !!selectedOrder && refundedOrderIds.has(selectedOrder.id);
+
   const handleBack = () => {
     closeOrder();
     navigation?.navigate('Orders');
   };
 
-  const handleRefund = async () => {
+  const refundErrorMessage = (err: string): string => {
+    switch (err) {
+      case 'refund_rpc_disabled':
+        return 'Возврат временно недоступен. Попробуйте позже.';
+      case 'shift_not_open':
+      case 'shift_required':
+        return 'Смена не открыта. Откройте смену и повторите.';
+      case 'shift_mismatch':
+        return 'Заказ относится к другой смене — возврат запрещён.';
+      case 'order_not_paid':
+        return 'Заказ уже не оплачен — возврат недоступен.';
+      case 'order_not_found':
+        return 'Заказ не найден.';
+      case 'no_qualifying_payment':
+        return 'Нет подходящего платежа для возврата.';
+      case 'actor_forbidden_role':
+      case 'actor_not_allowed':
+      case 'forbidden':
+        return 'Недостаточно прав для возврата.';
+      default:
+        return `Не удалось выполнить возврат: ${err}`;
+    }
+  };
+
+  const cancelErrorMessage = (err: string): string => {
+    switch (err) {
+      case 'refund_rpc_disabled':
+        return 'Отмена возврата временно недоступна.';
+      case 'shift_not_open':
+        return 'Смена возврата уже закрыта — отменить нельзя.';
+      case 'order_not_active':
+        return 'Заказ уже не в состоянии возврата.';
+      case 'refund_not_found':
+        return 'Запись о возврате не найдена.';
+      case 'no_refunded_payment':
+        return 'Не найден возвращённый платёж.';
+      case 'order_items_changed_after_refund':
+        return 'Позиции чека изменились после возврата — отменить нельзя. Создайте новый заказ.';
+      case 'order_total_changed_after_refund':
+        return 'Сумма чека изменилась после возврата — отменить нельзя.';
+      case 'actor_forbidden_role':
+      case 'actor_not_allowed':
+      case 'forbidden':
+        return 'Недостаточно прав для отмены возврата.';
+      default:
+        return `Не удалось отменить возврат: ${err}`;
+    }
+  };
+
+  const runRefund = async () => {
     if (!selectedOrder) return;
-    useOrderStore.setState((state) => ({
-      orders: state.orders.map(o =>
-        o.id === selectedOrder.id ? { ...o, status: 'active' as const } : o
-      ),
-    }));
-    await supabase.from('orders').update({ status: 'active', closed_at: null }).eq('id', selectedOrder.id);
-    await supabase.from('payments').delete().eq('order_id', selectedOrder.id);
-    navigation?.navigate('Pos');
+    if (isRefunding) return;
+    if (!canRefund) return;
+    if (!currentShift) {
+      Alert.alert('Смена не открыта', 'Сначала откройте смену.');
+      navigation?.replace('OpenShift');
+      return;
+    }
+
+    try {
+      setIsRefunding(true);
+
+      const occurredAt = new Date().toISOString();
+      const res = await refundOrder({
+        venueId: VENUE_ID,
+        orderId: selectedOrder.id,
+        shiftId: currentShift.id,
+        actorUserId: currentUser?.id ?? null,
+        reason: 'Возврат через экран закрытых заказов',
+        occurredAt,
+      });
+
+      if (!res.ok) {
+        logger.error('paidCheck.refund', res.error, { orderId: selectedOrder.id, detail: res.detail });
+        if (res.error === 'shift_not_open' || res.error === 'shift_required') {
+          Alert.alert('Смена не открыта', 'Сначала откройте смену.');
+          navigation?.replace('OpenShift');
+          return;
+        }
+        Alert.alert('Ошибка возврата', refundErrorMessage(res.error));
+        return;
+      }
+
+      await fetchOpenShift();
+      await refreshShiftCashSummary();
+      await useOrderStore.getState().fetchOrders();
+      await reloadActiveRefunds(currentShift.id);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'unknown_error';
+      logger.error('paidCheck.refund', e);
+      Alert.alert('Ошибка возврата', `Не удалось выполнить возврат: ${msg}`);
+    } finally {
+      setIsRefunding(false);
+    }
+  };
+
+  const runCancelRefund = async () => {
+    if (!selectedOrder) return;
+    if (isCancelling) return;
+    if (!canRefund) return;
+    if (!currentShift) {
+      Alert.alert('Смена не открыта', 'Сначала откройте смену.');
+      navigation?.replace('OpenShift');
+      return;
+    }
+
+    try {
+      setIsCancelling(true);
+      const res = await cancelRefund({
+        venueId: VENUE_ID,
+        orderId: selectedOrder.id,
+        actorUserId: currentUser?.id ?? null,
+        occurredAt: new Date().toISOString(),
+      });
+
+      if (!res.ok) {
+        logger.error('paidCheck.cancelRefund', res.error, { orderId: selectedOrder.id, detail: res.detail });
+        Alert.alert('Не удалось отменить возврат', cancelErrorMessage(res.error));
+        return;
+      }
+
+      await fetchOpenShift();
+      await refreshShiftCashSummary();
+      await useOrderStore.getState().fetchOrders();
+      await reloadActiveRefunds(currentShift.id);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'unknown_error';
+      logger.error('paidCheck.cancelRefund', e);
+      Alert.alert('Не удалось отменить возврат', msg);
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
+  const confirmAction = (
+    title: string,
+    message: string,
+    confirmLabel: string,
+    onAccept: () => void,
+  ) => {
+    if (Platform.OS === 'web') {
+      const accepted = typeof globalThis.confirm === 'function' ? globalThis.confirm(message) : true;
+      if (accepted) onAccept();
+      return;
+    }
+    Alert.alert(title, message, [
+      { text: 'Отмена', style: 'cancel' },
+      { text: confirmLabel, style: 'destructive', onPress: onAccept },
+    ]);
+  };
+
+  const handleRefund = () => {
+    if (!selectedOrder || !payment) return;
+    if (isRefunding) return;
+
+    const methodLabel = METHOD_LABEL[payment.method] ?? payment.method;
+    const isCardLike = payment.method === 'card' || payment.method === 'qr';
+    const extraHint = isCardLike
+      ? '\n\nВнимание: возврат на карту/QR клиенту пока выполняется вручную (терминал и фискализация будут подключены позже).'
+      : '';
+    const message =
+      `Заказ #${selectedOrder.number} будет переоткрыт, а сумма ${formatAmount(selectedOrder.totalAmount)} ₽ ` +
+      `(${methodLabel}) будет компенсирована в учете.${extraHint}`;
+
+    confirmAction('Подтвердите возврат', message, 'Выполнить возврат', () => {
+      void runRefund();
+    });
+  };
+
+  const handleCancelRefund = () => {
+    if (!selectedOrder) return;
+    if (isCancelling) return;
+    const message =
+      `Возврат заказа #${selectedOrder.number} будет отменён. ` +
+      `Сумма ${formatAmount(selectedOrder.totalAmount)} ₽ вернётся в выручку смены, ` +
+      `а списания склада восстановятся. ` +
+      `Если позиции чека менялись после возврата — отмена будет отклонена.`;
+    confirmAction('Отменить возврат?', message, 'Отменить возврат', () => {
+      void runCancelRefund();
+    });
   };
 
   return (
@@ -108,11 +344,17 @@ export const PaidCheckScreen: React.FC<{ navigation?: any }> = ({ navigation }) 
           {/* ── Left: Closed orders list ── */}
           <View style={styles.leftCol}>
             <View style={styles.listPanel}>
-              <ScrollView showsVerticalScrollIndicator={false}>
+              <ScrollView
+                style={styles.listScroll}
+                contentContainerStyle={styles.listScrollContent}
+                showsVerticalScrollIndicator={true}
+              >
                 {closedOrders.length === 0 && (
                   <Text style={styles.emptyText}>Нет закрытых заказов</Text>
                 )}
-                {closedOrders.map((o) => (
+                {closedOrders.map((o) => {
+                  const isRefunded = refundedOrderIds.has(o.id);
+                  return (
                   <TouchableOpacity
                     key={o.id}
                     style={[
@@ -127,13 +369,20 @@ export const PaidCheckScreen: React.FC<{ navigation?: any }> = ({ navigation }) 
                       <Text style={styles.listRowNum}>#{o.number}</Text>
                       <Text style={styles.listRowAmount}>{formatAmount(o.totalAmount)} ₽</Text>
                     </View>
-                    <Text style={styles.listRowSub}>
-                      {o.tableNumber ? `Стол ${o.tableNumber}` : 'Быстрый чек'}{' · '}{formatTime(o.closedAt ?? o.openedAt)}
-                    </Text>
+                    <View style={styles.listRowSubRow}>
+                      <Text style={styles.listRowSub}>
+                        {o.tableNumber ? `Стол ${o.tableNumber}` : 'Быстрый чек'}{' · '}{formatTime(o.closedAt ?? o.openedAt)}
+                      </Text>
+                      {isRefunded && (
+                        <View style={styles.refundChip}>
+                          <Text style={styles.refundChipText}>Возврат</Text>
+                        </View>
+                      )}
+                    </View>
                     {o.items.length > 0 ? (
                       <View style={styles.listRowPreviewWrap}>
-                        <Text style={styles.listRowPreview} numberOfLines={1}>
-                          {o.items.map(i => i.product.name).filter((n, idx, arr) => arr.indexOf(n) === idx).join(', ')}
+                        <Text style={styles.listRowPreview} numberOfLines={2}>
+                          {orderListPreview(o)}
                         </Text>
                         <LinearGradient
                           colors={[selectedOrder?.id === o.id ? 'rgba(51,51,51,0)' : 'rgba(42,42,42,0)', selectedOrder?.id === o.id ? theme.colors.surfaceLight : theme.colors.surface]}
@@ -144,7 +393,8 @@ export const PaidCheckScreen: React.FC<{ navigation?: any }> = ({ navigation }) 
                       </View>
                     ) : null}
                   </TouchableOpacity>
-                ))}
+                  );
+                })}
               </ScrollView>
             </View>
           </View>
@@ -161,9 +411,27 @@ export const PaidCheckScreen: React.FC<{ navigation?: any }> = ({ navigation }) 
               <View style={styles.detailPanel}>
                 {/* Meta */}
                 <View style={styles.metaBlock}>
-                  <View style={[styles.badge, selectedOrder.status === 'cancelled' ? styles.badgeCancelled : styles.badgePaid]}>
-                    <Text style={[styles.badgeText, selectedOrder.status === 'cancelled' ? styles.badgeCancelledText : styles.badgePaidText]}>
-                      {selectedOrder.status === 'cancelled' ? 'Без оплаты' : 'Оплачен'}
+                  <View style={[
+                    styles.badge,
+                    selectedOrder.status === 'cancelled'
+                      ? styles.badgeCancelled
+                      : isRefundedSelected
+                        ? styles.badgeRefunded
+                        : styles.badgePaid,
+                  ]}>
+                    <Text style={[
+                      styles.badgeText,
+                      selectedOrder.status === 'cancelled'
+                        ? styles.badgeCancelledText
+                        : isRefundedSelected
+                          ? styles.badgeRefundedText
+                          : styles.badgePaidText,
+                    ]}>
+                      {selectedOrder.status === 'cancelled'
+                        ? 'Без оплаты'
+                        : isRefundedSelected
+                          ? 'Возврат'
+                          : 'Оплачен'}
                     </Text>
                   </View>
                   <Text style={styles.metaLabel}>Заказ #{selectedOrder.number}</Text>
@@ -182,18 +450,27 @@ export const PaidCheckScreen: React.FC<{ navigation?: any }> = ({ navigation }) 
                 <View style={styles.divider} />
 
                 {/* Items */}
-                <ScrollView style={styles.itemsList} showsVerticalScrollIndicator={false}>
-                  {selectedOrder.items.length === 0 && (
-                    <Text style={styles.emptyText}>Нет позиций</Text>
-                  )}
-                  {selectedOrder.items.map((item) => (
-                    <View key={item.id} style={styles.itemRow}>
-                      <Text style={styles.itemQty}>{item.quantity}×</Text>
-                      <Text style={styles.itemName} numberOfLines={1}>{item.product.name}</Text>
-                      <Text style={styles.itemPrice}>{formatAmount(item.product.price * item.quantity)} ₽</Text>
-                    </View>
-                  ))}
-                </ScrollView>
+                <View style={styles.itemsListWrap}>
+                  <ScrollView style={styles.itemsList} showsVerticalScrollIndicator={true}>
+                    {selectedOrder.items.length === 0 && (
+                      <Text style={styles.emptyText}>Нет позиций</Text>
+                    )}
+                    {selectedOrder.items.map((item) => (
+                      <View key={item.id} style={styles.itemBlock}>
+                        <View style={styles.itemRow}>
+                          <Text style={styles.itemQty}>{item.quantity}×</Text>
+                          <View style={styles.itemNameCol}>
+                            <Text style={styles.itemName}>{item.product.name}</Text>
+                            {item.modifiers.map((m) => (
+                              <Text key={m.id} style={styles.modLine}>+ {m.name}</Text>
+                            ))}
+                          </View>
+                          <Text style={styles.itemPrice}>{formatAmount(lineTotal(item))} ₽</Text>
+                        </View>
+                      </View>
+                    ))}
+                  </ScrollView>
+                </View>
 
                 <View style={styles.divider} />
 
@@ -236,10 +513,47 @@ export const PaidCheckScreen: React.FC<{ navigation?: any }> = ({ navigation }) 
                     <Text style={styles.actionText}>Напечатать чек</Text>
                   </TouchableOpacity>
 
-                  {selectedOrder.status !== 'cancelled' && (
-                    <TouchableOpacity style={[styles.actionBtn, styles.refundBtn, { flex: 1 }]} onPress={handleRefund}>
-                      <Feather name="rotate-ccw" size={18} color="#fff" />
-                      <Text style={styles.refundText}>Возврат</Text>
+                  {isRefundedSelected && canRefund && (
+                    <TouchableOpacity
+                      style={[
+                        styles.actionBtn,
+                        styles.cancelRefundBtn,
+                        isCancelling && styles.refundBtnDisabled,
+                        { flex: 1 },
+                      ]}
+                      onPress={handleCancelRefund}
+                      disabled={isCancelling}
+                    >
+                      {isCancelling ? (
+                        <ActivityIndicator color="#fff" />
+                      ) : (
+                        <>
+                          <Feather name="rotate-cw" size={18} color="#fff" />
+                          <Text style={styles.refundText}>Отменить возврат</Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+                  )}
+
+                  {!isRefundedSelected && selectedOrder.status !== 'cancelled' && canRefund && (
+                    <TouchableOpacity
+                      style={[
+                        styles.actionBtn,
+                        styles.refundBtn,
+                        isRefunding && styles.refundBtnDisabled,
+                        { flex: 1 },
+                      ]}
+                      onPress={handleRefund}
+                      disabled={isRefunding || loadingPayment}
+                    >
+                      {isRefunding ? (
+                        <ActivityIndicator color="#fff" />
+                      ) : (
+                        <>
+                          <Feather name="rotate-ccw" size={18} color="#fff" />
+                          <Text style={styles.refundText}>Возврат</Text>
+                        </>
+                      )}
                     </TouchableOpacity>
                   )}
                 </View>
@@ -254,8 +568,8 @@ export const PaidCheckScreen: React.FC<{ navigation?: any }> = ({ navigation }) 
 };
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: theme.colors.background },
-  root: { flex: 1, backgroundColor: '#1A1A1A' },
+  safeArea: { flex: 1, minHeight: 0, minWidth: 0, overflow: 'hidden', backgroundColor: theme.colors.background },
+  root: { flex: 1, minHeight: 0, minWidth: 0, overflow: 'hidden', backgroundColor: '#1A1A1A' },
 
   // Header
   header: {
@@ -293,10 +607,15 @@ const styles = StyleSheet.create({
   // Left: order list
   listPanel: {
     flex: 1,
+    minHeight: 0,
+    position: 'relative',
+    overflow: 'hidden',
     backgroundColor: theme.colors.surface,
     borderRadius: theme.borderRadius,
     padding: 4,
   },
+  listScroll: { ...StyleSheet.absoluteFillObject },
+  listScrollContent: { padding: 4 },
   listRow: {
     flexDirection: 'column',
     paddingVertical: 8,
@@ -310,7 +629,15 @@ const styles = StyleSheet.create({
   listRowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   listRowNum: { color: theme.colors.textPrimary, fontSize: 17, fontWeight: '700' },
   listRowAmount: { color: theme.colors.textPrimary, fontSize: 17, fontWeight: '600' },
-  listRowSub: { color: theme.colors.textSecondary, fontSize: 15 },
+  listRowSub: { color: theme.colors.textSecondary, fontSize: 15, flex: 1 },
+  listRowSubRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  refundChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    backgroundColor: '#3D2A0A',
+  },
+  refundChipText: { color: '#FFB74D', fontSize: 13, fontWeight: '700' },
   listRowPreviewWrap: { overflow: 'hidden', position: 'relative' },
   listRowPreview: { color: theme.colors.textSecondary, fontSize: 15, opacity: 0.8 },
   listRowFade: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 40 },
@@ -318,6 +645,8 @@ const styles = StyleSheet.create({
   // Right: detail panel
   detailPanel: {
     flex: 1,
+    minHeight: 0,
+    overflow: 'hidden',
     backgroundColor: theme.colors.surface,
     borderRadius: theme.borderRadius,
     padding: PADDING,
@@ -341,6 +670,8 @@ const styles = StyleSheet.create({
   badgePaidText: { color: '#00C853' },
   badgeCancelled: { backgroundColor: '#3D0A0A' },
   badgeCancelledText: { color: '#FF8A80' },
+  badgeRefunded: { backgroundColor: '#3D2A0A' },
+  badgeRefundedText: { color: '#FFB74D' },
   badgeText: { fontSize: 15, fontWeight: '700' },
 
   metaBlock: { gap: 3, marginBottom: 10 },
@@ -350,12 +681,16 @@ const styles = StyleSheet.create({
   metaDot: { color: theme.colors.textSecondary, fontSize: 15 },
   divider: { height: 1, backgroundColor: 'rgba(255,255,255,0.08)', marginVertical: 10 },
 
-  itemsList: { flex: 1 },
+  itemsListWrap: { flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden' },
+  itemsList: { ...StyleSheet.absoluteFillObject },
   emptyText: { color: theme.colors.textSecondary, fontSize: 17, padding: 8 },
-  itemRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 5, gap: 8 },
-  itemQty: { color: theme.colors.textSecondary, fontSize: 17, width: 30 },
-  itemName: { color: theme.colors.textPrimary, fontSize: 17, flexShrink: 1 },
-  itemPrice: { color: theme.colors.textPrimary, fontSize: 17, fontWeight: '600' },
+  itemBlock: { paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.06)' },
+  itemRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 4, gap: 8 },
+  itemQty: { color: theme.colors.textSecondary, fontSize: 17, width: 30, paddingTop: 2 },
+  itemNameCol: { flex: 1, minWidth: 0 },
+  itemName: { color: theme.colors.textPrimary, fontSize: 17 },
+  modLine: { color: theme.colors.textSecondary, fontSize: 15, marginTop: 2 },
+  itemPrice: { color: theme.colors.textPrimary, fontSize: 17, fontWeight: '600', paddingTop: 2 },
 
   totalRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   totalLabel: { color: theme.colors.textSecondary, fontSize: 17 },
@@ -383,6 +718,8 @@ const styles = StyleSheet.create({
   },
   actionText: { color: theme.colors.textPrimary, fontSize: 17, fontWeight: '600' },
   refundBtn: { backgroundColor: '#D32F2F' },
+  cancelRefundBtn: { backgroundColor: '#F57C00' },
+  refundBtnDisabled: { opacity: 0.55 },
   refundText: { color: '#fff', fontSize: 17, fontWeight: '700' },
 
 });

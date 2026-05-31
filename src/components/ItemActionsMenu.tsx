@@ -5,10 +5,16 @@ import { useOrderStore } from '../store/orderStore';
 import { ActiveAction } from '../types';
 
 const COLS = 2;
+// 5 рядов, чтобы высота ячеек совпадала с ModifierGrid (там тоже 5 рядов).
+// Выход из режима выбора позиции делается через кнопку «Готово» в правом гриде.
 const ROWS = 5;
 const GAP = 2;
 
-type ActionDef = { action: ActiveAction; label: string } | { action: 'delete'; label: string } | null;
+type ActionDef =
+  | { action: ActiveAction; label: string }
+  | { action: 'delete'; label: string }
+  | { action: 'duplicate'; label: string }
+  | null;
 
 const ACTIONS: ActionDef[] = [
   { action: 'modifiers', label: 'Модификатор' },
@@ -16,15 +22,11 @@ const ACTIONS: ActionDef[] = [
   { action: 'combo',     label: 'Комбо' },
   { action: 'comment',   label: 'Комментарий' },
   { action: 'delete',    label: 'Удалить' },
-  null,
-  null,
-  null,
-  null,
-  null,
+  { action: 'duplicate', label: 'Повторить' },
 ];
 
 export const ItemActionsMenu: React.FC = () => {
-  const { items, selectedItemId, activeAction, setActiveAction, removeProduct, selectItem } = useOrderStore();
+  const { items, selectedItemId, activeAction, setActiveAction, removeProduct, duplicateItem } = useOrderStore();
   const selectedItem = items.find(i => i.id === selectedItemId);
   if (!selectedItem) return null;
 
@@ -55,12 +57,15 @@ export const ItemActionsMenu: React.FC = () => {
                 );
               }
 
-              const isActive = cell.action !== 'delete' && activeAction === cell.action;
               const isDelete = cell.action === 'delete';
+              const isDuplicate = cell.action === 'duplicate';
+              const isActive = !isDelete && !isDuplicate && activeAction === cell.action;
 
               const handlePress = () => {
                 if (isDelete) {
                   removeProduct(selectedItem.id);
+                } else if (isDuplicate) {
+                  duplicateItem(selectedItem.id);
                 } else {
                   setActiveAction(cell.action as ActiveAction);
                 }

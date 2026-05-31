@@ -35,7 +35,7 @@ export const ShiftInfoModal: React.FC<Props> = ({ visible, onClose }) => {
   if (!currentShift) return null;
 
   const now = new Date();
-  const expectedCash = currentShift.startingCash + currentShift.cashTotal;
+  const expectedCash = currentShift.expectedCash ?? (currentShift.startingCash + currentShift.cashTotal);
 
   return (
     <Modal visible={visible} transparent animationType="fade">
@@ -87,6 +87,18 @@ export const ShiftInfoModal: React.FC<Props> = ({ visible, onClose }) => {
             <View style={styles.infoRow}>
               <Text style={styles.label}>Наличные в кассе</Text>
               <Text style={styles.valueBold}>{formatAmount(expectedCash)}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>Внесения</Text>
+              <Text style={styles.valueBold}>{formatAmount(currentShift.cashFloatIn ?? 0)}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>Изъятия</Text>
+              <Text style={styles.valueBold}>{formatAmount(currentShift.cashFloatOut ?? 0)}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>Инкассация</Text>
+              <Text style={styles.valueBold}>{formatAmount(currentShift.cashCollectionsTotal ?? 0)}</Text>
             </View>
           </View>
         </View>

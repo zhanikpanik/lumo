@@ -44,7 +44,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.divider,
-    backgroundColor: theme.colors.surfaceDeep,
+    backgroundColor: 'transparent',
   },
   selectedContainer: {
     backgroundColor: theme.colors.orderItemActive,

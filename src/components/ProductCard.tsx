@@ -14,9 +14,13 @@ export const ProductCard: React.FC<Props> = ({ product, colorHex, onPress }) => 
     <TouchableOpacity
       style={[styles.card, { backgroundColor: colorHex }]}
       onPress={onPress}
+      activeOpacity={0.85}
     >
       <View style={styles.content}>
-        <Text style={styles.name}>{product.name}</Text>
+        <View style={styles.nameRow}>
+          <Text style={styles.name}>{product.name}</Text>
+          {product.hasModifiers && <Text style={styles.modifierPlus}>+</Text>}
+        </View>
         <Text style={styles.price}>{product.price} сом</Text>
       </View>
     </TouchableOpacity>
@@ -26,8 +30,8 @@ export const ProductCard: React.FC<Props> = ({ product, colorHex, onPress }) => 
 const styles = StyleSheet.create({
   card: {
     flex: 1,
-    minWidth: 100,
-    minHeight: 100,
+    minWidth: 0,
+    minHeight: 80,
     margin: 6,
     borderRadius: theme.borderRadius,
     padding: 12,
@@ -36,10 +40,22 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'space-between',
   },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   name: {
     color: theme.colors.textPrimary,
     fontSize: 15,
     fontWeight: 'bold',
+    flexShrink: 1,
+  },
+  modifierPlus: {
+    color: theme.colors.textPrimary,
+    fontSize: 15,
+    fontWeight: 'bold',
+    opacity: 0.4,
   },
   price: {
     color: theme.colors.textPrimary,

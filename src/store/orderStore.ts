@@ -1,11 +1,11 @@
 import { create } from 'zustand';
-import { Product, OrderItem, Guest, Modifier, ActiveAction, Order } from '../types';
+import { Product, OrderItem, Modifier, ActiveAction, Order } from '../types';
 import { supabase } from '../utils/supabase';
 import { useShiftStore } from './shiftStore';
+import { useMenuStore } from './menuStore';
+import { VENUE_ID } from '../config';
+import { logger } from '../utils/logger';
 
-const VENUE_ID = '00000000-0000-0000-0000-000000000010';
-
-// Helper to generate a UUID
 const generateId = () => {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0;
@@ -16,20 +16,13 @@ const generateId = () => {
 
 const now = () => new Date().toISOString();
 
-// ── Helper: calculate total from items ──
 const calcTotal = (items: OrderItem[]): number =>
   items.reduce((sum, item) => {
     const modPrice = item.modifiers.reduce((ms, m) => ms + m.price, 0);
     return sum + (item.product.price + modPrice) * item.quantity;
   }, 0);
 
-// Get next order number (resets daily)
 const getNextOrderNumber = (orders: Order[]): string => {
-  const today = new Date().toDateString();
-  const todayOrders = orders.filter(o => {
-    // Compare by openedAt time string — rough but works for same-day
-    return true; // For MVP, just increment globally
-  });
   const nums = orders.map(o => parseFloat(o.number)).filter(n => !isNaN(n));
   const maxNum = nums.length > 0 ? Math.max(...nums) : 0;
   return String(Math.floor(maxNum) + 1);
@@ -39,9 +32,12 @@ const getNextOrderNumber = (orders: Order[]): string => {
 
 const syncCreateOrder = async (order: Order) => {
   try {
+    const waiterId = useShiftStore.getState().currentUser?.id || null;
+    const shiftId = useShiftStore.getState().currentShift?.id || null;
     const { error } = await supabase.from('orders').insert({
       id: order.id,
       venue_id: VENUE_ID,
+      shift_id: shiftId,
       table_id: order.tableId || null,
       number: order.number,
       status: order.status,
@@ -49,19 +45,22 @@ const syncCreateOrder = async (order: Order) => {
       table_number: order.tableNumber || null,
       zone_name: order.zone,
       order_type: order.type,
+      order_source: order.source ?? 'pos',
+      external_order_id: order.externalOrderId ?? null,
       is_quick_check: order.isQuickCheck || false,
       opened_at: new Date().toISOString(),
       total_amount: order.totalAmount,
-      waiter_id: null, // TODO: map waiter name to ID
+      waiter_id: waiterId,
     });
-    if (error) console.error('syncCreateOrder:', error.message);
-  } catch (e: any) {
-    console.error('syncCreateOrder:', e.message);
+    if (error) logger.error('orderStore.syncCreateOrder', error, { orderId: order.id });
+  } catch (e) {
+    logger.error('orderStore.syncCreateOrder', e, { orderId: order.id });
   }
 };
 
 const syncUpdateOrder = async (order: Order) => {
   try {
+    const waiterId = useShiftStore.getState().currentUser?.id || null;
     const { error } = await supabase.from('orders').update({
       status: order.status,
       guest_count: order.guestCount,
@@ -70,18 +69,41 @@ const syncUpdateOrder = async (order: Order) => {
       zone_name: order.zone,
       total_amount: order.totalAmount,
       is_quick_check: order.isQuickCheck || false,
-      comment: (order as any).comment || null,
-      closed_at: (order.status === 'paid' || order.status === 'cancelled') ? new Date().toISOString() : null,
+      comment: order.comment || null,
+      waiter_id: waiterId,
+      closed_at:
+        order.status === 'paid' || order.status === 'cancelled'
+          ? (order.closedAt ?? new Date().toISOString())
+          : null,
     }).eq('id', order.id);
-    if (error) console.error('syncUpdateOrder:', error.message);
-  } catch (e: any) {
-    console.error('syncUpdateOrder:', e.message);
+    if (error) logger.error('orderStore.syncUpdateOrder', error, { orderId: order.id });
+  } catch (e) {
+    logger.error('orderStore.syncUpdateOrder', e, { orderId: order.id });
   }
+};
+
+const syncUpdateOrderAwait = async (order: Order) => {
+  const waiterId = useShiftStore.getState().currentUser?.id || null;
+  const { error } = await supabase.from('orders').update({
+    status: order.status,
+    guest_count: order.guestCount,
+    table_id: order.tableId || null,
+    table_number: order.tableNumber || null,
+    zone_name: order.zone,
+    total_amount: order.totalAmount,
+    is_quick_check: order.isQuickCheck || false,
+    comment: order.comment || null,
+    waiter_id: waiterId,
+    closed_at:
+      order.status === 'paid' || order.status === 'cancelled'
+        ? (order.closedAt ?? new Date().toISOString())
+        : null,
+  }).eq('id', order.id);
+  if (error) throw new Error(error.message);
 };
 
 const syncOrderItems = async (orderId: string, items: OrderItem[]) => {
   try {
-    // Delete existing modifiers (only if there are items to avoid an empty .in() filter)
     if (items.length > 0) {
       await supabase.from('order_item_modifiers')
         .delete()
@@ -90,22 +112,33 @@ const syncOrderItems = async (orderId: string, items: OrderItem[]) => {
 
     await supabase.from('order_items').delete().eq('order_id', orderId);
 
-    // Insert current items
     if (items.length > 0) {
-      const orderItems = items.map((item, idx) => ({
+      const orderItems = items.map((item) => ({
         id: item.id,
         order_id: orderId,
         product_id: item.product.id,
         product_name: item.product.name,
         product_price: item.product.price,
         quantity: item.quantity,
-        guest_number: item.guestId ? idx + 1 : 1,
+        guest_number: 1,
       }));
 
-      const { error } = await supabase.from('order_items').upsert(orderItems, { onConflict: 'id' });
-      if (error) console.error('syncOrderItems upsert:', error.message);
+      const { error: itemsError } = await supabase
+        .from('order_items')
+        .upsert(orderItems, { onConflict: 'id' });
+      if (itemsError) {
+        logger.error('orderStore.syncOrderItems.upsertItems', itemsError, {
+          orderId,
+          code: itemsError.code,
+        });
+        // 23503 — FK violation (например, product_id больше нет в products после правок в админке).
+        // Инвалидируем кэш меню — далее пользователь увидит свежие позиции.
+        if (itemsError.code === '23503') {
+          useMenuStore.getState().fetchMenu(true).catch(() => {});
+        }
+        return; // без order_items нет смысла пытаться вставлять модификаторы
+      }
 
-      // Insert modifiers
       const modRows: any[] = [];
       items.forEach(item => {
         item.modifiers.forEach(mod => {
@@ -118,11 +151,23 @@ const syncOrderItems = async (orderId: string, items: OrderItem[]) => {
         });
       });
       if (modRows.length > 0) {
-        await supabase.from('order_item_modifiers').upsert(modRows, { onConflict: 'id' });
+        // id генерится сервером, поэтому простой insert (без бессмысленного onConflict: 'id').
+        const { error: modError } = await supabase.from('order_item_modifiers').insert(modRows);
+        if (modError) {
+          logger.error('orderStore.syncOrderItems.insertModifiers', modError, {
+            orderId,
+            code: modError.code,
+          });
+          if (modError.code === '23503') {
+            // FK на modifier_id отвалился — кэш меню устарел (модификаторы пересоздали в админке).
+            // Принудительно обновляем — на следующей попытке клиент возьмёт актуальные UUID.
+            useMenuStore.getState().fetchMenu(true).catch(() => {});
+          }
+        }
       }
     }
-  } catch (e: any) {
-    console.error('syncOrderItems:', e.message);
+  } catch (e) {
+    logger.error('orderStore.syncOrderItems', e, { orderId });
   }
 };
 
@@ -135,8 +180,8 @@ const syncDeleteOrder = async (orderId: string) => {
       );
     await supabase.from('order_items').delete().eq('order_id', orderId);
     await supabase.from('orders').delete().eq('id', orderId);
-  } catch (e: any) {
-    console.error('syncDeleteOrder:', e.message);
+  } catch (e) {
+    logger.error('orderStore.syncDeleteOrder', e, { orderId });
   }
 };
 
@@ -144,24 +189,27 @@ const syncDeleteOrder = async (orderId: string) => {
 
 const loadOrdersFromSupabase = async (): Promise<Order[]> => {
   try {
+    const currentShiftId = useShiftStore.getState().currentShift?.id;
+    if (!currentShiftId) return [];
+
     const { data: orderData, error: orderError } = await supabase
       .from('orders')
-      .select('*')
+      .select('*, users(name)')
       .eq('venue_id', VENUE_ID)
+      .eq('shift_id', currentShiftId)
       .in('status', ['active', 'alert', 'paid', 'cancelled'])
       .order('opened_at', { ascending: false });
 
     if (orderError) throw orderError;
     if (!orderData || orderData.length === 0) return [];
 
-    // Load items for all orders
     const orderIds = orderData.map((o: any) => o.id);
     const { data: itemData } = await supabase
       .from('order_items')
       .select('*, order_item_modifiers(*)')
       .in('order_id', orderIds);
 
-    return orderData.map((o: any) => {
+    const mapped = orderData.map((o: any) => {
       const items: OrderItem[] = (itemData || [])
         .filter((i: any) => i.order_id === o.id)
         .map((i: any) => ({
@@ -173,7 +221,6 @@ const loadOrdersFromSupabase = async (): Promise<Order[]> => {
             price: Number(i.product_price),
           },
           quantity: i.quantity,
-          guestId: null,
           modifiers: (i.order_item_modifiers || []).map((m: any) => ({
             id: m.modifier_id || m.id,
             name: m.modifier_name,
@@ -185,7 +232,9 @@ const loadOrdersFromSupabase = async (): Promise<Order[]> => {
         id: o.id,
         number: o.number,
         status: o.status as any,
-        waiter: 'Иванов', // TODO: resolve from waiter_id
+        source: (o.order_source as 'pos' | 'glovo' | 'yandex_eda' | undefined) ?? 'pos',
+        externalOrderId: o.external_order_id || undefined,
+        waiter: (Array.isArray(o.users) ? o.users[0]?.name : o.users?.name) || 'Иванов',
         openedAt: o.opened_at,
         closedAt: o.closed_at || undefined,
         zone: o.zone_name || '',
@@ -194,18 +243,24 @@ const loadOrdersFromSupabase = async (): Promise<Order[]> => {
         tableNumber: o.table_number || '',
         tableId: o.table_id || '',
         guestCount: o.guest_count || 1,
-        guests: Array.from({ length: o.guest_count || 1 }, (_, i) => ({
-          id: `g${i + 1}`,
-          name: `Гость ${i + 1}`,
-        })),
         items,
         isQuickCheck: o.is_quick_check || false,
         comment: o.comment || undefined,
         closeReason: o.close_reason || undefined,
       } as Order;
     });
-  } catch (e: any) {
-    console.error('loadOrdersFromSupabase:', e.message);
+
+    // Sort: active/alert first, then paid/cancelled. Within each group — newest first.
+    const statusPriority: Record<string, number> = { active: 0, alert: 0, paid: 1, cancelled: 2 };
+    mapped.sort((a, b) => {
+      const pa = statusPriority[a.status] ?? 0;
+      const pb = statusPriority[b.status] ?? 0;
+      if (pa !== pb) return pa - pb;
+      return new Date(b.openedAt).getTime() - new Date(a.openedAt).getTime();
+    });
+    return mapped;
+  } catch (e) {
+    logger.error('orderStore.loadOrdersFromSupabase', e);
     return [];
   }
 };
@@ -225,19 +280,22 @@ const debouncedSyncItems = (orderId: string, items: OrderItem[]) => {
   }, 500);
 };
 
-const flushPendingSync = () => {
-  if (itemSyncTimeout) clearTimeout(itemSyncTimeout);
-  if (pendingSync) {
-    syncOrderItems(pendingSync.orderId, pendingSync.items);
-    const total = calcTotal(pendingSync.items);
-    supabase.from('orders').update({ total_amount: total }).eq('id', pendingSync.orderId);
-    pendingSync = null;
+const flushPendingSyncAwait = async () => {
+  if (itemSyncTimeout) {
+    clearTimeout(itemSyncTimeout);
+    itemSyncTimeout = null;
   }
+  if (!pendingSync) return;
+  const { orderId, items } = pendingSync;
+  pendingSync = null;
+  await syncOrderItems(orderId, items);
+  const total = calcTotal(items);
+  const { error } = await supabase.from('orders').update({ total_amount: total }).eq('id', orderId);
+  if (error) throw new Error(error.message);
 };
 
 // ═══ Store ═══
 
-// ── Sync current editing state back into the orders array ──
 const syncToOrders = (state: OrderStoreState): Order[] => {
   if (!state.currentOrderId) return state.orders;
 
@@ -247,9 +305,7 @@ const syncToOrders = (state: OrderStoreState): Order[] => {
       ? {
           ...o,
           items: state.items,
-          guests: state.guests,
           totalAmount: total,
-          guestCount: state.guests.length,
           tableNumber: state.tableNumber,
           tableId: state.tableId,
           isQuickCheck: state.isQuickCheck,
@@ -258,7 +314,6 @@ const syncToOrders = (state: OrderStoreState): Order[] => {
       : o
   );
 
-  // Debounced sync to Supabase
   debouncedSyncItems(state.currentOrderId, state.items);
 
   return updated;
@@ -268,37 +323,37 @@ interface OrderStoreState {
   orders: Order[];
   currentOrderId: string | null;
   items: OrderItem[];
-  guests: Guest[];
   tableNumber: string;
   tableId: string;
   isQuickCheck: boolean;
   selectedItemId: string | null;
-  activeGuestId: string | null;
   activeAction: ActiveAction;
   activeCategoryId: string;
   activeModifierGroupId: string;
 
-  // Actions
+  flushPendingItemsToServer: () => Promise<void>;
+  syncRemoteOrder: (order: Order) => Promise<void>;
+
   fetchOrders: () => Promise<void>;
   createOrderForTable: (tableId: string, tableNumber: string, zone: string) => string;
   createQuickCheck: () => string;
   getOrderForTable: (tableId: string) => Order | undefined;
   openOrder: (orderId: string) => void;
-  closeOrder: () => void;
+  closeOrder: () => Promise<void>;
   deleteOrder: (orderId: string) => void;
-  addGuest: () => void;
-  setActiveGuest: (guestId: string | null) => void;
+  setGuestCount: (delta: number) => void;
+  sendToKitchen: () => void;
+  updateOrderMeta: (patch: Partial<Pick<Order, 'waiter' | 'tableId' | 'tableNumber' | 'zone' | 'guestCount'>>) => void;
   addProduct: (product: Product) => void;
   removeProduct: (itemId: string) => void;
+  duplicateItem: (itemId: string) => void;
   updateQuantity: (itemId: string, delta: number) => void;
   getTotal: () => number;
-  getGuestTotal: (guestId: string | null) => number;
   selectItem: (itemId: string | null) => void;
   setActiveAction: (action: ActiveAction) => void;
   setActiveCategory: (categoryId: string) => void;
   setActiveModifierGroup: (groupId: string) => void;
   toggleModifier: (modifier: Modifier) => void;
-  assignItemToGuest: (itemId: string, guestId: string | null) => void;
   setItemComment: (itemId: string, comment: string) => void;
 }
 
@@ -306,40 +361,43 @@ export const useOrderStore = create<OrderStoreState>((set, get) => ({
   orders: [],
   currentOrderId: null,
   items: [],
-  guests: [],
   tableNumber: '',
   tableId: '',
   isQuickCheck: false,
   selectedItemId: null,
-  activeGuestId: null,
   activeAction: null,
   activeCategoryId: '',
   activeModifierGroupId: 'filling',
 
-  // ── Load from Supabase ──
+  flushPendingItemsToServer: async () => {
+    await flushPendingSyncAwait();
+  },
+
+  syncRemoteOrder: async (order: Order) => {
+    await syncUpdateOrderAwait(order);
+  },
+
   fetchOrders: async () => {
     const orders = await loadOrdersFromSupabase();
     set({ orders });
   },
 
-  // ── Create order for table ──
   createOrderForTable: (tableId: string, tableNumber: string, zone: string) => {
     const state = get();
-    const existing = state.orders.find(o => o.tableId === tableId && o.status !== 'cancelled');
+    const existing = state.orders.find(o => o.tableId === tableId && (o.status === 'active' || o.status === 'alert'));
     if (existing) {
       get().openOrder(existing.id);
       return existing.id;
     }
 
     const id = generateId();
-    const guest1Id = generateId();
-    const guests = [{ id: guest1Id, name: 'Гость 1' }];
     const currentUser = useShiftStore.getState().currentUser;
 
     const newOrder: Order = {
       id,
       number: getNextOrderNumber(state.orders),
       status: 'active',
+      source: 'pos',
       waiter: currentUser?.name || 'Иванов',
       openedAt: now(),
       zone,
@@ -348,41 +406,34 @@ export const useOrderStore = create<OrderStoreState>((set, get) => ({
       tableNumber,
       tableId,
       guestCount: 1,
-      guests: [...guests],
       items: [],
     };
 
     set({
-      orders: [...state.orders, newOrder],
+      orders: [newOrder, ...state.orders],
       currentOrderId: id,
       items: [],
-      guests,
       tableNumber,
       tableId,
       isQuickCheck: false,
       selectedItemId: null,
-      activeGuestId: guest1Id,
       activeAction: null,
     });
 
-    // Sync to Supabase
     syncCreateOrder(newOrder);
-
     return id;
   },
 
-  // ── Quick check ──
   createQuickCheck: () => {
     const state = get();
     const id = generateId();
-    const guest1Id = generateId();
-    const guests = [{ id: guest1Id, name: 'Гость 1' }];
     const currentUser = useShiftStore.getState().currentUser;
 
     const newOrder: Order = {
       id,
       number: getNextOrderNumber(state.orders),
       status: 'active',
+      source: 'pos',
       waiter: currentUser?.name || 'Иванов',
       openedAt: now(),
       zone: 'Быстрый чек',
@@ -391,21 +442,18 @@ export const useOrderStore = create<OrderStoreState>((set, get) => ({
       tableNumber: '',
       tableId: '',
       guestCount: 1,
-      guests: [...guests],
       items: [],
       isQuickCheck: true,
     };
 
     set({
-      orders: [...state.orders, newOrder],
+      orders: [newOrder, ...state.orders],
       currentOrderId: id,
       items: [],
-      guests,
       tableNumber: '',
       tableId: '',
       isQuickCheck: true,
       selectedItemId: null,
-      activeGuestId: guest1Id,
       activeAction: null,
     });
 
@@ -414,7 +462,7 @@ export const useOrderStore = create<OrderStoreState>((set, get) => ({
   },
 
   getOrderForTable: (tableId: string) => {
-    return get().orders.find(o => o.tableId === tableId && o.status !== 'cancelled');
+    return get().orders.find(o => o.tableId === tableId && (o.status === 'active' || o.status === 'alert'));
   },
 
   openOrder: (orderId: string) => {
@@ -424,36 +472,67 @@ export const useOrderStore = create<OrderStoreState>((set, get) => ({
     set({
       currentOrderId: order.id,
       items: JSON.parse(JSON.stringify(order.items)),
-      guests: JSON.parse(JSON.stringify(order.guests)),
       tableNumber: order.tableNumber,
       tableId: order.tableId || '',
       isQuickCheck: order.isQuickCheck || false,
       selectedItemId: null,
-      activeGuestId: order.guests.length > 0 ? order.guests[0].id : null,
       activeAction: null,
     });
   },
 
-  closeOrder: () => {
+  closeOrder: async () => {
     const state = get();
+    try {
+      await flushPendingSyncAwait();
+    } catch (e) {
+      logger.error('orderStore.flushPendingItemsToServer', e);
+    }
 
-    // Flush any pending debounced sync immediately
-    flushPendingSync();
+    if (!state.currentOrderId) {
+      set({
+        currentOrderId: null,
+        items: [],
+        selectedItemId: null,
+        tableId: '',
+        tableNumber: '',
+        isQuickCheck: false,
+      });
+      return;
+    }
 
-    // Flush the latest items/total into the orders array before clearing editing state
-    const updatedOrders = syncToOrders(state);
+    const total = calcTotal(state.items);
+    const updatedOrders = state.orders.map((o) =>
+      o.id === state.currentOrderId
+        ? {
+            ...o,
+            items: state.items,
+            totalAmount: total,
+            tableNumber: state.tableNumber,
+            tableId: state.tableId,
+            isQuickCheck: state.isQuickCheck,
+            status:
+              o.status === 'paid' || o.status === 'cancelled'
+                ? o.status
+                : total > 0
+                  ? ('active' as const)
+                  : o.status,
+          }
+        : o
+    );
 
-    // Sync final state to Supabase
-    if (state.currentOrderId) {
-      const order = updatedOrders.find(o => o.id === state.currentOrderId);
-      if (order) syncUpdateOrder(order);
+    const order = updatedOrders.find((o) => o.id === state.currentOrderId);
+    if (order) {
+      try {
+        await syncUpdateOrderAwait(order);
+      } catch (e) {
+        logger.error('orderStore.syncRemoteOrder', e, { orderId: order.id });
+      }
     }
 
     set({
       orders: updatedOrders,
       currentOrderId: null,
       items: [],
-      guests: [],
       selectedItemId: null,
       tableId: '',
       tableNumber: '',
@@ -468,29 +547,54 @@ export const useOrderStore = create<OrderStoreState>((set, get) => ({
     syncDeleteOrder(orderId);
   },
 
-  // ── POS editing (all auto-save via syncToOrders) ──
-
-  addGuest: () => {
-    set((state) => {
-      const newGuestNumber = state.guests.length + 1;
-      const newGuest = { id: generateId(), name: `Гость ${newGuestNumber}` };
-      const newState = { ...state, guests: [...state.guests, newGuest] };
-      return { guests: newState.guests, orders: syncToOrders(newState) };
-    });
+  setGuestCount: (delta: number) => {
+    const state = get();
+    if (!state.currentOrderId) return;
+    const order = state.orders.find(o => o.id === state.currentOrderId);
+    if (!order) return;
+    const newCount = Math.max(1, order.guestCount + delta);
+    const updatedOrders = state.orders.map(o =>
+      o.id === state.currentOrderId ? { ...o, guestCount: newCount } : o
+    );
+    set({ orders: updatedOrders });
+    syncUpdateOrder({ ...order, guestCount: newCount });
   },
 
-  setActiveGuest: (guestId: string | null) => {
-    set({ activeGuestId: guestId });
+  sendToKitchen: () => {
+    const state = get();
+    if (!state.currentOrderId) return;
+    const order = state.orders.find(o => o.id === state.currentOrderId);
+    if (!order || order.sentToKitchen) return;
+    const updated = { ...order, sentToKitchen: true };
+    const updatedOrders = state.orders.map(o =>
+      o.id === state.currentOrderId ? updated : o
+    );
+    set({ orders: updatedOrders });
+    syncUpdateOrder(updated);
+  },
+
+  updateOrderMeta: (patch) => {
+    const state = get();
+    if (!state.currentOrderId) return;
+    const order = state.orders.find(o => o.id === state.currentOrderId);
+    if (!order) return;
+    const updated = { ...order, ...patch };
+    const updatedOrders = state.orders.map(o =>
+      o.id === state.currentOrderId ? updated : o
+    );
+    set({ orders: updatedOrders });
+    syncUpdateOrder(updated);
   },
 
   addProduct: (product: Product) => {
     set((state) => {
-      const targetGuestId = state.activeGuestId;
-      const existing = state.items.find(
-        (item) => item.product.id === product.id
-          && item.modifiers.length === 0
-          && item.guestId === targetGuestId
-      );
+      // Для продуктов с модификаторами каждое добавление — это отдельная позиция,
+      // чтобы можно было задать разные модификаторы (например, два Латте с разным молоком).
+      const existing = product.hasModifiers
+        ? undefined
+        : state.items.find(
+            (item) => item.product.id === product.id && item.modifiers.length === 0
+          );
 
       if (existing) {
         const newItems = state.items.map((item) =>
@@ -504,7 +608,6 @@ export const useOrderStore = create<OrderStoreState>((set, get) => ({
         id: generateId(),
         product,
         quantity: 1,
-        guestId: targetGuestId,
         modifiers: [],
       };
       const newItems = [...state.items, newItem];
@@ -536,6 +639,33 @@ export const useOrderStore = create<OrderStoreState>((set, get) => ({
     });
   },
 
+  duplicateItem: (itemId: string) => {
+    set((state) => {
+      const idx = state.items.findIndex((item) => item.id === itemId);
+      if (idx < 0) return state;
+      const source = state.items[idx];
+      const clone: OrderItem = {
+        id: generateId(),
+        product: source.product,
+        quantity: 1,
+        modifiers: source.modifiers.map((m) => ({ ...m })),
+        comment: source.comment,
+      };
+      const newItems = [
+        ...state.items.slice(0, idx + 1),
+        clone,
+        ...state.items.slice(idx + 1),
+      ];
+      const newState = { ...state, items: newItems };
+      return {
+        items: newItems,
+        selectedItemId: clone.id,
+        activeAction: source.product.hasModifiers ? ('modifiers' as ActiveAction) : state.activeAction,
+        orders: syncToOrders(newState),
+      };
+    });
+  },
+
   updateQuantity: (itemId: string, delta: number) => {
     set((state) => {
       const newItems = state.items.map(item => {
@@ -557,7 +687,6 @@ export const useOrderStore = create<OrderStoreState>((set, get) => ({
   },
 
   getTotal: () => calcTotal(get().items),
-  getGuestTotal: (guestId: string | null) => calcTotal(get().items.filter(item => item.guestId === guestId)),
 
   selectItem: (itemId: string | null) => {
     if (!itemId) {
@@ -579,24 +708,33 @@ export const useOrderStore = create<OrderStoreState>((set, get) => ({
   toggleModifier: (modifier: Modifier) => {
     set((state) => {
       if (!state.selectedItemId) return state;
+      // Группа модификатора и её правила (max_select, is_required) живут в menuStore.
+      // 0 / undefined трактуем как «без лимита» — поведение совместимо со старым кодом.
+      const group = useMenuStore
+        .getState()
+        .modifierGroups.find((g) => g.modifiers.some((m) => m.id === modifier.id));
+      const siblingIds = group ? group.modifiers.map((m) => m.id) : [modifier.id];
+      const maxSelect = group?.maxSelect ?? 0;
+
       const newItems = state.items.map((item) => {
         if (item.id !== state.selectedItemId) return item;
         const has = item.modifiers.some((m) => m.id === modifier.id);
-        const newMods = has
-          ? item.modifiers.filter((m) => m.id !== modifier.id)
-          : [...item.modifiers, modifier];
+        if (has) {
+          return { ...item, modifiers: item.modifiers.filter((m) => m.id !== modifier.id) };
+        }
+        let newMods = [...item.modifiers, modifier];
+        if (maxSelect > 0) {
+          // Считаем выбранные из той же группы и убираем самый ранний (FIFO),
+          // пока не уложимся в лимит. При max_select=1 это даёт радио-поведение.
+          const inGroup = newMods.filter((m) => siblingIds.includes(m.id));
+          const overflow = inGroup.length - maxSelect;
+          if (overflow > 0) {
+            const toRemove = new Set(inGroup.slice(0, overflow).map((m) => m.id));
+            newMods = newMods.filter((m) => !toRemove.has(m.id));
+          }
+        }
         return { ...item, modifiers: newMods };
       });
-      const newState = { ...state, items: newItems };
-      return { items: newItems, orders: syncToOrders(newState) };
-    });
-  },
-
-  assignItemToGuest: (itemId: string, guestId: string | null) => {
-    set((state) => {
-      const newItems = state.items.map(item =>
-        item.id === itemId ? { ...item, guestId } : item
-      );
       const newState = { ...state, items: newItems };
       return { items: newItems, orders: syncToOrders(newState) };
     });

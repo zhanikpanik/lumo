@@ -1,19 +1,25 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, Text, TextInput, TouchableOpacity, SafeAreaView, StatusBar, useWindowDimensions } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Alert, View, StyleSheet, Text, TextInput, TouchableOpacity, SafeAreaView, StatusBar, useWindowDimensions } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { theme } from '../theme/colors';
 import { SearchIcon, NotificationIcon } from '../components/Icons';
 import { OrderCard } from '../components/OrderCard';
 import { FloorPlan } from '../components/FloorPlan';
 import { BottomTabBar } from '../components/BottomTabBar';
+import { SegmentedSwitcher } from '../components/SegmentedSwitcher';
 import { FunctionsModal } from '../components/FunctionsModal';
 import { SalesReportModal } from '../components/SalesReportModal';
-import { ShiftInfoModal } from '../components/ShiftInfoModal';
 import { CloseShiftModal } from '../components/CloseShiftModal';
+import { CashCollectionModal } from '../components/CashCollectionModal';
+import { CashTransactionModal } from '../components/CashTransactionModal';
+import { CashModal } from '../components/CashModal';
 import { useShiftStore } from '../store/shiftStore';
 import { useOrderStore } from '../store/orderStore';
 import { useVenueStore, VenueTable } from '../store/venueStore';
+import { useNotificationStore } from '../store/notificationStore';
+import { useOrdersUiStore } from '../store/ordersUiStore';
 import { Order } from '../types';
+import { can } from '../utils/permissions';
 
 const getCols = (width: number): number => {
   if (width < 1200) return 4;
@@ -29,6 +35,27 @@ const getRows = (height: number): number => {
   return 6;
 };
 
+/** Digits / spaces / comma as decimal separator → number for matching `totalAmount`. */
+function parseAmountSearchQuery(raw: string): number | null {
+  const s = raw.trim().replace(/\s+/g, '').replace(',', '.');
+  if (!/\d/.test(s)) return null;
+  if (!/^\d*\.?\d+$/.test(s)) return null;
+  const n = parseFloat(s);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+function orderItemsSearchHaystack(o: Order): string {
+  const parts: string[] = [];
+  for (const it of o.items) {
+    parts.push(it.product.name);
+    if (it.comment) parts.push(it.comment);
+    for (const m of it.modifiers) {
+      parts.push(m.name);
+    }
+  }
+  return parts.join(' ').toLowerCase();
+}
+
 export const OrdersScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState<'orders' | 'tables'>('orders');
   const [page, setPage] = useState(0);
@@ -38,19 +65,40 @@ export const OrdersScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const openOrder = useOrderStore((s) => s.openOrder);
   const [menuVisible, setMenuVisible] = useState(false);
   const [zoneIdx, setZoneIdx] = useState(0);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'paid'>('all');
+  const statusFilter = useOrdersUiStore((s) => s.statusFilter);
+  const setStatusFilter = useOrdersUiStore((s) => s.setStatusFilter);
   const [reportVisible, setReportVisible] = useState(false);
-  const [shiftInfoVisible, setShiftInfoVisible] = useState(false);
   const [closeShiftVisible, setCloseShiftVisible] = useState(false);
+  const [cashCollectionVisible, setCashCollectionVisible] = useState(false);
+  const [cashInVisible, setCashInVisible] = useState(false);
+  const [cashOutVisible, setCashOutVisible] = useState(false);
+  const [cashModalVisible, setCashModalVisible] = useState(false);
   const [searchActive, setSearchActive] = useState(false);
-  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
-  const [sortDropdownOpen, setSortDropdownOpen] = useState(false);
-  const [sortMode, setSortMode] = useState<'time' | 'table'>('time');
+  const sortMode = useOrdersUiStore((s) => s.sortMode);
+  const setSortMode = useOrdersUiStore((s) => s.setSortMode);
   const closeShift = useShiftStore((s) => s.closeShift);
+  const addCashCollection = useShiftStore((s) => s.addCashCollection);
+  const addCashTransaction = useShiftStore((s) => s.addCashTransaction);
+  const refreshShiftCashSummary = useShiftStore((s) => s.refreshShiftCashSummary);
   const logout = useShiftStore((s) => s.logout);
+  const currentUser = useShiftStore((s) => s.currentUser);
   const [searchQuery, setSearchQuery] = useState('');
-  const isOrders = activeTab === 'orders';
+  const venueType = useVenueStore((s) => s.venueType);
+  const isTakeaway = venueType === 'takeaway';
+  const isOrders = isTakeaway || activeTab === 'orders';
+  const canCloseShift = can(currentUser?.role, 'closeShift');
+  const canCashTransaction = can(currentUser?.role, 'cashTransaction');
   const venueZones = useVenueStore((s) => s.zones);
+  const [waiterFilter, setWaiterFilter] = useState(false);
+
+  useEffect(() => {
+    // Takeaway has no tables tab — keep the user on the orders grid.
+    // We deliberately do NOT touch statusFilter/sortMode here: they live in
+    // the persisted ordersUiStore and must survive navigation back from an
+    // order. Restricted options for takeaway are enforced at the switcher
+    // level (sortMode 'table' is simply not offered).
+    if (isTakeaway) setActiveTab('orders');
+  }, [isTakeaway]);
 
   // Data is fetched once at App level — no need to re-fetch on mount
 
@@ -70,23 +118,34 @@ export const OrdersScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   // ── Filter orders by status ──
   const statusFiltered = statusFilter === 'all' ? orders : orders.filter(o => o.status === statusFilter);
 
+  // ── Filter orders by waiter ──
+  const waiterFiltered = waiterFilter && currentUser
+    ? statusFiltered.filter(o => o.waiter === currentUser.name)
+    : statusFiltered;
+
   // ── Filter orders by search ──
   const filteredOrders = searchQuery.trim()
-    ? statusFiltered.filter((o) => {
-        const q = searchQuery.toLowerCase();
+    ? waiterFiltered.filter((o) => {
+        const raw = searchQuery.trim();
+        const q = raw.toLowerCase();
+        const amount = parseAmountSearchQuery(raw);
+        const itemsHay = orderItemsSearchHaystack(o);
         return (
           o.number.toLowerCase().includes(q) ||
           (o.tableNumber && o.tableNumber.toLowerCase().includes(q)) ||
           o.waiter.toLowerCase().includes(q) ||
-          (o.zone && o.zone.toLowerCase().includes(q))
+          (o.zone && o.zone.toLowerCase().includes(q)) ||
+          (o.comment && o.comment.toLowerCase().includes(q)) ||
+          itemsHay.includes(q) ||
+          (amount !== null && Math.abs(o.totalAmount - amount) < 0.005)
         );
       })
-    : statusFiltered;
+    : waiterFiltered;
 
   const STATUS_LABELS: Record<string, string> = {
     all: 'Все заказы',
-    active: 'Открытые заказы',
-    paid: 'Закрытые заказы',
+    active: 'Открытые',
+    paid: 'Закрытые',
   };
 
   const SORT_LABELS: Record<string, string> = {
@@ -114,6 +173,7 @@ export const OrdersScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   };
 
   const handleSelectOrder = (orderId: string) => {
+    useNotificationStore.getState().markSeen(orderId);
     openOrder(orderId);
     const order = useOrderStore.getState().orders.find(o => o.id === orderId);
     navigation.navigate(order?.status === 'paid' ? 'PaidCheck' : 'Pos');
@@ -132,6 +192,60 @@ export const OrdersScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 
   const handlePageUp = () => setPage((p) => Math.max(0, p - 1));
   const handlePageDown = () => setPage((p) => Math.min(totalPages - 1, p + 1));
+
+  const cashTransactionErrorMessage = (
+    err: string,
+    detail?: Record<string, unknown>,
+  ): { title: string; message: string } => {
+    switch (err) {
+      case 'shift_not_open':
+      case 'shift_not_found':
+        return { title: 'Смена не открыта', message: 'Откройте смену и повторите.' };
+      case 'invalid_amount':
+        return { title: 'Ошибка', message: 'Сумма должна быть больше нуля.' };
+      case 'invalid_kind':
+        return { title: 'Ошибка', message: 'Тип транзакции не распознан.' };
+      case 'insufficient_cash': {
+        const available = Number(detail?.available ?? 0);
+        return {
+          title: 'Недостаточно наличных',
+          message: `Доступно: ${formatAmount(available)} ₽. Уменьшите сумму или сначала проведите внесение.`,
+        };
+      }
+      case 'actor_forbidden_role':
+      case 'actor_not_allowed':
+      case 'forbidden':
+        return { title: 'Недостаточно прав', message: 'Эта операция недоступна для вашей роли.' };
+      default:
+        return { title: 'Ошибка', message: `Не удалось провести операцию: ${err}` };
+    }
+  };
+
+  const handleCashTransaction = async (
+    kind: 'in' | 'out',
+    amount: number,
+    note?: string,
+  ): Promise<{ ok: boolean }> => {
+    if (!canCashTransaction) {
+      Alert.alert('Недостаточно прав', 'Эта операция недоступна для вашей роли.');
+      return { ok: false };
+    }
+    const shift = useShiftStore.getState().currentShift;
+    if (!shift) {
+      Alert.alert('Смена не открыта', 'Откройте смену и повторите.');
+      return { ok: false };
+    }
+    const res = await addCashTransaction(kind, amount, note, currentUser?.id ?? null);
+    if (!res.ok) {
+      const { title, message } = cashTransactionErrorMessage(
+        res.error ?? 'cash_transaction_failed',
+        res.detail,
+      );
+      Alert.alert(title, message);
+      return { ok: false };
+    }
+    return { ok: true };
+  };
 
   // ── Build flat cell list for orders grid ──
   type Cell =
@@ -163,7 +277,7 @@ export const OrdersScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
               <SearchIcon size={18} color={theme.colors.textSecondary} />
               <TextInput
                 style={styles.searchInput}
-                placeholder="Номер, стол, официант..."
+                placeholder="Номер, стол, официант, блюдо, сумма…"
                 placeholderTextColor={theme.colors.textSecondary}
                 value={searchQuery}
                 onChangeText={(text) => { setSearchQuery(text); setPage(0); }}
@@ -175,68 +289,54 @@ export const OrdersScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
             </View>
           ) : (
             <>
-              {/* Status filter chip */}
-              <View style={styles.dropdownWrap}>
-                <TouchableOpacity
-                  style={styles.filterChip}
-                  onPress={() => { setStatusDropdownOpen(o => !o); setSortDropdownOpen(false); }}
-                >
-                  <Text style={styles.filterChipText}>{STATUS_LABELS[statusFilter]}</Text>
-                  <Feather name="chevron-down" size={16} color={theme.colors.textSecondary} />
-                </TouchableOpacity>
-                {statusDropdownOpen && (
-                  <View style={styles.dropdown}>
-                    {(['all', 'active', 'paid'] as const).map(s => (
-                      <TouchableOpacity
-                        key={s}
-                        style={[styles.dropdownItem, statusFilter === s && styles.dropdownItemActive]}
-                        onPress={() => { setStatusFilter(s); setStatusDropdownOpen(false); setPage(0); }}
-                      >
-                        <Text style={[styles.dropdownItemText, statusFilter === s && styles.dropdownItemTextActive]}>
-                          {STATUS_LABELS[s]}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-              </View>
+              <SegmentedSwitcher
+                options={[
+                  { value: 'all', label: STATUS_LABELS.all },
+                  { value: 'active', label: STATUS_LABELS.active },
+                  { value: 'paid', label: STATUS_LABELS.paid },
+                ]}
+                value={statusFilter}
+                onChange={(v) => { setStatusFilter(v); setPage(0); }}
+              />
 
-              {/* Sort chip — only on orders tab */}
-              {isOrders && (
-                <View style={[styles.dropdownWrap, { marginLeft: GAP }]}>
-                  <TouchableOpacity
-                    style={styles.filterChip}
-                    onPress={() => { setSortDropdownOpen(o => !o); setStatusDropdownOpen(false); }}
-                  >
-                    <Text style={styles.filterChipText}>{SORT_LABELS[sortMode]}</Text>
-                    <Feather name="chevron-down" size={16} color={theme.colors.textSecondary} />
-                  </TouchableOpacity>
-                  {sortDropdownOpen && (
-                    <View style={styles.dropdown}>
-                      {(['time', 'table'] as const).map(s => (
-                        <TouchableOpacity
-                          key={s}
-                          style={[styles.dropdownItem, sortMode === s && styles.dropdownItemActive]}
-                          onPress={() => { setSortMode(s); setSortDropdownOpen(false); }}
-                        >
-                          <Text style={[styles.dropdownItemText, sortMode === s && styles.dropdownItemTextActive]}>{SORT_LABELS[s]}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  )}
+              {currentUser && (
+                <SegmentedSwitcher
+                  style={{ marginLeft: GAP }}
+                  options={[
+                    { value: 'false', label: 'Все' },
+                    { value: 'true', label: 'Мои' },
+                  ]}
+                  value={String(waiterFilter)}
+                  onChange={(v) => { setWaiterFilter(v === 'true'); setPage(0); }}
+                />
+              )}
+
+              {isOrders && !isTakeaway && (
+                <SegmentedSwitcher
+                  style={{ marginLeft: GAP }}
+                  options={[
+                    { value: 'time', label: SORT_LABELS.time },
+                    { value: 'table', label: SORT_LABELS.table },
+                  ]}
+                  value={sortMode}
+                  onChange={setSortMode}
+                />
+              )}
+
+              <View style={{ flex: 1 }} />
+
+              {currentUser && (
+                <View style={styles.userChip}>
+                  <View style={[styles.onlineDot, { backgroundColor: '#4CAF50' }]} />
+                  <Text style={styles.userChipText} numberOfLines={1}>{currentUser.name}</Text>
                 </View>
               )}
 
-              {/* Spacer */}
-              <View style={{ flex: 1 }} />
-
-              {/* Notification */}
               <TouchableOpacity style={[styles.iconBtn, { marginRight: GAP }]}>
                 <NotificationIcon size={22} color={theme.colors.textPrimary} />
               </TouchableOpacity>
 
-              {/* Search icon */}
-              <TouchableOpacity style={styles.iconBtn} onPress={() => { setSearchActive(true); setStatusDropdownOpen(false); setSortDropdownOpen(false); }}>
+              <TouchableOpacity style={styles.iconBtn} onPress={() => { setSearchActive(true); }}>
                 <SearchIcon size={22} color={theme.colors.textPrimary} />
               </TouchableOpacity>
             </>
@@ -261,7 +361,7 @@ export const OrdersScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                       <View style={styles.actionsCell}>
                         <TouchableOpacity style={styles.actionFull} onPress={handleQuickCheck}>
                           <Feather name="plus" size={24} color="#fff" />
-                          <Text style={[styles.actionLabel, { fontSize: 14 }]}>Новый{'\n'}заказ</Text>
+                          <Text style={styles.actionLabel}>Новый{'\n'}заказ</Text>
                         </TouchableOpacity>
                       </View>
                     )}
@@ -304,32 +404,109 @@ export const OrdersScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         {/* ═══ BOTTOM TAB BAR ═══ */}
         <BottomTabBar
           activeTab={activeTab}
-          onTabChange={setActiveTab}
+          onTabChange={(tab) => {
+            if (isTakeaway && tab === 'tables') return;
+            setActiveTab(tab);
+          }}
           onMenuPress={() => setMenuVisible(true)}
           onLockPress={() => navigation.navigate('Lock', { mode: 'lock' })}
+          showTablesTab={!isTakeaway}
           scale={scale}
         />
 
         <FunctionsModal
           visible={menuVisible}
           onClose={() => setMenuVisible(false)}
-          onOpenReport={() => setReportVisible(true)}
-          onOpenShiftInfo={() => setShiftInfoVisible(true)}
-          onCloseShift={() => setCloseShiftVisible(true)}
+          onOpenShift={() => setReportVisible(true)}
+          onOpenChecksArchive={() => navigation.navigate('PaidCheck')}
+          onOpenCash={() => {
+            void refreshShiftCashSummary();
+            setCashModalVisible(true);
+          }}
+          onCloseShift={() => {
+            if (!canCloseShift) return;
+            void refreshShiftCashSummary();
+            setCloseShiftVisible(true);
+          }}
+          onCashCollection={() => {
+            void refreshShiftCashSummary();
+            setCashCollectionVisible(true);
+          }}
+          onCashIn={() => {
+            if (!canCashTransaction) return;
+            void refreshShiftCashSummary();
+            setCashInVisible(true);
+          }}
+          onCashOut={() => {
+            if (!canCashTransaction) return;
+            void refreshShiftCashSummary();
+            setCashOutVisible(true);
+          }}
+          canCloseShift={canCloseShift}
+          canCashTransaction={canCashTransaction}
           onLogout={() => {
             logout();
             navigation.replace('Lock');
           }}
         />
         <SalesReportModal visible={reportVisible} onClose={() => setReportVisible(false)} />
-        <ShiftInfoModal visible={shiftInfoVisible} onClose={() => setShiftInfoVisible(false)} />
+        <CashModal
+          visible={cashModalVisible}
+          onClose={() => setCashModalVisible(false)}
+          role={currentUser?.role ?? null}
+          onCashIn={() => {
+            if (!canCashTransaction) return;
+            setCashInVisible(true);
+          }}
+          onCashOut={() => {
+            if (!canCashTransaction) return;
+            setCashOutVisible(true);
+          }}
+          onCashCollection={() => setCashCollectionVisible(true)}
+        />
         <CloseShiftModal
           visible={closeShiftVisible}
           onClose={() => setCloseShiftVisible(false)}
-          onConfirmClose={() => {
-            closeShift();
+          canConfirmClose={canCloseShift}
+          onConfirmClose={async (counted) => {
+            if (!canCloseShift) return;
+            const closed = await closeShift(counted);
+            if (!closed) {
+              Alert.alert('Ошибка', 'Не удалось закрыть смену. Проверьте соединение и попробуйте снова.');
+              return;
+            }
             setCloseShiftVisible(false);
             navigation.replace('OpenShift');
+          }}
+        />
+        <CashCollectionModal
+          visible={cashCollectionVisible}
+          onClose={() => setCashCollectionVisible(false)}
+          onConfirm={async (amount, note) => {
+            const res = await addCashCollection(amount, note);
+            if (!res.ok) {
+              Alert.alert('Ошибка', res.error ?? 'Не удалось провести инкассацию');
+              return;
+            }
+            setCashCollectionVisible(false);
+          }}
+        />
+        <CashTransactionModal
+          visible={cashInVisible}
+          mode="in"
+          onClose={() => setCashInVisible(false)}
+          onConfirm={async (amount, note) => {
+            const res = await handleCashTransaction('in', amount, note);
+            if (res.ok) setCashInVisible(false);
+          }}
+        />
+        <CashTransactionModal
+          visible={cashOutVisible}
+          mode="out"
+          onClose={() => setCashOutVisible(false)}
+          onConfirm={async (amount, note) => {
+            const res = await handleCashTransaction('out', amount, note);
+            if (res.ok) setCashOutVisible(false);
           }}
         />
       </View>
@@ -337,9 +514,11 @@ export const OrdersScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   );
 };
 
+const formatAmount = (n: number) => Number(n).toLocaleString('ru-RU');
+
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#1A1A1A' },
-  root: { flex: 1, backgroundColor: '#1A1A1A' },
+  safeArea: { flex: 1, minWidth: 0, overflow: 'hidden', backgroundColor: '#1A1A1A' },
+  root: { flex: 1, minWidth: 0, overflow: 'hidden', backgroundColor: '#1A1A1A' },
 
   headerRow: {
     height: 44,
@@ -349,37 +528,6 @@ const styles = StyleSheet.create({
     zIndex: 1000,
     overflow: 'visible',
   },
-  filterChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#333',
-    borderRadius: theme.borderRadius,
-    paddingHorizontal: 14,
-    height: 44,
-    gap: 6,
-    minWidth: 140,
-  },
-  filterChipText: { color: theme.colors.textPrimary, fontSize: 14, fontWeight: '600' },
-  dropdownWrap: { position: 'relative', zIndex: 100 },
-  dropdown: {
-    position: 'absolute',
-    top: 48,
-    left: 0,
-    minWidth: 200,
-    backgroundColor: '#2a2a2a',
-    borderRadius: theme.borderRadius,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    zIndex: 200,
-  },
-  dropdownItem: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  dropdownItemActive: { backgroundColor: 'rgba(0,200,83,0.15)' },
-  dropdownItemText: { color: theme.colors.textSecondary, fontSize: 14 },
-  dropdownItemTextActive: { color: '#00C853', fontWeight: '600' },
   iconBtn: {
     width: 44,
     height: 44,
@@ -388,6 +536,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  userChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 6,
+    marginRight: 8,
+  },
+  onlineDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  userChipText: {
+    color: theme.colors.textPrimary,
+    fontSize: 13,
+    fontWeight: '500',
+    maxWidth: 100,
+  },
+
   searchInputWrap: {
     flex: 1,
     flexDirection: 'row',
@@ -433,7 +600,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
   },
-  actionLabel: { color: '#fff', fontSize: 13, fontWeight: '600', textAlign: 'center' },
+  actionLabel: { color: '#fff', fontSize: 16, fontWeight: '600', textAlign: 'center' },
 
   paginationCell: {
     flex: 1,

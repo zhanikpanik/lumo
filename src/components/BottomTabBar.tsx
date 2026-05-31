@@ -9,10 +9,18 @@ interface Props {
   onTabChange: (tab: 'orders' | 'tables') => void;
   onMenuPress?: () => void;
   onLockPress?: () => void;
+  showTablesTab?: boolean;
   scale?: number;
 }
 
-export const BottomTabBar: React.FC<Props> = ({ activeTab, onTabChange, onMenuPress, onLockPress, scale = 1 }) => {
+export const BottomTabBar: React.FC<Props> = ({
+  activeTab,
+  onTabChange,
+  onMenuPress,
+  onLockPress,
+  showTablesTab = true,
+  scale = 1,
+}) => {
   return (
     <View style={styles.wrapper}>
       <View style={styles.container}>
@@ -33,15 +41,17 @@ export const BottomTabBar: React.FC<Props> = ({ activeTab, onTabChange, onMenuPr
             </Text>
           </TouchableOpacity>
           
-          <TouchableOpacity 
-            style={[styles.tab, activeTab === 'tables' && styles.activeTab]}
-            onPress={() => onTabChange('tables')}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.tabText, activeTab === 'tables' && styles.activeTabText, { fontSize: 16 }]}>
-              Столы
-            </Text>
-          </TouchableOpacity>
+          {showTablesTab && (
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'tables' && styles.activeTab]}
+              onPress={() => onTabChange('tables')}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.tabText, activeTab === 'tables' && styles.activeTabText, { fontSize: 16 }]}>
+                Столы
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
         
         {/* Lock Button */}

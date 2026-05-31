@@ -1,15 +1,29 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, Alert } from 'react-native';
 import { theme } from '../theme/colors';
 import { useOrderStore } from '../store/orderStore';
 import { useShiftStore } from '../store/shiftStore';
+import { useSyncOutboxStore, formatRpcError } from '../store/syncOutboxStore';
 import { supabase } from '../utils/supabase';
-
-const VENUE_ID = '00000000-0000-0000-0000-000000000010';
+import { VENUE_ID } from '../config';
+import { can } from '../utils/permissions';
+import { finalizeOrderConsumption } from '../api/inventory';
+import { saleConsumptionIdempotencyKey } from '../types/inventory';
+import { logger } from '../utils/logger';
+import type { Order } from '../types';
 
 const formatAmount = (n: number) => n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 
 type PaymentMethod = 'cash' | 'card' | 'none';
+
+const generatePaymentAttemptId = () => {
+  // UUID v4-подобный — для идемпотентности достаточно энтропии Math.random.
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+};
 
 const CLOSE_REASONS = [
   'За счёт заведения',
@@ -20,16 +34,33 @@ const CLOSE_REASONS = [
 ];
 
 export const PaymentScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
-  const { currentOrderId, items, getTotal, orders } = useOrderStore();
+  const { currentOrderId, items, getTotal } = useOrderStore();
+  const currentUser = useShiftStore((s) => s.currentUser);
   const [method, setMethod] = useState<PaymentMethod>('cash');
   const [cashInput, setCashInput] = useState('');
   const [printReceipt, setPrintReceipt] = useState(true);
   const [closeReason, setCloseReason] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  // Стабильный per-сессия id попытки оплаты: повторный тап «Оплатить» / сетевой
+  // retry попадают в тот же idempotency_key и не дублируют запись в payments.
+  // Новый заход на PaymentScreen (например, после refund) даст новый attempt_id.
+  const paymentAttemptId = useRef<string>(generatePaymentAttemptId());
+
+  // Если компонент остался примонтированным (react-navigation stack), но
+  // currentOrderId сменился (открыли другой заказ) — нужен свежий attemptId,
+  // иначе idempotency_key первого заказа не пересечётся (orderId другой),
+  // но лучше быть чистым и не полагаться на это.
+  useEffect(() => {
+    paymentAttemptId.current = generatePaymentAttemptId();
+  }, [currentOrderId]);
 
   const total = getTotal();
+  const canCloseWithoutPayment = can(currentUser?.role, 'closeWithoutPayment');
   const cashAmount = cashInput ? parseInt(cashInput, 10) : 0;
   const change = cashAmount > total ? cashAmount - total : 0;
-  const canPay = method === 'card' || (method === 'none' && closeReason !== null) || (method === 'cash' && cashAmount >= total);
+  const canPay = method === 'card'
+    || (method === 'none' && canCloseWithoutPayment && closeReason !== null)
+    || (method === 'cash' && cashAmount >= total);
 
   const handleNumPress = (num: string) => {
     if (cashInput.length > 7) return;
@@ -45,40 +76,138 @@ export const PaymentScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
   };
 
   const handlePay = async () => {
+    if (isProcessing) return;
     if (!canPay || !currentOrderId) return;
+    if (method === 'none' && !canCloseWithoutPayment) return;
 
     const shiftId = useShiftStore.getState().currentShift?.id ?? null;
-
-    // Record payment in shift store
-    if (method !== 'none') {
-      useShiftStore.getState().recordPayment(method, total);
+    if (!shiftId) {
+      Alert.alert('Смена не открыта', 'Сначала откройте смену.');
+      navigation?.replace('OpenShift');
+      return;
     }
 
-    // Insert payment record into Supabase
-    const { error: payError } = await supabase.from('payments').insert({
-      order_id: currentOrderId,
-      venue_id: VENUE_ID,
-      shift_id: shiftId,
-      method: method === 'none' ? 'none' : method,
-      amount: total,
-      change_amount: method === 'cash' ? Math.max(0, cashAmount - total) : 0,
-      close_reason: method === 'none' ? (closeReason ?? '') : null,
-    });
-    if (payError) console.error('insert payment:', payError.message);
+    setIsProcessing(true);
+    try {
+      // Стабильный ключ повторного нажатия / сетевого retry в рамках сессии экрана.
+      const idempotencyKey = `${currentOrderId}:${method}:${paymentAttemptId.current}`;
 
-    // Update order status and sync to Supabase
-    const newStatus = method === 'none' ? 'cancelled' as const : 'paid' as const;
-    useOrderStore.setState((state) => ({
-      orders: state.orders.map(o =>
-        o.id === currentOrderId
-          ? { ...o, status: newStatus, closedAt: new Date().toISOString(), closeReason: method === 'none' ? (closeReason ?? '') : undefined }
-          : o
-      ),
-    }));
+      const { error: payError } = await supabase.from('payments').insert({
+        order_id: currentOrderId,
+        venue_id: VENUE_ID,
+        shift_id: shiftId,
+        method: method === 'none' ? 'none' : method,
+        amount: total,
+        change_amount: method === 'cash' ? Math.max(0, cashAmount - total) : 0,
+        close_reason: method === 'none' ? (closeReason ?? '') : null,
+        idempotency_key: idempotencyKey,
+      });
 
-    // Close order (will sync the paid status + closed_at to Supabase)
-    useOrderStore.getState().closeOrder();
-    navigation?.navigate('Orders');
+      // 23505 — unique violation. Убеждаемся, что это именно наш индекс
+      // idempotency_key, а не какой-то другой constraint, который может
+      // появиться в будущем. Если наш — трактуем как «оплата уже прошла».
+      const isIdempotencyConflict =
+        payError?.code === '23505' &&
+        /payments_idempotency_key_venue_uidx/i.test(
+          `${payError?.message ?? ''} ${(payError as any)?.details ?? ''}`,
+        );
+      if (payError && !isIdempotencyConflict) {
+        logger.error('payment.insert', payError, {
+          orderId: currentOrderId,
+          method,
+          code: payError.code,
+        });
+        Alert.alert('Ошибка оплаты', payError.message);
+        return;
+      }
+
+      if (method !== 'none' && !isIdempotencyConflict) {
+        useShiftStore.getState().recordPayment(method, total);
+        void useShiftStore.getState().refreshShiftCashSummary();
+      }
+
+      // Update local state immediately — UI responds right away
+      const closedAt = new Date().toISOString();
+      const newStatus = method === 'none' ? ('cancelled' as const) : ('paid' as const);
+      useOrderStore.setState((state) => ({
+        orders: state.orders.map((o) =>
+          o.id === currentOrderId
+            ? {
+                ...o,
+                status: newStatus,
+                closedAt,
+                closeReason: method === 'none' ? (closeReason ?? '') : undefined,
+              }
+            : o
+        ),
+      }));
+
+      // Fire-and-forget: sync to Supabase in background, don't block navigation
+      if (method !== 'none') {
+        const os = useOrderStore.getState();
+        const base = os.orders.find((o) => o.id === currentOrderId);
+        if (base) {
+          const paidOrder: Order = {
+            ...base,
+            items: os.items,
+            totalAmount: os.getTotal(),
+            status: 'paid',
+            closedAt,
+          };
+
+          // Background sync: items + order + consumption + outbox — all in parallel, none block UI
+          void (async () => {
+            try {
+              await os.flushPendingItemsToServer();
+            } catch (e) {
+              logger.error('payment.flushPendingItemsToServer', e, { orderId: currentOrderId });
+            }
+            try {
+              await os.syncRemoteOrder(paidOrder);
+            } catch (e) {
+              logger.error('payment.syncRemoteOrder', e, { orderId: currentOrderId });
+            }
+
+            const consumptionIdemKey = saleConsumptionIdempotencyKey(currentOrderId);
+            const payload = {
+              venueId: VENUE_ID,
+              orderId: currentOrderId,
+              occurredAt: closedAt,
+              idempotencyKey: consumptionIdemKey,
+              shiftId: shiftId,
+              lines: os.items.map((i) => ({
+                order_item_id: i.id,
+                product_id: i.product.id,
+                quantity: i.quantity,
+                modifier_ids: i.modifiers.map((m) => m.id),
+              })),
+            };
+
+            try {
+              const res = await finalizeOrderConsumption(payload);
+              if (!res.ok) {
+                logger.warn(
+                  'payment.finalizeOrderConsumption.enqueue',
+                  formatRpcError(res.error, res.detail),
+                  { orderId: currentOrderId, detail: res.detail },
+                );
+                useSyncOutboxStore.getState().enqueueConsumption(payload);
+              }
+            } catch (e) {
+              logger.error('payment.finalizeOrderConsumption', e, { orderId: currentOrderId });
+              useSyncOutboxStore.getState().enqueueConsumption(payload);
+            }
+
+            void useSyncOutboxStore.getState().flush();
+          })();
+        }
+      }
+
+      useOrderStore.getState().closeOrder();
+      navigation?.navigate('Orders');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleCancel = () => {
@@ -130,8 +259,18 @@ export const PaymentScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
 
           <View style={styles.methodSection}>
             <TouchableOpacity
-              style={[styles.methodBtn, method === 'none' && styles.methodActiveRed]}
-              onPress={() => { setMethod('none'); setCashInput(''); setCloseReason(null); }}
+              style={[
+                styles.methodBtn,
+                method === 'none' && styles.methodActiveRed,
+                !canCloseWithoutPayment && styles.methodBtnDisabled,
+              ]}
+              onPress={() => {
+                if (!canCloseWithoutPayment) return;
+                setMethod('none');
+                setCashInput('');
+                setCloseReason(null);
+              }}
+              disabled={!canCloseWithoutPayment}
               activeOpacity={0.7}
             >
               <Text style={[styles.methodText, method === 'none' && styles.methodTextActive]}>
@@ -139,6 +278,9 @@ export const PaymentScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
               </Text>
             </TouchableOpacity>
           </View>
+          {!canCloseWithoutPayment && (
+            <Text style={styles.permissionHint}>Без оплаты доступно только кассиру</Text>
+          )}
 
           {/* Cash change info */}
           {method === 'cash' && cashAmount > 0 && cashAmount >= total && (
@@ -165,27 +307,36 @@ export const PaymentScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
 
           {/* Action buttons */}
           <View style={styles.actionRow}>
-            <TouchableOpacity style={styles.cancelBtn} onPress={handleCancel} activeOpacity={0.7}>
+            <TouchableOpacity
+              style={[styles.cancelBtn, isProcessing && styles.payBtnDisabled]}
+              onPress={handleCancel}
+              disabled={isProcessing}
+              activeOpacity={0.7}
+            >
               <Text style={styles.cancelText}>Отмена</Text>
             </TouchableOpacity>
             <View style={{ width: 8 }} />
             {method === 'none' ? (
               <TouchableOpacity
-                style={[styles.payBtnRed, !canPay && styles.payBtnDisabled]}
+                style={[styles.payBtnRed, (!canPay || isProcessing) && styles.payBtnDisabled]}
                 onPress={handlePay}
-                disabled={!canPay}
+                disabled={!canPay || isProcessing}
                 activeOpacity={0.7}
               >
-                <Text style={styles.payText}>Закрыть без оплаты</Text>
+                <Text style={styles.payText}>
+                  {isProcessing ? 'Закрываем...' : 'Закрыть без оплаты'}
+                </Text>
               </TouchableOpacity>
             ) : (
               <TouchableOpacity
-                style={[styles.payBtn, !canPay && styles.payBtnDisabled]}
+                style={[styles.payBtn, (!canPay || isProcessing) && styles.payBtnDisabled]}
                 onPress={handlePay}
-                disabled={!canPay}
+                disabled={!canPay || isProcessing}
                 activeOpacity={0.7}
               >
-                <Text style={styles.payText}>Оплатить</Text>
+                <Text style={styles.payText}>
+                  {isProcessing ? 'Обработка...' : 'Оплатить'}
+                </Text>
               </TouchableOpacity>
             )}
           </View>
@@ -322,6 +473,14 @@ const styles = StyleSheet.create({
   methodTextActive: {
     color: '#fff',
     fontWeight: 'bold',
+  },
+  methodBtnDisabled: {
+    opacity: 0.45,
+  },
+  permissionHint: {
+    color: '#FF8A80',
+    fontSize: 13,
+    marginBottom: 12,
   },
 
   changeSection: {

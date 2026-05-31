@@ -1,5 +1,7 @@
-import React, { useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
+  Animated,
+  Easing,
   View,
   Text,
   TouchableOpacity,
@@ -11,6 +13,7 @@ import { theme } from '../theme/colors';
 import { LockIcon } from '../components/Icons';
 import { useVenueStore } from '../store/venueStore';
 import { useShiftStore } from '../store/shiftStore';
+import { useNotificationStore } from '../store/notificationStore';
 
 const PIN_LENGTH = 4;
 
@@ -55,13 +58,10 @@ export const LockScreen: React.FC<Props> = ({ navigation, route }) => {
         if (isLockMode) {
           navigation.goBack();
         } else {
-          // Check if there's an open shift
-          const hasOpenShift = await useShiftStore.getState().fetchOpenShift();
-          if (hasOpenShift) {
-            navigation.replace('Orders');
-          } else {
-            navigation.replace('OpenShift');
-          }
+          // Check shift optimistically: navigate immediately, verify in background.
+          // If no shift is found, the App-level useEffect will redirect to OpenShift.
+          useShiftStore.getState().fetchOpenShift().catch(() => {});
+          navigation.replace('Orders');
         }
       } else {
         setError(true);
@@ -79,6 +79,34 @@ export const LockScreen: React.FC<Props> = ({ navigation, route }) => {
     setError(false);
     setPin((p) => p.slice(0, -1));
   }, []);
+
+  const unseenCount = useNotificationStore((s) => s.unseenIds.size);
+  const pulse = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (unseenCount === 0) {
+      pulse.stopAnimation();
+      pulse.setValue(1);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, {
+          toValue: 0.85,
+          duration: 700,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulse, {
+          toValue: 1,
+          duration: 700,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [unseenCount, pulse]);
 
   const dots = Array.from({ length: PIN_LENGTH }, (_, i) => (
     <View
@@ -101,6 +129,12 @@ export const LockScreen: React.FC<Props> = ({ navigation, route }) => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar hidden />
+      {unseenCount > 0 && (
+        <Animated.View style={[styles.unseenChip, { opacity: pulse }]}>
+          <View style={styles.unseenDot} />
+          <Text style={styles.unseenText}>Новых заказов: {unseenCount}</Text>
+        </Animated.View>
+      )}
       <View style={styles.container}>
         <View style={styles.content}>
           <View style={styles.iconWrap}>
@@ -236,5 +270,29 @@ const styles = StyleSheet.create({
   delText: {
     fontSize: 24,
     color: theme.colors.textSecondary,
+  },
+  unseenChip: {
+    position: 'absolute',
+    top: 24,
+    right: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 24,
+    backgroundColor: '#FF7A45',
+    zIndex: 10,
+  },
+  unseenDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#fff',
+  },
+  unseenText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

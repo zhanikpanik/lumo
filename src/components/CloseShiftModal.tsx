@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,8 @@ import {
   StyleSheet,
   Modal,
   ScrollView,
+  TextInput,
+  Alert,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { theme } from '../theme/colors';
@@ -36,16 +38,40 @@ const formatDuration = (start: Date, end: Date): string => {
 interface Props {
   visible: boolean;
   onClose: () => void;
-  onConfirmClose: () => void;
+  onConfirmClose: (countedCash: number) => void;
+  canConfirmClose?: boolean;
 }
 
-export const CloseShiftModal: React.FC<Props> = ({ visible, onClose, onConfirmClose }) => {
+export const CloseShiftModal: React.FC<Props> = ({
+  visible,
+  onClose,
+  onConfirmClose,
+  canConfirmClose = true,
+}) => {
   const currentShift = useShiftStore((s) => s.currentShift);
+  const [countedInput, setCountedInput] = useState('');
+
+  useEffect(() => {
+    if (visible) setCountedInput('');
+  }, [visible]);
 
   if (!currentShift) return null;
 
   const now = new Date();
-  const expectedCash = currentShift.startingCash + currentShift.cashTotal;
+
+  const handleConfirmClose = () => {
+    const raw = countedInput.replace(/\s/g, '').replace(',', '.').trim();
+    if (raw === '') {
+      Alert.alert('Введите сумму', 'Укажите фактически пересчитанную сумму в кассе.');
+      return;
+    }
+    const n = Number(raw);
+    if (Number.isNaN(n) || n < 0) {
+      Alert.alert('Ошибка', 'Некорректная сумма.');
+      return;
+    }
+    onConfirmClose(n);
+  };
 
   return (
     <Modal visible={visible} transparent animationType="fade">
@@ -55,98 +81,97 @@ export const CloseShiftModal: React.FC<Props> = ({ visible, onClose, onConfirmCl
           <View style={styles.header}>
             <Text style={styles.title}>Закрытие смены</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <Feather name="x" size={22} color={theme.colors.textSecondary} />
+              <Feather name="x" size={20} color={theme.colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.body} showsVerticalScrollIndicator={false}>
-            {/* Z-Report title */}
+          <ScrollView
+            style={styles.body}
+            contentContainerStyle={styles.bodyContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Report header */}
             <Text style={styles.reportTitle}>Z-отчет</Text>
             <Text style={styles.reportDate}>{formatDate(now)}</Text>
 
-            {/* Shift info */}
             <View style={styles.divider} />
 
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Кассир</Text>
-              <Text style={styles.infoValue}>{currentShift.cashier}</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Смена открыта</Text>
-              <Text style={styles.infoValue}>{formatTime(currentShift.openedAt)}</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Длительность</Text>
-              <Text style={styles.infoValue}>{formatDuration(currentShift.openedAt, now)}</Text>
-            </View>
+            {/* Shift meta */}
+            <Row label="Кассир" value={currentShift.cashier} />
+            <Row label="Смена открыта" value={formatTime(currentShift.openedAt)} />
+            <Row label="Длительность" value={formatDuration(currentShift.openedAt, now)} />
 
-            {/* Sales summary */}
             <View style={styles.divider} />
 
-            <View style={styles.infoRow}>
-              <Text style={styles.statLabel}>Количество заказов</Text>
-              <Text style={styles.statValue}>{currentShift.totalOrders}</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.statLabel}>Выручка</Text>
-              <Text style={styles.statValue}>{formatAmount(currentShift.totalRevenue)}</Text>
-            </View>
+            {/* Totals */}
+            <Row label="Заказов" value={String(currentShift.totalOrders)} bold />
+            <Row label="Выручка" value={formatAmount(currentShift.totalRevenue)} bold />
 
-            {/* Payment breakdown */}
             <View style={styles.divider} />
             <Text style={styles.sectionTitle}>По способам оплаты</Text>
 
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Наличные</Text>
-              <Text style={styles.infoValue}>
-                {currentShift.cashPayments} заказов · {formatAmount(currentShift.cashTotal)}
-              </Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Карта</Text>
-              <Text style={styles.infoValue}>
-                {currentShift.cardPayments} заказов · {formatAmount(currentShift.cardTotal)}
-              </Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Другое</Text>
-              <Text style={styles.infoValue}>
-                {currentShift.otherPayments} заказов · {formatAmount(currentShift.otherTotal)}
-              </Text>
-            </View>
+            <Row label="Наличные" value={`${currentShift.cashPayments} зак. · ${formatAmount(currentShift.cashTotal)}`} />
+            <Row label="Карта" value={`${currentShift.cardPayments} зак. · ${formatAmount(currentShift.cardTotal)}`} />
+            <Row label="Без оплаты" value={`${currentShift.otherPayments} зак. · ${formatAmount(currentShift.otherTotal)}`} />
 
-            {/* Cash in drawer */}
             <View style={styles.divider} />
-            <Text style={styles.sectionTitle}>Касса</Text>
+            <Text style={styles.sectionTitle}>Движения наличных</Text>
 
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Наличные на начало</Text>
-              <Text style={styles.infoValue}>{formatAmount(currentShift.startingCash)}</Text>
-            </View>
-            <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Поступления наличными</Text>
-              <Text style={styles.infoValue}>{formatAmount(currentShift.cashTotal)}</Text>
-            </View>
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>Ожидаемая сумма в кассе</Text>
-              <Text style={styles.totalValue}>{formatAmount(expectedCash)}</Text>
-            </View>
+            <Row label="Внесения" value={`+${formatAmount(currentShift.cashFloatIn ?? 0)}`} accent />
+            <Row label="Изъятия" value={`-${formatAmount(currentShift.cashFloatOut ?? 0)}`} />
+            <Row label="Инкассация" value={`-${formatAmount(currentShift.cashCollectionsTotal ?? 0)}`} />
+
+            {/* Cash count */}
+            <View style={styles.divider} />
+            <Text style={styles.sectionTitle}>На конец смены</Text>
+            <Text style={styles.inputHint}>Пересчитайте наличные и введите сумму</Text>
+            <TextInput
+              style={styles.cashInput}
+              value={countedInput}
+              onChangeText={setCountedInput}
+              placeholder="0"
+              placeholderTextColor={theme.colors.textSecondary}
+              keyboardType="decimal-pad"
+            />
           </ScrollView>
 
           {/* Actions */}
-          <View style={styles.actions}>
+          <View style={styles.footer}>
             <TouchableOpacity style={styles.cancelBtn} onPress={onClose} activeOpacity={0.7}>
               <Text style={styles.cancelText}>Отмена</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.confirmBtn} onPress={onConfirmClose} activeOpacity={0.8}>
+            <TouchableOpacity
+              style={[styles.confirmBtn, !canConfirmClose && styles.confirmBtnDisabled]}
+              onPress={handleConfirmClose}
+              disabled={!canConfirmClose}
+              activeOpacity={0.8}
+            >
               <Text style={styles.confirmText}>Закрыть смену</Text>
             </TouchableOpacity>
           </View>
+          {!canConfirmClose && (
+            <Text style={styles.warningText}>Только кассир может закрывать смену</Text>
+          )}
         </View>
       </View>
     </Modal>
   );
 };
+
+// ── Tiny row helper ──
+const Row: React.FC<{
+  label: string;
+  value: string;
+  bold?: boolean;
+  accent?: boolean;
+}> = ({ label, value, bold, accent }) => (
+  <View style={styles.infoRow}>
+    <Text style={[styles.infoLabel, bold && styles.bold]}>{label}</Text>
+    <Text style={[styles.infoValue, bold && styles.bold, accent && styles.accent]}>
+      {value}
+    </Text>
+  </View>
+);
 
 const styles = StyleSheet.create({
   overlay: {
@@ -157,107 +182,114 @@ const styles = StyleSheet.create({
   },
   modal: {
     width: '40%',
-    maxWidth: 480,
-    minWidth: 360,
+    maxWidth: 440,
+    minWidth: 340,
+    maxHeight: '90%',
     backgroundColor: theme.colors.surface,
     borderRadius: 12,
     overflow: 'hidden',
-    maxHeight: '85%',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 16,
+    paddingTop: 16,
+    paddingBottom: 12,
   },
   title: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: theme.colors.textPrimary,
   },
   closeBtn: {
-    width: 36,
-    height: 36,
+    width: 32,
+    height: 32,
     justifyContent: 'center',
     alignItems: 'center',
   },
+
   body: {
     paddingHorizontal: 20,
   },
+  bodyContent: {
+    paddingBottom: 8,
+  },
+
   reportTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '700',
     color: theme.colors.textPrimary,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   reportDate: {
-    fontSize: 14,
+    fontSize: 13,
     color: theme.colors.textSecondary,
   },
+
   divider: {
     height: 1,
     backgroundColor: 'rgba(255,255,255,0.08)',
-    marginVertical: 16,
+    marginVertical: 10,
   },
+
   sectionTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: theme.colors.textSecondary,
-    marginBottom: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    marginBottom: 6,
   },
+
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 6,
+    paddingVertical: 3,
   },
   infoLabel: {
-    fontSize: 14,
+    fontSize: 13,
     color: theme.colors.textSecondary,
   },
   infoValue: {
-    fontSize: 14,
+    fontSize: 13,
     color: theme.colors.textPrimary,
   },
-  statLabel: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: theme.colors.textPrimary,
-  },
-  statValue: {
-    fontSize: 15,
+  bold: {
     fontWeight: '600',
     color: theme.colors.textPrimary,
   },
-  totalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-    marginTop: 4,
+  accent: {
+    color: '#4CAF50',
   },
-  totalLabel: {
-    fontSize: 16,
-    fontWeight: '700',
+
+  inputHint: {
+    fontSize: 13,
+    color: theme.colors.textSecondary,
+    marginBottom: 8,
+  },
+  cashInput: {
+    backgroundColor: theme.colors.surfaceLight,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 20,
+    fontWeight: '500',
     color: theme.colors.textPrimary,
+    textAlign: 'center',
+    marginBottom: 8,
   },
-  totalValue: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: theme.colors.textPrimary,
-  },
-  actions: {
+
+  footer: {
     flexDirection: 'row',
-    padding: 20,
-    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.08)',
+    gap: 10,
   },
   cancelBtn: {
     flex: 1,
-    height: 48,
+    height: 46,
     backgroundColor: theme.colors.surfaceLight,
     borderRadius: 10,
     justifyContent: 'center',
@@ -265,20 +297,29 @@ const styles = StyleSheet.create({
   },
   cancelText: {
     color: theme.colors.textPrimary,
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '600',
   },
   confirmBtn: {
     flex: 2,
-    height: 48,
+    height: 46,
     backgroundColor: '#D32F2F',
     borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  confirmBtnDisabled: {
+    opacity: 0.4,
+  },
   confirmText: {
     color: '#fff',
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '700',
+  },
+  warningText: {
+    color: '#FF8A80',
+    fontSize: 12,
+    textAlign: 'center',
+    paddingBottom: 12,
   },
 });

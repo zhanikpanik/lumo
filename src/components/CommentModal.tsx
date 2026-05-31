@@ -15,7 +15,7 @@ export const CommentModal: React.FC<Props> = ({ visible, onClose }) => {
 
   useEffect(() => {
     if (visible) {
-      setComment((currentOrder as any)?.comment || '');
+      setComment(currentOrder?.comment || '');
     }
   }, [visible]);
 

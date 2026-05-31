@@ -28,7 +28,7 @@ export const TablePickerModal: React.FC<Props> = ({ visible, onClose }) => {
   };
 
   const getOrderForTable = (id: string) => {
-    return orders.find(o => o.tableId === id && o.status !== 'cancelled');
+    return orders.find(o => o.tableId === id && (o.status === 'active' || o.status === 'alert'));
   };
 
   const getTableColor = (table: VenueTable): string => {
