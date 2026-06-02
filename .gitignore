@@ -2,3 +2,6 @@ node_modules/
 dist/
 .expo/
 report/
+.env
+.env.local
+.env.*.local
