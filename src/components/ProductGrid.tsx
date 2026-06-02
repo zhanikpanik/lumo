@@ -12,12 +12,25 @@ const GAP = 2;
 const TOTAL_CELLS = COLS * ROWS; // 18
 
 export const ProductGrid: React.FC = () => {
-  const { activeCategoryId, addProduct } = useOrderStore();
+  const { activeCategoryId, addProduct, removeProduct, items } = useOrderStore();
   const menuProducts = useMenuStore((s) => s.products);
   const menuCategories = useMenuStore((s) => s.categories);
   const products = menuProducts[activeCategoryId] || [];
   const category = menuCategories.find(c => c.id === activeCategoryId);
   const categoryName = category?.name || '';
+
+  // Product IDs already in current order — used for toggle + green tint
+  const orderedProductIds = new Set(items.map(i => i.product.id));
+
+  const handleProductToggle = (product: Product) => {
+    // If already in order — remove. Otherwise — add.
+    const existing = items.find(i => i.product.id === product.id);
+    if (existing) {
+      removeProduct(existing.id);
+    } else {
+      addProduct(product);
+    }
+  };
 
   // Build cells
   type Cell = { kind: 'product'; product: Product } | { kind: 'pageDown' } | { kind: 'empty' };
@@ -51,16 +64,23 @@ export const ProductGrid: React.FC = () => {
           <View key={ri} style={[styles.row, ri < ROWS - 1 && { marginBottom: GAP }]}>
             {row.map((cell, ci) => (
               <View key={ci} style={[styles.cellWrap, ci < COLS - 1 && { marginRight: GAP }]}>
-                {cell.kind === 'product' && (
-                  <TouchableOpacity
-                    style={styles.productBtn}
-                    onPress={() => addProduct(cell.product)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.productName} numberOfLines={2}>{cell.product.name}</Text>
-                    <Text style={styles.productPrice}>{cell.product.price} ₽</Text>
-                  </TouchableOpacity>
-                )}
+                {cell.kind === 'product' && (() => {
+                  const isOrdered = orderedProductIds.has(cell.product.id);
+                  return (
+                    <TouchableOpacity
+                      style={[styles.productBtn, isOrdered && styles.productBtnOrdered]}
+                      onPress={() => handleProductToggle(cell.product)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.productName, isOrdered && styles.productNameOrdered]} numberOfLines={2}>
+                        {cell.product.name}
+                      </Text>
+                      <Text style={[styles.productPrice, isOrdered && styles.productPriceOrdered]}>
+                        {cell.product.price} ₽
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })()}
                 {cell.kind === 'pageDown' && (
                   <TouchableOpacity style={styles.pageBtn} activeOpacity={0.7}>
                     <Feather name="chevron-down" size={24} color={theme.colors.textSecondary} />
@@ -99,6 +119,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 4,
   },
+  productBtnOrdered: {
+    backgroundColor: '#003E21',
+  },
   productName: {
     color: '#fff',
     fontSize: 16,
@@ -106,9 +129,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 2,
   },
+  productNameOrdered: {
+    color: '#A5D6A7',
+  },
   productPrice: {
     color: 'rgba(255,255,255,0.85)',
     fontSize: 14,
+  },
+  productPriceOrdered: {
+    color: 'rgba(255,255,255,0.65)',
   },
   pageBtn: {
     flex: 1,

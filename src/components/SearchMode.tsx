@@ -14,7 +14,18 @@ interface Props {
 }
 
 export const SearchMode: React.FC<Props> = ({ searchQuery }) => {
-  const { addProduct } = useOrderStore();
+  const { addProduct, removeProduct, items } = useOrderStore();
+
+  const orderedProductIds = new Set(items.map(i => i.product.id));
+
+  const handleProductToggle = (product: Product) => {
+    const existing = items.find(i => i.product.id === product.id);
+    if (existing) {
+      removeProduct(existing.id);
+    } else {
+      addProduct(product);
+    }
+  };
 
   const menuCategories = useMenuStore((s) => s.categories);
   const allProducts = useMenuStore((s) => s.allProducts);
@@ -58,8 +69,12 @@ export const SearchMode: React.FC<Props> = ({ searchQuery }) => {
               {row.map((product) => (
                 <TouchableOpacity
                   key={product.id}
-                  style={[styles.productCard, { backgroundColor: getCategoryColor(product.categoryId) }]}
-                  onPress={() => addProduct(product)}
+                  style={[
+                    styles.productCard,
+                    { backgroundColor: getCategoryColor(product.categoryId) },
+                    orderedProductIds.has(product.id) && styles.productCardOrdered,
+                  ]}
+                  onPress={() => handleProductToggle(product)}
                   activeOpacity={0.7}
                 >
                   <Text style={styles.productName} numberOfLines={2}>{product.name}</Text>
@@ -98,6 +113,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 10,
+  },
+  productCardOrdered: {
+    borderWidth: 3,
+    borderColor: '#00E676',
   },
   productCardEmpty: {
     flex: 1,
