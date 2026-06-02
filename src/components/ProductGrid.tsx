@@ -12,25 +12,18 @@ const GAP = 2;
 const TOTAL_CELLS = COLS * ROWS; // 18
 
 export const ProductGrid: React.FC = () => {
-  const { activeCategoryId, addProduct, removeProduct, items } = useOrderStore();
+  const { activeCategoryId, addProduct, items } = useOrderStore();
   const menuProducts = useMenuStore((s) => s.products);
   const menuCategories = useMenuStore((s) => s.categories);
   const products = menuProducts[activeCategoryId] || [];
   const category = menuCategories.find(c => c.id === activeCategoryId);
   const categoryName = category?.name || '';
 
-  // Product IDs already in current order — used for toggle + green tint
-  const orderedProductIds = new Set(items.map(i => i.product.id));
-
-  const handleProductToggle = (product: Product) => {
-    // If already in order — remove. Otherwise — add.
-    const existing = items.find(i => i.product.id === product.id);
-    if (existing) {
-      removeProduct(existing.id);
-    } else {
-      addProduct(product);
-    }
-  };
+  // Map productId → total quantity already in order (for green tint + count badge)
+  const orderedQty = new Map<string, number>();
+  items.forEach(i => {
+    orderedQty.set(i.product.id, (orderedQty.get(i.product.id) || 0) + i.quantity);
+  });
 
   // Build cells
   type Cell = { kind: 'product'; product: Product } | { kind: 'pageDown' } | { kind: 'empty' };
@@ -65,13 +58,19 @@ export const ProductGrid: React.FC = () => {
             {row.map((cell, ci) => (
               <View key={ci} style={[styles.cellWrap, ci < COLS - 1 && { marginRight: GAP }]}>
                 {cell.kind === 'product' && (() => {
-                  const isOrdered = orderedProductIds.has(cell.product.id);
+                  const qty = orderedQty.get(cell.product.id) || 0;
+                  const isOrdered = qty > 0;
                   return (
                     <TouchableOpacity
                       style={[styles.productBtn, isOrdered && styles.productBtnOrdered]}
-                      onPress={() => handleProductToggle(cell.product)}
+                      onPress={() => addProduct(cell.product)}
                       activeOpacity={0.7}
                     >
+                      {isOrdered && (
+                        <View style={styles.qtyBadge}>
+                          <Text style={styles.qtyBadgeText}>×{qty}</Text>
+                        </View>
+                      )}
                       <Text style={[styles.productName, isOrdered && styles.productNameOrdered]} numberOfLines={2}>
                         {cell.product.name}
                       </Text>
@@ -138,6 +137,20 @@ const styles = StyleSheet.create({
   },
   productPriceOrdered: {
     color: 'rgba(255,255,255,0.65)',
+  },
+  qtyBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 6,
+    backgroundColor: '#00E676',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
+  qtyBadgeText: {
+    color: '#000',
+    fontSize: 12,
+    fontWeight: '800',
   },
   pageBtn: {
     flex: 1,

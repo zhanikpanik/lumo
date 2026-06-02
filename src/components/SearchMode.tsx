@@ -14,18 +14,12 @@ interface Props {
 }
 
 export const SearchMode: React.FC<Props> = ({ searchQuery }) => {
-  const { addProduct, removeProduct, items } = useOrderStore();
+  const { addProduct, items } = useOrderStore();
 
-  const orderedProductIds = new Set(items.map(i => i.product.id));
-
-  const handleProductToggle = (product: Product) => {
-    const existing = items.find(i => i.product.id === product.id);
-    if (existing) {
-      removeProduct(existing.id);
-    } else {
-      addProduct(product);
-    }
-  };
+  const orderedQty = new Map<string, number>();
+  items.forEach(i => {
+    orderedQty.set(i.product.id, (orderedQty.get(i.product.id) || 0) + i.quantity);
+  });
 
   const menuCategories = useMenuStore((s) => s.categories);
   const allProducts = useMenuStore((s) => s.allProducts);
@@ -72,11 +66,16 @@ export const SearchMode: React.FC<Props> = ({ searchQuery }) => {
                   style={[
                     styles.productCard,
                     { backgroundColor: getCategoryColor(product.categoryId) },
-                    orderedProductIds.has(product.id) && styles.productCardOrdered,
+                    (orderedQty.get(product.id) || 0) > 0 && styles.productCardOrdered,
                   ]}
-                  onPress={() => handleProductToggle(product)}
+                  onPress={() => addProduct(product)}
                   activeOpacity={0.7}
                 >
+                  {(orderedQty.get(product.id) || 0) > 0 && (
+                    <View style={styles.qtyBadge}>
+                      <Text style={styles.qtyBadgeText}>×{orderedQty.get(product.id)}</Text>
+                    </View>
+                  )}
                   <Text style={styles.productName} numberOfLines={2}>{product.name}</Text>
                   <Text style={styles.productPrice}>{product.price} ₽</Text>
                 </TouchableOpacity>
@@ -117,6 +116,20 @@ const styles = StyleSheet.create({
   productCardOrdered: {
     borderWidth: 3,
     borderColor: '#00E676',
+  },
+  qtyBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 6,
+    backgroundColor: '#00E676',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
+  qtyBadgeText: {
+    color: '#000',
+    fontSize: 12,
+    fontWeight: '800',
   },
   productCardEmpty: {
     flex: 1,
