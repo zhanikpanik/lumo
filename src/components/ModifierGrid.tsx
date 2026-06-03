@@ -9,7 +9,7 @@ import { DishCommentPanel } from './DishCommentPanel';
 import { DeleteOptions } from './DeleteOptions';
 import { useMenuStore } from '../store/menuStore';
 
-const COLS = 5;
+const COLS = 3;
 const ROWS = 5;
 const MODIFIER_ROWS = ROWS;
 const MODIFIER_CELLS = COLS * MODIFIER_ROWS;

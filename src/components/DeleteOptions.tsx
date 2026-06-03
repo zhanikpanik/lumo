@@ -3,8 +3,8 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../theme/colors';
 import { useOrderStore } from '../store/orderStore';
 
-const COLS = 5;
-const ROWS = 6;
+const COLS = 3;
+const ROWS = 5;
 const GAP = 2;
 
 interface Props {

@@ -6,8 +6,8 @@ import { useOrderStore } from '../store/orderStore';
 import { useMenuStore } from '../store/menuStore';
 import { Product } from '../types';
 
-const COLS = 5;
-const ROWS = 6;
+const COLS = 3;
+const ROWS = 5;
 const GAP = 2;
 const TOTAL_CELLS = COLS * ROWS;
 

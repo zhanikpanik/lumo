@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../theme/colors';
 import { useOrderStore } from '../store/orderStore';
 
-const COLS = 5;
+const COLS = 2;
 const ROWS = 3;
 const GAP = 2;
 

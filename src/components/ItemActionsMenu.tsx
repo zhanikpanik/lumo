@@ -4,7 +4,7 @@ import { theme } from '../theme/colors';
 import { useOrderStore } from '../store/orderStore';
 import { ActiveAction } from '../types';
 
-const COLS = 5;
+const COLS = 2;
 const ROWS = 5;
 const GAP = 2;
 

@@ -11,7 +11,7 @@ export const CategoryMenu: React.FC = () => {
   const { activeCategoryId, setActiveCategory } = useOrderStore();
 
   // Build cells: categories + fill to complete grid
-  const ROWS = 6;
+  const ROWS = 5;
   const totalCells = ROWS * COLS;
 
   type Cell = { kind: 'category'; id: string; name: string } | { kind: 'empty' };
