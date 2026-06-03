@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { theme } from '../theme/colors';
 import { useOrderStore } from '../store/orderStore';
 import { useVenueStore, VenueTable } from '../store/venueStore';
@@ -19,7 +20,16 @@ export const FloorPlan: React.FC<Props> = ({ onTablePress, zoneIdx = 0 }) => {
   const zones = useVenueStore((s) => s.zones);
   const zone = zones[zoneIdx];
 
-  if (!zone) return null;
+  if (!zone) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.emptyState}>
+          <Feather name="map" size={48} color={theme.colors.textDisabled} />
+          <Text style={styles.emptyText}>Схема зала не настроена</Text>
+        </View>
+      </View>
+    );
+  }
 
   const getOrderForTable = (tableId: string): Order | undefined => {
     return orders.find(o => o.tableId === tableId && (o.status === 'active' || o.status === 'alert'));
@@ -62,6 +72,17 @@ export const FloorPlan: React.FC<Props> = ({ onTablePress, zoneIdx = 0 }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 12,
+  },
+  emptyText: {
+    color: theme.colors.textDisabled,
+    fontSize: 16,
+    fontWeight: '500',
   },
   tableNumber: {
     color: '#fff',

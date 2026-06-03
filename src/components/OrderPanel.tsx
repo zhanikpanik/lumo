@@ -90,13 +90,20 @@ export const OrderPanel: React.FC<Props> = ({ onCommentPress }) => {
           ref={scrollRef}
           style={styles.scrollView}
           showsVerticalScrollIndicator={true}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={isEmpty ? styles.scrollContentEmpty : styles.scrollContent}
           onScroll={handleScroll}
           scrollEventThrottle={16}
           onContentSizeChange={handleContentSizeChange}
           onLayout={handleLayout}
         >
-          {renderItems()}
+          {isEmpty ? (
+            <View style={styles.emptyOrder}>
+              <Feather name="plus-circle" size={32} color={theme.colors.textDisabled} />
+              <Text style={styles.emptyOrderText}>Добавьте блюда из меню</Text>
+            </View>
+          ) : (
+            renderItems()
+          )}
         </ScrollView>
       </View>
 
@@ -193,6 +200,16 @@ const styles = StyleSheet.create({
   itemListContainer: { flex: 1, position: 'relative', minHeight: 0 },
   scrollView: { ...StyleSheet.absoluteFillObject },
   scrollContent: { paddingBottom: 4 },
+  scrollContentEmpty: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  emptyOrder: {
+    alignItems: 'center',
+    gap: 12,
+  },
+  emptyOrderText: {
+    color: theme.colors.textDisabled,
+    fontSize: 15,
+    fontWeight: '500',
+  },
 
   itemPressed: {
     backgroundColor: '#333',

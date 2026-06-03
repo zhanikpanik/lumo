@@ -53,7 +53,11 @@ export const ProductGrid: React.FC = () => {
 
       {/* Grid */}
       <View style={styles.grid}>
-        {rows.map((row, ri) => (
+        {products.length === 0 ? (
+          <View style={styles.emptyCat}>
+            <Text style={styles.emptyCatText}>Нет блюд в категории</Text>
+          </View>
+        ) : rows.map((row, ri) => (
           <View key={ri} style={[styles.row, ri < ROWS - 1 && { marginBottom: GAP }]}>
             {row.map((cell, ci) => (
               <View key={ci} style={[styles.cellWrap, ci < COLS - 1 && { marginRight: GAP }]}>
@@ -159,4 +163,6 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surfaceLight,
   },
   emptyCell: { flex: 1, backgroundColor: theme.colors.surface },
+  emptyCat: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  emptyCatText: { color: theme.colors.textDisabled, fontSize: 15 },
 });
