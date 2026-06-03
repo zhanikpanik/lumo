@@ -81,22 +81,11 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
 
         {/* ═══ MAIN CONTENT ═══ */}
         <View style={styles.mainRow}>
-          {/* ── Left: Order Panel + Payment buttons ── */}
+          {/* ── Left: Order Panel ── */}
           <View style={styles.leftCol}>
             <View style={styles.orderPanelWrap}>
               <OrderPanel onCommentPress={() => setCommentVisible(true)} />
             </View>
-            {!isLocked && (
-              <View style={styles.paymentRow}>
-                <TouchableOpacity style={styles.precheckBtn}>
-                  <Text style={styles.precheckText}>Пречек</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.paymentBtn} onPress={() => navigation?.navigate('Payment')}>
-                  <Text style={styles.paymentLabel}>Оплата</Text>
-                  <Text style={styles.paymentAmount}>{formatAmount(total)} ₽</Text>
-                </TouchableOpacity>
-              </View>
-            )}
           </View>
 
           <View style={{ width: COL_GAP }} />
@@ -118,9 +107,23 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
             </View>
           ) : (
             <>
-              {/* ── Middle: Categories or Actions ── */}
+              {/* ── Middle: Categories/Actions + bottom button ── */}
               <View style={styles.midCol}>
-                {isItemSelected ? <ItemActionsMenu /> : <CategoryMenu />}
+                <View style={{ flex: 1 }}>
+                  {isItemSelected ? <ItemActionsMenu /> : <CategoryMenu />}
+                </View>
+                {!isItemSelected ? (
+                  <TouchableOpacity style={styles.discountBtn}>
+                    <Text style={styles.discountBtnText}>Скидки</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.cancelActionBtn}
+                    onPress={() => useOrderStore.getState().selectItem(null)}
+                  >
+                    <Text style={styles.cancelActionBtnText}>Отмена</Text>
+                  </TouchableOpacity>
+                )}
               </View>
 
               <View style={{ width: COL_GAP }} />
@@ -132,6 +135,37 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
             </>
           )}
         </View>
+
+        {/* ═══ FOOTER ═══ */}
+        {!isLocked && !searchMode && (
+          <View style={styles.footerRow}>
+            <TouchableOpacity style={styles.footerBtn}>
+              <Text style={styles.footerBtnText}>Пречек</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.footerBtn, styles.paymentFooterBtn]}
+              onPress={() => navigation?.navigate('Payment')}
+            >
+              <Text style={styles.footerBtnText}>Оплата</Text>
+              <Text style={styles.paymentFooterAmount}>{formatAmount(total)} ₽</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.footerBtn}
+              onPress={() => {
+                if (isItemSelected) {
+                  useOrderStore.getState().selectItem(null);
+                } else {
+                  closeOrder();
+                  navigation?.navigate('Orders');
+                }
+              }}
+            >
+              <Text style={styles.footerBtnText}>
+                {isItemSelected ? 'Готово' : 'Сохранить заказ'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       <CommentModal
@@ -167,16 +201,72 @@ const styles = StyleSheet.create({
     flex: 1,
     overflow: 'hidden',
   },
-  paymentRow: {
+
+  // Footer
+  footerRow: {
     height: 56,
     flexDirection: 'row',
     gap: GAP,
+    marginHorizontal: PADDING,
+    marginBottom: PADDING,
+  },
+  footerBtn: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: theme.colors.surfaceLight,
+    borderRadius: theme.borderRadius,
+  },
+  footerBtnText: {
+    color: theme.colors.textPrimary,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  paymentFooterBtn: {
+    flex: 1.4,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: '#00C853',
+    paddingHorizontal: 12,
+  },
+  paymentFooterAmount: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+
+  // Middle column bottom buttons
+  discountBtn: {
+    height: 44,
     marginTop: GAP,
+    backgroundColor: theme.colors.surfaceLight,
+    borderRadius: theme.borderRadius,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  discountBtnText: {
+    color: theme.colors.textPrimary,
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  cancelActionBtn: {
+    height: 44,
+    marginTop: GAP,
+    backgroundColor: theme.colors.surfaceLight,
+    borderRadius: theme.borderRadius,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cancelActionBtnText: {
+    color: '#D32F2F',
+    fontSize: 15,
+    fontWeight: '600',
   },
   midCol: {
     flex: 0.25,
     overflow: 'hidden',
     borderRadius: theme.borderRadius,
+    flexDirection: 'column',
   },
   rightCol: {
     flex: 0.40,
@@ -190,38 +280,6 @@ const styles = StyleSheet.create({
     flex: 0.65,
     overflow: 'hidden',
     borderRadius: theme.borderRadius,
-  },
-
-  paymentBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#00C853',
-    borderRadius: theme.borderRadius,
-    paddingHorizontal: 12,
-  },
-  paymentLabel: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  paymentAmount: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  precheckBtn: {
-    flex: 0.5,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: theme.colors.surfaceLight,
-    borderRadius: theme.borderRadius,
-  },
-  precheckText: {
-    color: theme.colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '600',
   },
 
 });
