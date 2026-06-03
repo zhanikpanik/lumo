@@ -326,6 +326,7 @@ interface OrderStoreState {
   tableId: string;
   isQuickCheck: boolean;
   selectedItemId: string | null;
+  selectedModifierId: string | null;
   activeAction: ActiveAction;
   activeCategoryId: string;
   activeModifierGroupId: string;
@@ -355,6 +356,8 @@ interface OrderStoreState {
   setActiveModifierGroup: (groupId: string) => void;
   toggleModifier: (modifier: Modifier) => void;
   setItemComment: (itemId: string, comment: string) => void;
+  selectModifier: (modifierId: string | null) => void;
+  removeModifierFromDraft: (modifierId: string) => void;
   commitDraft: () => void;
   cancelDraft: () => void;
   lastSyncError: string | null;
@@ -369,6 +372,7 @@ export const useOrderStore = create<OrderStoreState>((set, get) => ({
   tableId: '',
   isQuickCheck: false,
   selectedItemId: null,
+  selectedModifierId: null,
   activeAction: null,
   activeCategoryId: '',
   activeModifierGroupId: 'filling',
@@ -775,12 +779,29 @@ export const useOrderStore = create<OrderStoreState>((set, get) => ({
       items: newItems,
       draftItem: null,
       selectedItemId: null,
+      selectedModifierId: null,
       activeAction: null,
       orders: syncToOrders(newState),
     });
   },
 
+  selectModifier: (modifierId: string | null) => {
+    set({ selectedModifierId: modifierId });
+  },
+
+  removeModifierFromDraft: (modifierId: string) => {
+    const { draftItem } = get();
+    if (!draftItem) return;
+    set({
+      draftItem: {
+        ...draftItem,
+        modifiers: draftItem.modifiers.filter(m => m.id !== modifierId),
+      },
+      selectedModifierId: null,
+    });
+  },
+
   cancelDraft: () => {
-    set({ draftItem: null, selectedItemId: null, activeAction: null });
+    set({ draftItem: null, selectedItemId: null, selectedModifierId: null, activeAction: null });
   },
 }));

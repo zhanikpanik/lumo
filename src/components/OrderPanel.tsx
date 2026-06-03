@@ -13,7 +13,7 @@ interface Props {
 }
 
 export const OrderPanel: React.FC<Props> = ({ onCommentPress }) => {
-  const { items, selectedItemId, selectItem, getTotal, sendToKitchen } = useOrderStore();
+  const { items, selectedItemId, selectedModifierId, selectItem, selectModifier, getTotal, sendToKitchen } = useOrderStore();
   const currentOrder = useOrderStore((s) => s.orders.find(o => o.id === s.currentOrderId));
   const comment = currentOrder?.comment || '';
   const sentToKitchen = currentOrder?.sentToKitchen ?? false;
@@ -64,12 +64,24 @@ export const OrderPanel: React.FC<Props> = ({ onCommentPress }) => {
       {item.modifiers.length > 0 && (
         <View style={[styles.modifiersContainer, item.id === selectedItemId && styles.modifiersContainerSelected]}>
           {item.modifiers.map((mod) => (
-            <View key={mod.id} style={styles.modifierRow}>
+            <TouchableOpacity
+              key={mod.id}
+              style={[
+                styles.modifierRow,
+                item.id === selectedItemId && selectedModifierId === mod.id && styles.modifierRowSelected,
+              ]}
+              onPress={() => {
+                if (item.id === selectedItemId) {
+                  selectModifier(selectedModifierId === mod.id ? null : mod.id);
+                }
+              }}
+              activeOpacity={0.7}
+            >
               <View style={styles.modifierLine} />
               <Text style={[styles.modifierText, item.id === selectedItemId && styles.modifierTextSelected]}>{mod.name}</Text>
               <Text style={[styles.modifierQty, item.id === selectedItemId && styles.modifierTextSelected]}>1</Text>
               <Text style={[styles.modifierPrice, item.id === selectedItemId && styles.modifierTextSelected]}>{mod.price} ₽</Text>
-            </View>
+            </TouchableOpacity>
           ))}
         </View>
       )}
@@ -225,6 +237,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 8,
     paddingRight: 16,
+  },
+  modifierRowSelected: {
+    backgroundColor: 'rgba(0,200,83,0.15)',
   },
   modifierLine: {
     width: 2,

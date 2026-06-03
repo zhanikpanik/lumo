@@ -7,6 +7,7 @@ import { CategoryMenu } from '../components/CategoryMenu';
 import { ProductGrid } from '../components/ProductGrid';
 import { ItemActionsMenu } from '../components/ItemActionsMenu';
 import { ModifierGrid } from '../components/ModifierGrid';
+import { ModifierActionsMenu } from '../components/ModifierActionsMenu';
 import { SearchMode } from '../components/SearchMode';
 import { TakeoverLock } from '../components/TakeoverLock';
 import { useOrderStore } from '../store/orderStore';
@@ -19,7 +20,8 @@ const COL_GAP = 8;
 const PADDING = 8;
 
 export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
-  const { selectedItemId, items, getTotal, closeOrder, deleteOrder, tableNumber, currentOrderId, updateOrderMeta, commitDraft, cancelDraft } = useOrderStore();
+  const { selectedItemId, selectedModifierId, items, getTotal, closeOrder, deleteOrder, tableNumber, currentOrderId, updateOrderMeta, commitDraft, cancelDraft } = useOrderStore();
+  const isModifierSelected = !!selectedModifierId;
   const currentOrder = useOrderStore((s) => s.orders.find(o => o.id === s.currentOrderId));
   const selectedItem = items.find(i => i.id === selectedItemId);
   const isItemSelected = !!selectedItem;
@@ -128,19 +130,29 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
 
             <View style={{ width: COL_GAP }} />
 
-            {/* ── Middle: Menu + Discount/Cancel ── */}
+            {/* ── Middle: Menu / ItemActions / ModifierActions + Discount/Cancel ── */}
             <View style={styles.midCol}>
               <View style={styles.colContent}>
-                {isItemSelected ? <ItemActionsMenu /> : <CategoryMenu />}
+                {isModifierSelected ? (
+                  <ModifierActionsMenu />
+                ) : isItemSelected ? (
+                  <ItemActionsMenu />
+                ) : (
+                  <CategoryMenu />
+                )}
               </View>
               <TouchableOpacity
-                style={[styles.colFooterBtn, isItemSelected && styles.colFooterBtnDanger]}
+                style={[styles.colFooterBtn, (isItemSelected || isModifierSelected) && styles.colFooterBtnDanger]}
                 onPress={() => {
-                  if (isItemSelected) cancelDraft();
+                  if (isModifierSelected) {
+                    useOrderStore.getState().selectModifier(null);
+                  } else if (isItemSelected) {
+                    cancelDraft();
+                  }
                 }}
               >
-                <Text style={[styles.colFooterBtnText, isItemSelected && styles.colFooterBtnTextDanger]}>
-                  {isItemSelected ? 'Отмена' : 'Скидки'}
+                <Text style={[styles.colFooterBtnText, (isItemSelected || isModifierSelected) && styles.colFooterBtnTextDanger]}>
+                  {isItemSelected || isModifierSelected ? 'Отмена' : 'Скидки'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -155,27 +167,27 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
               <TouchableOpacity
                 style={[
                   styles.colFooterBtn,
-                  isItemSelected && styles.colFooterBtnActive,
+                  (isItemSelected || isModifierSelected) && styles.colFooterBtnActive,
                   isEmpty && styles.btnDisabled,
                 ]}
                 onPress={() => {
-                  if (isItemSelected) {
+                  if (isItemSelected || isModifierSelected) {
                     commitDraft();
                   } else if (!isEmpty) {
                     closeOrder();
                     navigation?.navigate('Orders');
                   }
                 }}
-                disabled={isEmpty && !isItemSelected}
+                disabled={isEmpty && !isItemSelected && !isModifierSelected}
               >
                 <Text
                   style={[
-                    !isItemSelected && !isEmpty && styles.colFooterBtnTextAccent,
-                    isItemSelected && styles.colFooterBtnTextActive,
+                    !isItemSelected && !isModifierSelected && !isEmpty && styles.colFooterBtnTextAccent,
+                    (isItemSelected || isModifierSelected) && styles.colFooterBtnTextActive,
                     isEmpty && styles.colFooterBtnText,
                   ]}
                 >
-                  {isItemSelected ? 'Готово' : 'Сохранить заказ'}
+                  {isItemSelected || isModifierSelected ? 'Готово' : 'Сохранить заказ'}
                 </Text>
               </TouchableOpacity>
             </View>
