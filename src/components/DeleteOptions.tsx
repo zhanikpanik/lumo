@@ -18,15 +18,13 @@ export const DeleteOptions: React.FC<Props> = ({ onDone }) => {
 
   type Cell = 
     | { kind: 'action'; label: string; action: 'with_writeoff' | 'without_writeoff' }
-    | { kind: 'cancel'; label: string }
     | { kind: 'empty' };
 
   const cells: Cell[] = [
     { kind: 'action', label: 'Удалить со списанием', action: 'with_writeoff' },
     { kind: 'action', label: 'Удалить без списания', action: 'without_writeoff' },
   ];
-  while (cells.length < COLS * ROWS - 1) cells.push({ kind: 'empty' });
-  cells.push({ kind: 'cancel', label: 'Отмена' });
+  while (cells.length < COLS * ROWS) cells.push({ kind: 'empty' });
 
   const rows: Cell[][] = [];
   for (let r = 0; r < ROWS; r++) {
@@ -61,29 +59,11 @@ export const DeleteOptions: React.FC<Props> = ({ onDone }) => {
                 );
               }
 
-              if (cell.kind === 'cancel') {
-                return (
-                  <View key={key} style={[styles.cellWrap, ci < COLS - 1 && { marginRight: GAP }]}>
-                    <TouchableOpacity
-                      style={styles.cancelBtn}
-                      onPress={onDone}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.cancelText}>{cell.label}</Text>
-                    </TouchableOpacity>
-                  </View>
-                );
-              }
-
-              const isWithWriteoff = cell.action === 'with_writeoff';
               return (
                 <View key={key} style={[styles.cellWrap, ci < COLS - 1 && { marginRight: GAP }]}>
                   <TouchableOpacity
-                    style={[
-                      styles.actionBtn,
-                      isWithWriteoff ? styles.actionBtnDanger : styles.actionBtnSecondary,
-                    ]}
-                    onPress={() => handleDelete(isWithWriteoff)}
+                    style={styles.actionBtn}
+                    onPress={() => handleDelete(cell.action === 'with_writeoff')}
                     activeOpacity={0.7}
                   >
                     <Text style={styles.actionLabel}>{cell.label}</Text>
@@ -118,28 +98,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     backgroundColor: theme.colors.surfaceLight,
   },
-  actionBtnDanger: {
-    backgroundColor: '#D32F2F',
-  },
-  actionBtnSecondary: {
-    backgroundColor: '#E65100',
-  },
   actionLabel: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  cancelBtn: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: theme.colors.surfaceLight,
-  },
-  cancelText: {
     color: theme.colors.textPrimary,
     fontSize: 16,
     fontWeight: '500',
+    textAlign: 'center',
   },
   emptyCell: { flex: 1, backgroundColor: theme.colors.surfaceLight },
 });
