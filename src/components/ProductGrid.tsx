@@ -6,10 +6,10 @@ import { useOrderStore } from '../store/orderStore';
 import { useMenuStore } from '../store/menuStore';
 import { Product } from '../types';
 
-const COLS = 3;
+const COLS = 5;
 const ROWS = 6;
 const GAP = 2;
-const TOTAL_CELLS = COLS * ROWS; // 18
+const TOTAL_CELLS = COLS * ROWS;
 
 export const ProductGrid: React.FC = () => {
   const { activeCategoryId, addProduct, items } = useOrderStore();

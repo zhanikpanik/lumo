@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius,
   },
   colFooterBtn: {
-    height: 48,
+    height: 56,
     marginTop: GAP,
     backgroundColor: theme.colors.surfaceLight,
     borderRadius: theme.borderRadius,
@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
   },
 
   paymentRow: {
-    height: 48,
+    height: 56,
     flexDirection: 'row',
     gap: GAP,
     marginTop: GAP,

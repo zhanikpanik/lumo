@@ -4,9 +4,7 @@ import { theme } from '../theme/colors';
 import { useOrderStore } from '../store/orderStore';
 import { ActiveAction } from '../types';
 
-const COLS = 2;
-// 5 рядов, чтобы высота ячеек совпадала с ModifierGrid (там тоже 5 рядов).
-// Выход из режима выбора позиции делается через кнопку «Готово» в правом гриде.
+const COLS = 5;
 const ROWS = 5;
 const GAP = 2;
 
