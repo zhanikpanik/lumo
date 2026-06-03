@@ -6,6 +6,7 @@ import { useOrderStore } from '../store/orderStore';
 import { Modifier } from '../types';
 import { QuantityNumpad } from './QuantityNumpad';
 import { DishCommentPanel } from './DishCommentPanel';
+import { DeleteOptions } from './DeleteOptions';
 import { useMenuStore } from '../store/menuStore';
 
 const COLS = 3;
@@ -15,7 +16,7 @@ const MODIFIER_CELLS = COLS * MODIFIER_ROWS;
 const GAP = 2;
 
 export const ModifierGrid: React.FC = () => {
-  const { items, selectedItemId, draftItem, activeAction, activeModifierGroupId, setActiveModifierGroup, toggleModifier } = useOrderStore();
+  const { items, selectedItemId, draftItem, activeAction, activeModifierGroupId, setActiveModifierGroup, toggleModifier, selectItem } = useOrderStore();
   const modifierGroups = useMenuStore((s) => s.modifierGroups);
   const selectedItem = draftItem || items.find(i => i.id === selectedItemId);
 
@@ -27,6 +28,11 @@ export const ModifierGrid: React.FC = () => {
   // Comment mode → dish comment panel
   if (activeAction === 'comment' && selectedItem) {
     return <DishCommentPanel />;
+  }
+
+  // Delete mode → delete options
+  if (activeAction === 'delete' && selectedItem) {
+    return <DeleteOptions onDone={() => selectItem(null)} />;
   }
 
   // Modifier mode

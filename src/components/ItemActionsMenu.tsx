@@ -26,7 +26,7 @@ const ACTIONS: ActionDef[] = [
 ];
 
 export const ItemActionsMenu: React.FC = () => {
-  const { items, selectedItemId, activeAction, setActiveAction, removeProduct, duplicateItem } = useOrderStore();
+  const { items, selectedItemId, activeAction, setActiveAction, duplicateItem } = useOrderStore();
   const selectedItem = items.find(i => i.id === selectedItemId);
   if (!selectedItem) return null;
 
@@ -59,12 +59,10 @@ export const ItemActionsMenu: React.FC = () => {
 
               const isDelete = cell.action === 'delete';
               const isDuplicate = cell.action === 'duplicate';
-              const isActive = !isDelete && !isDuplicate && activeAction === cell.action;
+              const isActive = activeAction === cell.action;
 
               const handlePress = () => {
-                if (isDelete) {
-                  removeProduct(selectedItem.id);
-                } else if (isDuplicate) {
+                if (isDuplicate) {
                   duplicateItem(selectedItem.id);
                 } else {
                   setActiveAction(cell.action as ActiveAction);
