@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
   },
 
   paymentRow: {
-    height: 56,
+    height: 48,
     flexDirection: 'row',
     gap: GAP,
     marginTop: GAP,
