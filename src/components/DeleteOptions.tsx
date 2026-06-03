@@ -3,8 +3,8 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { theme } from '../theme/colors';
 import { useOrderStore } from '../store/orderStore';
 
-const COLS = 2;
-const ROWS = 3;
+const COLS = 3;
+const ROWS = 6;
 const GAP = 2;
 
 interface Props {
@@ -17,16 +17,16 @@ export const DeleteOptions: React.FC<Props> = ({ onDone }) => {
   const selectedItem = items.find(i => i.id === selectedItemId);
 
   type Cell = 
-    | { kind: 'action'; label: string; subtitle: string; action: 'with_writeoff' | 'without_writeoff' }
+    | { kind: 'action'; label: string; action: 'with_writeoff' | 'without_writeoff' }
     | { kind: 'cancel'; label: string }
     | { kind: 'empty' };
 
   const cells: Cell[] = [
-    { kind: 'action', label: 'Со списанием', subtitle: 'Продукты потрачены', action: 'with_writeoff' },
-    { kind: 'action', label: 'Без списания', subtitle: 'Продукты не тронуты', action: 'without_writeoff' },
-    { kind: 'cancel', label: 'Отмена' },
+    { kind: 'action', label: 'Удалить со списанием', action: 'with_writeoff' },
+    { kind: 'action', label: 'Удалить без списания', action: 'without_writeoff' },
   ];
-  while (cells.length < COLS * ROWS) cells.push({ kind: 'empty' });
+  while (cells.length < COLS * ROWS - 1) cells.push({ kind: 'empty' });
+  cells.push({ kind: 'cancel', label: 'Отмена' });
 
   const rows: Cell[][] = [];
   for (let r = 0; r < ROWS; r++) {
@@ -81,13 +81,12 @@ export const DeleteOptions: React.FC<Props> = ({ onDone }) => {
                   <TouchableOpacity
                     style={[
                       styles.actionBtn,
-                      isWithWriteoff ? styles.writeoffBtn : styles.nowriteoffBtn,
+                      isWithWriteoff ? styles.actionBtnDanger : styles.actionBtnSecondary,
                     ]}
                     onPress={() => handleDelete(isWithWriteoff)}
                     activeOpacity={0.7}
                   >
                     <Text style={styles.actionLabel}>{cell.label}</Text>
-                    <Text style={styles.actionSubtitle}>{cell.subtitle}</Text>
                   </TouchableOpacity>
                 </View>
               );
@@ -116,24 +115,19 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 8,
-    gap: 4,
+    paddingHorizontal: 6,
+    backgroundColor: theme.colors.surfaceLight,
   },
-  writeoffBtn: {
+  actionBtnDanger: {
     backgroundColor: '#D32F2F',
   },
-  nowriteoffBtn: {
+  actionBtnSecondary: {
     backgroundColor: '#E65100',
   },
   actionLabel: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  actionSubtitle: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 12,
+    fontWeight: '600',
     textAlign: 'center',
   },
   cancelBtn: {
