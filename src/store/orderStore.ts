@@ -356,8 +356,11 @@ interface OrderStoreState {
   setActiveModifierGroup: (groupId: string) => void;
   toggleModifier: (modifier: Modifier) => void;
   setItemComment: (itemId: string, comment: string) => void;
+  modifierAction: 'quantity' | 'delete' | null;
   selectModifier: (modifierId: string | null) => void;
+  setModifierAction: (action: 'quantity' | 'delete' | null) => void;
   removeModifierFromDraft: (modifierId: string) => void;
+  setModifierQuantity: (modifierId: string, qty: number) => void;
   commitDraft: () => void;
   cancelDraft: () => void;
   lastSyncError: string | null;
@@ -373,6 +376,7 @@ export const useOrderStore = create<OrderStoreState>((set, get) => ({
   isQuickCheck: false,
   selectedItemId: null,
   selectedModifierId: null,
+  modifierAction: null,
   activeAction: null,
   activeCategoryId: '',
   activeModifierGroupId: 'filling',
@@ -786,7 +790,50 @@ export const useOrderStore = create<OrderStoreState>((set, get) => ({
   },
 
   selectModifier: (modifierId: string | null) => {
-    set({ selectedModifierId: modifierId });
+    set({ selectedModifierId: modifierId, modifierAction: null });
+  },
+
+  setModifierAction: (action) => set({ modifierAction: action }),
+
+  setModifierQuantity: (modifierId: string, qty: number) => {
+    const { draftItem } = get();
+    if (!draftItem) return;
+    if (qty <= 0) {
+      set({
+        draftItem: {
+          ...draftItem,
+          modifiers: draftItem.modifiers.filter(m => m.id !== modifierId),
+        },
+        selectedModifierId: null,
+      });
+      return;
+    }
+    const existing = draftItem.modifiers.filter(m => m.id === modifierId);
+    const count = existing.length;
+    if (qty === count) return;
+    if (qty > count) {
+      const toAdd = qty - count;
+      const newModifiers = [...draftItem.modifiers];
+      for (let i = 0; i < toAdd; i++) {
+        newModifiers.push({ ...existing[0], id: existing[0].id + '_' + (count + i + 1) });
+      }
+      set({ draftItem: { ...draftItem, modifiers: newModifiers } });
+    } else {
+      const toRemove = count - qty;
+      let removed = 0;
+      set({
+        draftItem: {
+          ...draftItem,
+          modifiers: draftItem.modifiers.filter(m => {
+            if (m.id.startsWith(modifierId) && removed < toRemove) {
+              removed++;
+              return false;
+            }
+            return true;
+          }),
+        },
+      });
+    }
   },
 
   removeModifierFromDraft: (modifierId: string) => {

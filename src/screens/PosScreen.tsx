@@ -8,6 +8,8 @@ import { ProductGrid } from '../components/ProductGrid';
 import { ItemActionsMenu } from '../components/ItemActionsMenu';
 import { ModifierGrid } from '../components/ModifierGrid';
 import { ModifierActionsMenu } from '../components/ModifierActionsMenu';
+import { ModifierQuantityNumpad } from '../components/ModifierQuantityNumpad';
+import { DeleteOptions } from '../components/DeleteOptions';
 import { SearchMode } from '../components/SearchMode';
 import { TakeoverLock } from '../components/TakeoverLock';
 import { useOrderStore } from '../store/orderStore';
@@ -20,7 +22,7 @@ const COL_GAP = 8;
 const PADDING = 8;
 
 export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
-  const { selectedItemId, selectedModifierId, items, getTotal, closeOrder, deleteOrder, tableNumber, currentOrderId, updateOrderMeta, commitDraft, cancelDraft } = useOrderStore();
+  const { selectedItemId, selectedModifierId, modifierAction, items, getTotal, closeOrder, deleteOrder, tableNumber, currentOrderId, updateOrderMeta, commitDraft, cancelDraft } = useOrderStore();
   const isModifierSelected = !!selectedModifierId;
   const currentOrder = useOrderStore((s) => s.orders.find(o => o.id === s.currentOrderId));
   const selectedItem = items.find(i => i.id === selectedItemId);
@@ -159,10 +161,18 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
 
             <View style={{ width: COL_GAP }} />
 
-            {/* ── Right: Products + Save/Done ── */}
+            {/* ── Right: Products / Modifiers / Delete / Quantity ── */}
             <View style={styles.rightCol}>
               <View style={styles.colContent}>
-                {isItemSelected ? <ModifierGrid /> : <ProductGrid />}
+                {isModifierSelected && modifierAction === 'delete' ? (
+                  <DeleteOptions onDone={() => useOrderStore.getState().selectModifier(null)} />
+                ) : isModifierSelected && modifierAction === 'quantity' ? (
+                  <ModifierQuantityNumpad />
+                ) : isItemSelected ? (
+                  <ModifierGrid />
+                ) : (
+                  <ProductGrid />
+                )}
               </View>
               <TouchableOpacity
                 style={[

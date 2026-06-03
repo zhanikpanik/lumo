@@ -8,15 +8,15 @@ const ROWS = 3;
 const GAP = 2;
 
 export const ModifierActionsMenu: React.FC = () => {
-  const { draftItem, selectedModifierId, selectModifier, removeModifierFromDraft } = useOrderStore();
+  const { draftItem, selectedModifierId, modifierAction, setModifierAction, removeModifierFromDraft } = useOrderStore();
 
   const modifier = draftItem?.modifiers.find(m => m.id === selectedModifierId);
   if (!modifier) return null;
 
-  type Cell = { kind: 'action'; label: string; action: 'delete' | 'cancel' } | { kind: 'empty' };
+  type Cell = { kind: 'action'; label: string; action: 'quantity' | 'delete' } | { kind: 'empty' };
   const cells: Cell[] = [
+    { kind: 'action', label: 'Кол-во', action: 'quantity' },
     { kind: 'action', label: 'Удалить', action: 'delete' },
-    { kind: 'action', label: 'Отмена', action: 'cancel' },
   ];
   while (cells.length < COLS * ROWS) cells.push({ kind: 'empty' });
 
@@ -44,16 +44,25 @@ export const ModifierActionsMenu: React.FC = () => {
                 );
               }
 
+              const isActive = modifierAction === cell.action;
               const isDelete = cell.action === 'delete';
               return (
                 <View key={key} style={[styles.cellWrap, ci < COLS - 1 && { marginRight: GAP }]}>
                   <TouchableOpacity
-                    style={[styles.actionBtn, isDelete && styles.actionBtnDanger]}
+                    style={[
+                      styles.actionBtn,
+                      isDelete && styles.actionBtnDanger,
+                      !isDelete && isActive && styles.actionBtnActive,
+                    ]}
                     onPress={() => {
-                      if (isDelete) {
+                      if (isDelete && modifierAction === 'delete') {
+                        // Already in delete mode — execute delete
                         removeModifierFromDraft(modifier.id);
+                      } else if (isDelete) {
+                        // Enter delete mode
+                        setModifierAction('delete');
                       } else {
-                        selectModifier(null);
+                        setModifierAction(cell.action);
                       }
                     }}
                     activeOpacity={0.7}
@@ -91,6 +100,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: theme.colors.surfaceLight,
     paddingHorizontal: 4,
+  },
+  actionBtnActive: {
+    backgroundColor: theme.colors.actionMenuPurple,
   },
   actionBtnDanger: {
     backgroundColor: '#D32F2F',
