@@ -19,7 +19,7 @@ const COL_GAP = 8;
 const PADDING = 8;
 
 export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
-  const { selectedItemId, items, getTotal, closeOrder, deleteOrder, tableNumber, currentOrderId, updateOrderMeta } = useOrderStore();
+  const { selectedItemId, items, getTotal, closeOrder, deleteOrder, tableNumber, currentOrderId, updateOrderMeta, commitDraft, cancelDraft } = useOrderStore();
   const currentOrder = useOrderStore((s) => s.orders.find(o => o.id === s.currentOrderId));
   const selectedItem = items.find(i => i.id === selectedItemId);
   const isItemSelected = !!selectedItem;
@@ -136,9 +136,7 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
               <TouchableOpacity
                 style={[styles.colFooterBtn, isItemSelected && styles.colFooterBtnDanger]}
                 onPress={() => {
-                  if (isItemSelected) {
-                    useOrderStore.getState().selectItem(null);
-                  }
+                  if (isItemSelected) cancelDraft();
                 }}
               >
                 <Text style={[styles.colFooterBtnText, isItemSelected && styles.colFooterBtnTextDanger]}>
@@ -162,7 +160,7 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
                 ]}
                 onPress={() => {
                   if (isItemSelected) {
-                    useOrderStore.getState().selectItem(null);
+                    commitDraft();
                   } else if (!isEmpty) {
                     closeOrder();
                     navigation?.navigate('Orders');

@@ -9,18 +9,15 @@ import { DishCommentPanel } from './DishCommentPanel';
 import { useMenuStore } from '../store/menuStore';
 
 const COLS = 3;
-// Сетка из 5 рядов: 4 ряда модификаторов + последний ряд занимает кнопка «Готово»
-// (на всю ширину). Высота ряда совпадает с ItemActionsMenu, поэтому кнопки в обоих
-// гридах оказываются на одной горизонтали.
 const ROWS = 5;
-const MODIFIER_ROWS = ROWS - 1;
+const MODIFIER_ROWS = ROWS;
 const MODIFIER_CELLS = COLS * MODIFIER_ROWS;
 const GAP = 2;
 
 export const ModifierGrid: React.FC = () => {
-  const { items, selectedItemId, activeAction, activeModifierGroupId, setActiveModifierGroup, toggleModifier, selectItem } = useOrderStore();
+  const { items, selectedItemId, draftItem, activeAction, activeModifierGroupId, setActiveModifierGroup, toggleModifier } = useOrderStore();
   const modifierGroups = useMenuStore((s) => s.modifierGroups);
-  const selectedItem = items.find(i => i.id === selectedItemId);
+  const selectedItem = draftItem || items.find(i => i.id === selectedItemId);
 
   // Quantity mode → numpad
   if (activeAction === 'quantity' && selectedItem) {
@@ -64,18 +61,6 @@ export const ModifierGrid: React.FC = () => {
   for (let r = 0; r < MODIFIER_ROWS; r++) {
     rows.push(cells.slice(r * COLS, r * COLS + COLS));
   }
-
-  const renderDoneRow = () => (
-    <View style={styles.doneRow}>
-      <TouchableOpacity
-        style={styles.doneBtn}
-        onPress={() => selectItem(null)}
-        activeOpacity={0.7}
-      >
-        <Text style={styles.doneText}>Готово</Text>
-      </TouchableOpacity>
-    </View>
-  );
 
   // Заглушки для рендера пустых рядов в empty-state (когда у блюда нет групп модификаторов),
   // чтобы общая высота правой колонки не менялась.
@@ -121,7 +106,6 @@ export const ModifierGrid: React.FC = () => {
         </View>
         <View style={styles.grid}>
           {renderModifierRows(emptyRows)}
-          {renderDoneRow()}
         </View>
       </View>
     );
@@ -143,7 +127,6 @@ export const ModifierGrid: React.FC = () => {
 
       <View style={styles.grid}>
         {renderModifierRows(rows)}
-        {renderDoneRow()}
       </View>
     </View>
   );
@@ -186,19 +169,4 @@ const styles = StyleSheet.create({
   },
   emptyCell: { flex: 1, backgroundColor: theme.colors.surfaceLight },
 
-  // Ряд оставляем размером с обычный, чтобы общая высота сетки совпадала с ItemActionsMenu,
-  // а саму кнопку прижимаем к низу — над ней получается «воздух».
-  doneRow: { flex: 1, justifyContent: 'flex-end' },
-  doneBtn: {
-    height: 56,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#00C853',
-    borderRadius: theme.borderRadius,
-  },
-  doneText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
 });

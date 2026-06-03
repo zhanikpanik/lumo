@@ -329,6 +329,7 @@ interface OrderStoreState {
   activeAction: ActiveAction;
   activeCategoryId: string;
   activeModifierGroupId: string;
+  draftItem: OrderItem | null;
 
   flushPendingItemsToServer: () => Promise<void>;
   syncRemoteOrder: (order: Order) => Promise<void>;
@@ -354,6 +355,8 @@ interface OrderStoreState {
   setActiveModifierGroup: (groupId: string) => void;
   toggleModifier: (modifier: Modifier) => void;
   setItemComment: (itemId: string, comment: string) => void;
+  commitDraft: () => void;
+  cancelDraft: () => void;
   lastSyncError: string | null;
   clearSyncError: () => void;
 }
@@ -369,6 +372,7 @@ export const useOrderStore = create<OrderStoreState>((set, get) => ({
   activeAction: null,
   activeCategoryId: '',
   activeModifierGroupId: 'filling',
+  draftItem: null,
   lastSyncError: null,
   clearSyncError: () => set({ lastSyncError: null }),
 
@@ -674,21 +678,25 @@ export const useOrderStore = create<OrderStoreState>((set, get) => ({
 
   updateQuantity: (itemId: string, delta: number) => {
     set((state) => {
-      const newItems = state.items.map(item => {
-        if (item.id === itemId) {
-          return { ...item, quantity: Math.max(0, item.quantity + delta) };
-        }
-        return item;
-      }).filter(item => item.quantity > 0);
-
-      const itemStillExists = newItems.some(i => i.id === state.selectedItemId);
-      const newState = { ...state, items: newItems };
-      return {
-        items: newItems,
-        selectedItemId: itemStillExists ? state.selectedItemId : null,
-        activeAction: itemStillExists ? state.activeAction : null,
-        orders: syncToOrders(newState),
-      };
+      if (!state.draftItem) {
+        // No draft — edit items directly (legacy / pre-draft flow)
+        const newItems = state.items.map(item => {
+          if (item.id === itemId) return { ...item, quantity: Math.max(0, item.quantity + delta) };
+          return item;
+        }).filter(item => item.quantity > 0);
+        const itemStillExists = newItems.some(i => i.id === state.selectedItemId);
+        const newState = { ...state, items: newItems };
+        return {
+          items: newItems,
+          selectedItemId: itemStillExists ? state.selectedItemId : null,
+          activeAction: itemStillExists ? state.activeAction : null,
+          orders: syncToOrders(newState),
+        };
+      }
+      // Draft mode — edit draft only
+      const newQty = Math.max(0, state.draftItem.quantity + delta);
+      if (newQty === 0) return { draftItem: null, selectedItemId: null, activeAction: null };
+      return { draftItem: { ...state.draftItem, quantity: newQty } };
     });
   },
 
@@ -696,14 +704,17 @@ export const useOrderStore = create<OrderStoreState>((set, get) => ({
 
   selectItem: (itemId: string | null) => {
     if (!itemId) {
-      set({ selectedItemId: null, activeAction: null });
+      set({ selectedItemId: null, activeAction: null, draftItem: null });
       return;
     }
     const item = get().items.find(i => i.id === itemId);
+    if (!item) return;
     const hasModifiers = item?.product.hasModifiers || item?.modifiers.length;
     set({
       selectedItemId: itemId,
       activeAction: hasModifiers ? 'modifiers' : 'quantity',
+      // Snapshot for draft editing — commitDraft / cancelDraft work on this
+      draftItem: JSON.parse(JSON.stringify(item)),
     });
   },
 
@@ -713,25 +724,21 @@ export const useOrderStore = create<OrderStoreState>((set, get) => ({
 
   toggleModifier: (modifier: Modifier) => {
     set((state) => {
-      if (!state.selectedItemId) return state;
-      // Группа модификатора и её правила (max_select, is_required) живут в menuStore.
-      // 0 / undefined трактуем как «без лимита» — поведение совместимо со старым кодом.
+      if (!state.selectedItemId || !state.draftItem) return state;
       const group = useMenuStore
         .getState()
         .modifierGroups.find((g) => g.modifiers.some((m) => m.id === modifier.id));
       const siblingIds = group ? group.modifiers.map((m) => m.id) : [modifier.id];
       const maxSelect = group?.maxSelect ?? 0;
 
-      const newItems = state.items.map((item) => {
-        if (item.id !== state.selectedItemId) return item;
-        const has = item.modifiers.some((m) => m.id === modifier.id);
-        if (has) {
-          return { ...item, modifiers: item.modifiers.filter((m) => m.id !== modifier.id) };
-        }
-        let newMods = [...item.modifiers, modifier];
+      const draft = state.draftItem;
+      const has = draft.modifiers.some((m) => m.id === modifier.id);
+      let newMods: Modifier[];
+      if (has) {
+        newMods = draft.modifiers.filter((m) => m.id !== modifier.id);
+      } else {
+        newMods = [...draft.modifiers, modifier];
         if (maxSelect > 0) {
-          // Считаем выбранные из той же группы и убираем самый ранний (FIFO),
-          // пока не уложимся в лимит. При max_select=1 это даёт радио-поведение.
           const inGroup = newMods.filter((m) => siblingIds.includes(m.id));
           const overflow = inGroup.length - maxSelect;
           if (overflow > 0) {
@@ -739,20 +746,41 @@ export const useOrderStore = create<OrderStoreState>((set, get) => ({
             newMods = newMods.filter((m) => !toRemove.has(m.id));
           }
         }
-        return { ...item, modifiers: newMods };
-      });
-      const newState = { ...state, items: newItems };
-      return { items: newItems, orders: syncToOrders(newState) };
+      }
+      return { draftItem: { ...draft, modifiers: newMods } };
     });
   },
 
   setItemComment: (itemId: string, comment: string) => {
     set((state) => {
+      if (state.draftItem && state.draftItem.id === itemId) {
+        return { draftItem: { ...state.draftItem, comment: comment || undefined } };
+      }
       const newItems = state.items.map(item =>
         item.id === itemId ? { ...item, comment: comment || undefined } : item
       );
       const newState = { ...state, items: newItems };
       return { items: newItems, orders: syncToOrders(newState) };
     });
+  },
+
+  commitDraft: () => {
+    const { draftItem, items, selectedItemId } = get();
+    if (!draftItem || !selectedItemId) return;
+    const newItems = items.map(item =>
+      item.id === selectedItemId ? draftItem : item
+    );
+    const newState = { ...get(), items: newItems };
+    set({
+      items: newItems,
+      draftItem: null,
+      selectedItemId: null,
+      activeAction: null,
+      orders: syncToOrders(newState),
+    });
+  },
+
+  cancelDraft: () => {
+    set({ draftItem: null, selectedItemId: null, activeAction: null });
   },
 }));
