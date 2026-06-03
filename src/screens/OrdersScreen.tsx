@@ -356,17 +356,10 @@ export const OrdersScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                     style={[styles.cellWrap, colIdx < COLUMNS - 1 ? { marginRight: GAP } : undefined]}
                   >
                     {cell.kind === 'actions' && (
-                      <View style={styles.actionsCell}>
-                        <TouchableOpacity style={styles.actionHalf} onPress={handleQuickCheck}>
-                          <Feather name="plus" size={24} color="#fff" />
-                          <Text style={styles.actionLabel}>Новый{'\n'}заказ</Text>
-                        </TouchableOpacity>
-                        <View style={styles.actionDivider} />
-                        <TouchableOpacity style={styles.actionHalf} onPress={handleQuickCheck}>
-                          <Feather name="zap" size={22} color="#FFB74D" />
-                          <Text style={styles.actionLabelSmall}>Быстрый чек</Text>
-                        </TouchableOpacity>
-                      </View>
+                      <TouchableOpacity style={styles.actionFull} onPress={handleQuickCheck}>
+                        <Feather name="plus" size={24} color="#fff" />
+                        <Text style={styles.actionLabel}>Новый заказ</Text>
+                      </TouchableOpacity>
                     )}
 
                     {cell.kind === 'order' && (
@@ -574,20 +567,16 @@ const styles = StyleSheet.create({
     marginBottom: GAP,
   },
 
-  actionsCell: { flex: 1, flexDirection: 'column' },
-  actionHalf: {
+  actionFull: {
     flex: 1,
     backgroundColor: '#00C853',
+    borderRadius: theme.borderRadius,
     justifyContent: 'center',
     alignItems: 'center',
     gap: 4,
-  },
-  actionDivider: {
-    height: 2,
-    backgroundColor: '#1A1A1A',
+    margin: 0,
   },
   actionLabel: { color: '#fff', fontSize: 16, fontWeight: '600', textAlign: 'center' },
-  actionLabelSmall: { color: '#FFB74D', fontSize: 13, fontWeight: '600', textAlign: 'center' },
 
   paginationCell: {
     flex: 1,
