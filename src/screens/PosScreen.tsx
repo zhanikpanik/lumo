@@ -252,12 +252,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   colFooterBtnDanger: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#D32F2F',
+    backgroundColor: '#D32F2F',
   },
   colFooterBtnTextDanger: {
-    color: '#D32F2F',
+    color: '#fff',
+    fontWeight: '700',
   },
 
   paymentRow: {
