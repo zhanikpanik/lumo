@@ -23,6 +23,7 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
   const currentOrder = useOrderStore((s) => s.orders.find(o => o.id === s.currentOrderId));
   const selectedItem = items.find(i => i.id === selectedItemId);
   const isItemSelected = !!selectedItem;
+  const isEmpty = items.length === 0;
   const total = getTotal();
   const currentUser = useShiftStore((s) => s.currentUser);
   const [searchMode, setSearchMode] = useState(false);
@@ -110,7 +111,15 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
                 <TouchableOpacity style={styles.precheckBtn}>
                   <Text style={styles.precheckText}>Пречек</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.paymentBtn} onPress={() => navigation?.navigate('Payment')}>
+                <TouchableOpacity
+                  style={[
+                    styles.paymentBtn,
+                    isItemSelected && styles.paymentBtnSecondary,
+                    isEmpty && styles.btnDisabled,
+                  ]}
+                  onPress={() => navigation?.navigate('Payment')}
+                  disabled={isEmpty}
+                >
                   <Text style={styles.paymentLabel}>Оплата</Text>
                   <Text style={styles.paymentAmount}>{formatAmount(total)} ₽</Text>
                 </TouchableOpacity>
@@ -146,17 +155,28 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
                 {isItemSelected ? <ModifierGrid /> : <ProductGrid />}
               </View>
               <TouchableOpacity
-                style={styles.colFooterBtn}
+                style={[
+                  styles.colFooterBtn,
+                  isItemSelected && styles.colFooterBtnActive,
+                  isEmpty && styles.btnDisabled,
+                ]}
                 onPress={() => {
                   if (isItemSelected) {
                     useOrderStore.getState().selectItem(null);
-                  } else {
+                  } else if (!isEmpty) {
                     closeOrder();
                     navigation?.navigate('Orders');
                   }
                 }}
+                disabled={isEmpty && !isItemSelected}
               >
-                <Text style={styles.colFooterBtnText}>
+                <Text
+                  style={[
+                    !isItemSelected && !isEmpty && styles.colFooterBtnTextAccent,
+                    isItemSelected && styles.colFooterBtnTextActive,
+                    isEmpty && styles.colFooterBtnText,
+                  ]}
+                >
                   {isItemSelected ? 'Готово' : 'Сохранить заказ'}
                 </Text>
               </TouchableOpacity>
@@ -213,15 +233,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  colFooterBtnDanger: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#D32F2F',
+  colFooterBtnActive: {
+    backgroundColor: '#00C853',
   },
   colFooterBtnText: {
     color: theme.colors.textPrimary,
     fontSize: 14,
     fontWeight: '600',
+  },
+  colFooterBtnTextAccent: {
+    color: '#00E676',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  colFooterBtnTextActive: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  colFooterBtnDanger: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#D32F2F',
   },
   colFooterBtnTextDanger: {
     color: '#D32F2F',
@@ -250,6 +283,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#00C853',
     borderRadius: theme.borderRadius,
     paddingHorizontal: 12,
+  },
+  paymentBtnSecondary: {
+    backgroundColor: theme.colors.surfaceLight,
+  },
+  btnDisabled: {
+    opacity: 0.4,
   },
   paymentLabel: {
     color: '#fff',
