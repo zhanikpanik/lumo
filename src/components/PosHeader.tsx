@@ -1,74 +1,91 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, TextInput, StyleSheet } from 'react-native';
+import React, { useMemo } from 'react';
+import { View, Text, TouchableOpacity, TextInput, StyleSheet, useWindowDimensions } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { theme } from '../theme/colors';
 import { SearchIcon, NotificationIcon } from './Icons';
-import { useVenueStore } from '../store/venueStore';
 import { useOrderStore } from '../store/orderStore';
+import { useVenueStore } from '../store/venueStore';
 import { useShiftStore } from '../store/shiftStore';
-import { WaiterPickerModal } from './WaiterPickerModal';
+
+const LEFT = 0.35;
+const MID = 0.25;
+const RIGHT = 0.40;
+const COL_GAP = 10;
+const CELL_GAP = 2;
+const PAD = 10;
+
+const useSizes = () => {
+  const { width: W } = useWindowDimensions();
+  return useMemo(() => {
+    const fs = W - 40;
+    return {
+      back:  Math.round(LEFT / 3 * fs),
+      edit:  Math.round((LEFT * 2 / 3 + MID) * fs),
+      right: Math.round(RIGHT * fs),
+    };
+  }, [W]);
+};
 
 interface Props {
   onBack: () => void;
+  onEditPress: () => void;
+  editActive?: boolean;
   searchMode: boolean;
   searchQuery: string;
   onSearchChange: (q: string) => void;
   onSearchOpen: () => void;
   onSearchClose: () => void;
-  tableNumber: string;
-  onTablePress?: () => void;
-  isTakeaway?: boolean;
 }
 
 export const PosHeader: React.FC<Props> = ({
-  onBack, searchMode, searchQuery, onSearchChange, onSearchOpen, onSearchClose,
-  tableNumber,
-  onTablePress,
-  isTakeaway = false,
+  onBack, onEditPress, editActive = false,
+  searchMode, searchQuery,
+  onSearchChange, onSearchOpen, onSearchClose,
 }) => {
-  const trackGuests = useVenueStore((s) => s.trackGuests);
-  const currentOrderId = useOrderStore((s) => s.currentOrderId);
-  const currentOrder = useOrderStore((s) => s.orders.find(o => o.id === s.currentOrderId));
+  const S = useSizes();
   const currentUser = useShiftStore((s) => s.currentUser);
-  const guestCount = currentOrder?.guestCount ?? 1;
-  const setGuestCount = useOrderStore((s) => s.setGuestCount);
-  const [waiterPickerVisible, setWaiterPickerVisible] = useState(false);
+  const currentOrder = useOrderStore((s) => s.orders.find(o => o.id === s.currentOrderId));
+  const hasTables = useVenueStore((s) => s.venueType !== 'takeaway' && s.zones.length > 0);
+
+  const tableNumber = currentOrder?.tableNumber || '';
+  const zone = currentOrder?.zone || '';
+  const waiter = currentOrder?.waiter || '';
+
+  const infoParts: string[] = [];
+  if (hasTables) infoParts.push(tableNumber ? `Стол:${tableNumber}` : 'Без стола');
+  if (zone) infoParts.push(zone);
+  if (waiter) infoParts.push(waiter);
+
+  const renderInfo = () => (
+    <View style={styles.infoRow}>
+      {infoParts.map((p, i) => <Text key={i} style={styles.editSub}>{p}</Text>)}
+    </View>
+  );
 
   if (searchMode) {
     return (
-      <View style={styles.container}>
-        <View style={styles.leftSection}>
-          <TouchableOpacity style={styles.backButton} onPress={onSearchClose}>
-            <Text style={styles.backText}>Назад</Text>
-          </TouchableOpacity>
-
-          {!isTakeaway && (
-            <TouchableOpacity style={styles.metaBtn} onPress={onTablePress} activeOpacity={0.7}>
-              <Text style={styles.metaBtnText} numberOfLines={1}>
-                {tableNumber ? `Стол ${tableNumber}` : 'Назначить стол'}
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        <View style={styles.searchRightSection}>
-          <View style={styles.searchInputWrap}>
-            <TextInput
-              style={styles.searchInput}
-              value={searchQuery}
-              onChangeText={onSearchChange}
-              placeholder=""
-              placeholderTextColor={theme.colors.textSecondary}
-              autoFocus
-            />
+      <View style={styles.row}>
+        <TouchableOpacity style={[styles.brick, { width: S.back }]} onPress={onSearchClose}>
+          <Text style={styles.backText}>Назад</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.brick, styles.editBrick, { width: S.back * 2 }]}
+          onPress={onEditPress} activeOpacity={0.7}
+        >
+          <View style={styles.editLines}>
+            <Text style={styles.editTitle} numberOfLines={1}>Редактировать заказ</Text>
+            {renderInfo()}
           </View>
-
+        </TouchableOpacity>
+        <View style={{ flex: 1, flexDirection: 'row', gap: COL_GAP }}>
+          <View style={styles.searchWrap}>
+            <TextInput style={styles.searchInput} value={searchQuery} onChangeText={onSearchChange} autoFocus />
+          </View>
           <TouchableOpacity style={styles.clearBtn} onPress={() => onSearchChange('')}>
             <Text style={styles.clearText}>Очистить</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity style={styles.iconButton} onPress={onSearchClose}>
-            <Feather name="x" size={22} color={theme.colors.textPrimary} />
+          <TouchableOpacity style={styles.brick} onPress={onSearchClose}>
+            <Feather name="x" size={20} color={theme.colors.textPrimary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -76,209 +93,54 @@ export const PosHeader: React.FC<Props> = ({
   }
 
   return (
-    <>
-    <View style={styles.container}>
-      <View style={styles.leftSection}>
-        <TouchableOpacity style={styles.backButton} onPress={onBack}>
-          <Text style={styles.backText}>Назад</Text>
+    <View style={styles.row}>
+      <TouchableOpacity style={[styles.brick, { width: S.back }]} onPress={onBack}>
+        <Text style={styles.backText}>Назад</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.brick, styles.editBrick, { width: S.edit }, editActive && styles.editActive]}
+        onPress={onEditPress} activeOpacity={0.7}
+      >
+        <View style={styles.editLines}>
+          <Text style={styles.editTitle} numberOfLines={1}>Редактировать заказ</Text>
+          {renderInfo()}
+        </View>
+      </TouchableOpacity>
+
+      <View style={[styles.rightGroup, { width: S.right }]}>
+        <View style={styles.userChip}>
+          <View style={styles.dot} />
+          <Text style={styles.chipText} numberOfLines={1}>{currentUser?.name || ''}</Text>
+        </View>
+        <TouchableOpacity style={styles.rightItem}>
+          <NotificationIcon size={20} color={theme.colors.textPrimary} />
         </TouchableOpacity>
-
-        {!isTakeaway && (
-          <TouchableOpacity style={styles.metaBtn} onPress={onTablePress} activeOpacity={0.7}>
-            <Text style={styles.metaBtnText} numberOfLines={1}>
-              {tableNumber ? `Стол ${tableNumber}` : 'Назначить стол'}
-            </Text>
-          </TouchableOpacity>
-        )}
-
-        {currentOrderId && (
-          <TouchableOpacity
-            style={styles.metaBtn}
-            onPress={() => setWaiterPickerVisible(true)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.metaBtnText} numberOfLines={1}>
-              {currentOrder?.waiter || 'Официант'}
-            </Text>
-          </TouchableOpacity>
-        )}
-
-        {trackGuests && currentOrderId && (
-          <View style={styles.guestCounter}>
-            <TouchableOpacity style={styles.guestBtn} onPress={() => setGuestCount(-1)} disabled={guestCount <= 1}>
-              <Feather name="minus" size={16} color={guestCount <= 1 ? theme.colors.textDisabled : theme.colors.textPrimary} />
-            </TouchableOpacity>
-            <Text style={styles.guestText}>{guestCount}</Text>
-            <TouchableOpacity style={styles.guestBtn} onPress={() => setGuestCount(1)}>
-              <Feather name="plus" size={16} color={theme.colors.textPrimary} />
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
-
-      {/* Right actions */}
-      <View style={styles.rightActions}>
-        {currentUser && (
-          <View style={styles.userChip}>
-            <View style={[styles.onlineDot, { backgroundColor: '#4CAF50' }]} />
-            <Text style={styles.userChipText} numberOfLines={1}>{currentUser.name}</Text>
-          </View>
-        )}
-
-        <TouchableOpacity style={styles.iconButton}>
-          <NotificationIcon size={22} color={theme.colors.textPrimary} />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.iconButton} onPress={onSearchOpen}>
-          <SearchIcon size={22} color={theme.colors.textPrimary} />
+        <TouchableOpacity style={styles.rightItem} onPress={onSearchOpen}>
+          <SearchIcon size={20} color={theme.colors.textPrimary} />
         </TouchableOpacity>
       </View>
     </View>
-
-    <WaiterPickerModal
-      visible={waiterPickerVisible}
-      onClose={() => setWaiterPickerVisible(false)}
-    />
-  </>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    height: 44,
-    flexDirection: 'row',
-    paddingHorizontal: 8,
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  backButton: {
-    height: 44,
-    paddingHorizontal: 16,
-    backgroundColor: theme.colors.surfaceLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: theme.borderRadius,
-  },
-  backText: {
-    color: theme.colors.textPrimary,
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-
-  leftSection: {
-    flex: 0.42,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  metaBtn: {
-    flex: 1,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.surfaceLight,
-    borderRadius: theme.borderRadius,
-    paddingHorizontal: 10,
-    minWidth: 0,
-  },
-  metaBtnText: {
-    color: theme.colors.textPrimary,
-    fontSize: 13,
-    fontWeight: '600',
-    numberOfLines: 1,
-  } as any,
-
-  guestCounter: {
-    height: 44,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.surfaceLight,
-    borderRadius: theme.borderRadius,
-    paddingHorizontal: 2,
-    gap: 0,
-  },
-  guestBtn: {
-    width: 32,
-    height: 36,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  guestText: {
-    color: theme.colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '600',
-    minWidth: 18,
-    textAlign: 'center',
-  },
-
-  rightActions: {
-    flex: 0.58,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 8,
-  },
-  userChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 6,
-  },
-  onlineDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  userChipText: {
-    color: theme.colors.textPrimary,
-    fontSize: 13,
-    fontWeight: '500',
-    maxWidth: 100,
-  },
-  iconButton: {
-    width: 44,
-    height: 44,
-    backgroundColor: theme.colors.surfaceLight,
-    borderRadius: theme.borderRadius,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  // Search mode
-  searchRightSection: {
-    flex: 0.58,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginLeft: 8,
-  },
-  searchInputWrap: {
-    flex: 1,
-    height: 44,
-    borderWidth: 1,
-    borderColor: '#00C853',
-    borderRadius: theme.borderRadius,
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-  },
-  searchInput: {
-    color: theme.colors.textPrimary,
-    fontSize: 16,
-    height: '100%',
-    outlineStyle: 'none',
-  } as any,
-  clearBtn: {
-    height: 44,
-    paddingHorizontal: 16,
-    backgroundColor: theme.colors.surfaceLight,
-    borderRadius: theme.borderRadius,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  clearText: {
-    color: theme.colors.textPrimary,
-    fontSize: 14,
-  },
+  row: { height: 56, flexDirection: 'row', paddingHorizontal: PAD, marginTop: 8, marginBottom: 8, gap: COL_GAP },
+  brick: { height: 56, backgroundColor: theme.colors.surfaceLight, borderRadius: theme.borderRadius, justifyContent: 'center', alignItems: 'center' },
+  backText: { color: theme.colors.textPrimary, fontSize: 16, fontFamily: theme.fonts.medium },
+  editBrick: { paddingHorizontal: 14, alignItems: 'flex-start' },
+  editActive: { borderWidth: 1, borderColor: theme.colors.tabActive, backgroundColor: '#2A2A2A' },
+  editLines: { gap: 2, width: '100%' },
+  infoRow: { flexDirection: 'row', gap: 16 },
+  editTitle: { color: theme.colors.textPrimary, fontSize: 16, fontFamily: theme.fonts.medium },
+  editSub: { color: theme.colors.textSecondary, fontSize: 16, fontFamily: theme.fonts.regular },
+  rightGroup: { flexDirection: 'row', gap: CELL_GAP },
+  rightItem: { flex: 1, height: 56, backgroundColor: theme.colors.surfaceLight, borderRadius: theme.borderRadius, justifyContent: 'center', alignItems: 'center' },
+  userChip: { flex: 1, height: 56, justifyContent: 'center', alignItems: 'center', flexDirection: 'row', gap: 6 },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#4CAF50' },
+  chipText: { color: theme.colors.textPrimary, fontSize: 16, fontFamily: theme.fonts.regular },
+  searchWrap: { flex: 1, height: 56, borderWidth: 1, borderColor: '#00C853', borderRadius: theme.borderRadius, justifyContent: 'center', paddingHorizontal: 12 },
+  searchInput: { color: theme.colors.textPrimary, fontSize: 16, fontFamily: theme.fonts.regular, height: '100%', outlineStyle: 'none' } as any,
+  clearBtn: { height: 56, paddingHorizontal: 14, backgroundColor: theme.colors.surfaceLight, borderRadius: theme.borderRadius, justifyContent: 'center', alignItems: 'center' },
+  clearText: { color: theme.colors.textPrimary, fontSize: 15, fontFamily: theme.fonts.regular },
 });

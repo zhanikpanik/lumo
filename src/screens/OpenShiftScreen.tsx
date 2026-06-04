@@ -66,7 +66,7 @@ export const OpenShiftScreen: React.FC<Props> = ({ navigation }) => {
 
           {/* Amount display */}
           <View style={styles.amountWrap}>
-            <Text style={styles.amount}>{formatAmount(parseInt(amount) || 0)} ₽</Text>
+            <Text style={styles.amount}>{formatAmount(parseInt(amount) || 0)} c</Text>
           </View>
 
           {/* Numpad */}
@@ -125,7 +125,7 @@ export const OpenShiftScreen: React.FC<Props> = ({ navigation }) => {
             }}
             disabled={!canOpenShift}
           >
-            <Text style={styles.skipText}>Пропустить (0 ₽ в кассе)</Text>
+            <Text style={styles.skipText}>Пропустить (0c в кассе)</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -149,32 +149,33 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    fontWeight: '700',
+    fontFamily: theme.fonts.medium,
     color: theme.colors.textPrimary,
     marginBottom: 8,
   },
   cashierName: {
-    fontSize: 18,
-    fontWeight: '500',
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
     color: theme.colors.tabActive,
     marginBottom: 4,
   },
   subtitle: {
     fontSize: 16,
+    fontFamily: theme.fonts.regular,
     color: theme.colors.textSecondary,
     marginBottom: 32,
   },
   amountWrap: {
     width: '100%',
     backgroundColor: theme.colors.surface,
-    borderRadius: 12,
+    borderRadius: 10,
     paddingVertical: 20,
     alignItems: 'center',
     marginBottom: 24,
   },
   amount: {
     fontSize: 36,
-    fontWeight: '700',
+    fontFamily: theme.fonts.medium,
     color: theme.colors.textPrimary,
   },
   numpad: {
@@ -188,7 +189,7 @@ const styles = StyleSheet.create({
   numKey: {
     width: 96,
     height: 64,
-    borderRadius: 12,
+    borderRadius: 10,
     backgroundColor: theme.colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
@@ -198,18 +199,19 @@ const styles = StyleSheet.create({
   },
   numText: {
     fontSize: 24,
-    fontWeight: '500',
+    fontFamily: theme.fonts.medium,
     color: theme.colors.textPrimary,
   },
   numTextSpecial: {
     fontSize: 20,
+    fontFamily: theme.fonts.regular,
     color: theme.colors.textSecondary,
   },
   openBtn: {
     width: '100%',
     height: 56,
     backgroundColor: '#00C853',
-    borderRadius: 12,
+    borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
@@ -219,21 +221,23 @@ const styles = StyleSheet.create({
   },
   waiterHint: {
     color: '#FF8A80',
-    fontSize: 14,
+    fontSize: 16,
+    fontFamily: theme.fonts.regular,
     textAlign: 'center',
     marginBottom: 12,
     lineHeight: 20,
   },
   openBtnText: {
     color: '#fff',
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
   },
   skipBtn: {
     padding: 12,
   },
   skipText: {
     color: theme.colors.textSecondary,
-    fontSize: 14,
+    fontSize: 16,
+    fontFamily: theme.fonts.regular,
   },
 });

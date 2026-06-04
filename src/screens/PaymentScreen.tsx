@@ -219,7 +219,7 @@ export const PaymentScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
           {/* Total */}
           <View style={styles.totalSection}>
             <Text style={styles.totalLabel}>Итого</Text>
-            <Text style={styles.totalAmount}>{formatAmount(total)} ₽</Text>
+            <Text style={styles.totalAmount}>{formatAmount(total)} c</Text>
           </View>
 
           {/* Payment method */}
@@ -274,7 +274,7 @@ export const PaymentScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
           {method === 'cash' && cashAmount > 0 && cashAmount >= total && (
             <View style={styles.changeSection}>
               <Text style={styles.changeLabel}>Сдача</Text>
-              <Text style={styles.changeAmount}>{formatAmount(change)} ₽</Text>
+              <Text style={styles.changeAmount}>{formatAmount(change)} c</Text>
             </View>
           )}
 
@@ -339,13 +339,13 @@ export const PaymentScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
                 <Text style={styles.displayValue}>
                   {cashInput ? formatAmount(parseInt(cashInput, 10)) : '0'}
                 </Text>
-                <Text style={styles.displayCurrency}>₽</Text>
+                <Text style={styles.displayCurrency}>c</Text>
               </View>
 
               {/* Quick exact button */}
               <View style={styles.quickRow}>
                 <TouchableOpacity style={styles.exactBtn} onPress={handleExact} activeOpacity={0.6}>
-                  <Text style={styles.exactText}>Без сдачи — {formatAmount(total)} ₽</Text>
+                  <Text style={styles.exactText}>Без сдачи — {formatAmount(total)} c</Text>
                 </TouchableOpacity>
               </View>
 
@@ -381,7 +381,7 @@ export const PaymentScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
             <View style={styles.cardMode}>
               <Text style={styles.cardIcon}>💳</Text>
               <Text style={styles.cardTitle}>Оплата картой</Text>
-              <Text style={styles.cardAmount}>{formatAmount(total)} ₽</Text>
+              <Text style={styles.cardAmount}>{formatAmount(total)} c</Text>
               <Text style={styles.cardHint}>Приложите карту к терминалу</Text>
             </View>
           ) : (
@@ -427,12 +427,13 @@ const styles = StyleSheet.create({
   totalLabel: {
     color: theme.colors.textSecondary,
     fontSize: 16,
+    fontFamily: theme.fonts.regular,
     marginBottom: 8,
   },
   totalAmount: {
     color: theme.colors.textPrimary,
     fontSize: 48,
-    fontWeight: 'bold',
+    fontFamily: theme.fonts.medium,
   },
 
   methodSection: {
@@ -456,18 +457,19 @@ const styles = StyleSheet.create({
   methodText: {
     color: theme.colors.textPrimary,
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: theme.fonts.medium,
   },
   methodTextActive: {
     color: '#fff',
-    fontWeight: 'bold',
+    fontFamily: theme.fonts.medium,
   },
   methodBtnDisabled: {
     opacity: 0.45,
   },
   permissionHint: {
     color: '#FF8A80',
-    fontSize: 13,
+    fontSize: 16,
+    fontFamily: theme.fonts.regular,
     marginBottom: 12,
   },
 
@@ -483,11 +485,12 @@ const styles = StyleSheet.create({
   changeLabel: {
     color: theme.colors.textSecondary,
     fontSize: 16,
+    fontFamily: theme.fonts.regular,
   },
   changeAmount: {
     color: '#00C853',
     fontSize: 28,
-    fontWeight: 'bold',
+    fontFamily: theme.fonts.medium,
   },
 
   receiptToggle: {
@@ -514,12 +517,13 @@ const styles = StyleSheet.create({
   },
   checkmark: {
     color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
   },
   receiptText: {
     color: theme.colors.textPrimary,
     fontSize: 16,
+    fontFamily: theme.fonts.regular,
   },
 
   actionRow: {
@@ -536,7 +540,7 @@ const styles = StyleSheet.create({
   cancelText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: theme.fonts.medium,
   },
   payBtn: {
     flex: 1.5,
@@ -558,7 +562,7 @@ const styles = StyleSheet.create({
   payText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: theme.fonts.medium,
   },
 
   // Right panel
@@ -578,12 +582,12 @@ const styles = StyleSheet.create({
   displayValue: {
     color: theme.colors.textPrimary,
     fontSize: 48,
-    fontWeight: '300',
+    fontFamily: theme.fonts.regular,
   },
   displayCurrency: {
     color: theme.colors.textSecondary,
     fontSize: 24,
-    fontWeight: '300',
+    fontFamily: theme.fonts.regular,
     marginLeft: 8,
   },
 
@@ -599,8 +603,8 @@ const styles = StyleSheet.create({
   },
   exactText: {
     color: theme.colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '500',
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
   },
 
   numpad: {
@@ -625,7 +629,7 @@ const styles = StyleSheet.create({
   keyText: {
     color: theme.colors.textPrimary,
     fontSize: 28,
-    fontWeight: '300',
+    fontFamily: theme.fonts.regular,
   },
 
   // Card mode
@@ -638,28 +642,30 @@ const styles = StyleSheet.create({
   },
   cardIcon: {
     fontSize: 64,
+      fontFamily: theme.fonts.regular,
     marginBottom: 16,
   },
   cardTitle: {
     color: theme.colors.textPrimary,
     fontSize: 24,
-    fontWeight: '600',
+    fontFamily: theme.fonts.medium,
     marginBottom: 8,
   },
   cardAmount: {
     color: theme.colors.textPrimary,
     fontSize: 48,
-    fontWeight: 'bold',
+    fontFamily: theme.fonts.medium,
     marginBottom: 16,
   },
   cardHint: {
     color: theme.colors.textSecondary,
     fontSize: 16,
+    fontFamily: theme.fonts.regular,
   },
   confirmWarning: {
     color: '#FF5252',
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
   },
   reasonPanel: {
     flex: 1,
@@ -667,8 +673,8 @@ const styles = StyleSheet.create({
   },
   reasonTitle: {
     color: theme.colors.textPrimary,
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
     marginBottom: 16,
   },
   reasonBtn: {
@@ -685,9 +691,10 @@ const styles = StyleSheet.create({
   reasonText: {
     color: theme.colors.textPrimary,
     fontSize: 16,
+    fontFamily: theme.fonts.regular,
   },
   reasonTextActive: {
     color: '#fff',
-    fontWeight: 'bold',
+    fontFamily: theme.fonts.medium,
   },
 });

@@ -210,12 +210,13 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    fontWeight: '700',
+    fontFamily: theme.fonts.medium,
     color: theme.colors.textPrimary,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
+    fontFamily: theme.fonts.regular,
     color: theme.colors.textSecondary,
     marginBottom: 32,
   },
@@ -244,8 +245,8 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: '#D32F2F',
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
     marginBottom: 16,
     height: 20,
   },
@@ -267,11 +268,12 @@ const styles = StyleSheet.create({
   },
   numText: {
     fontSize: 28,
-    fontWeight: '500',
+    fontFamily: theme.fonts.medium,
     color: theme.colors.textPrimary,
   },
   delText: {
     fontSize: 24,
+    fontFamily: theme.fonts.regular,
     color: theme.colors.textSecondary,
   },
   unseenChip: {
@@ -295,7 +297,7 @@ const styles = StyleSheet.create({
   },
   unseenText: {
     color: '#fff',
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
   },
 });

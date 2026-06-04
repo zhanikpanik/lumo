@@ -70,6 +70,8 @@ export interface Table {
 
 export type ActiveAction = 'modifiers' | 'quantity' | 'course' | 'combo' | 'move' | 'comment' | 'delete' | null;
 
+export type OrderActionType = 'transfer' | 'waiter' | 'guests' | 'delete' | null;
+
 export * from './inventory';
 
 export interface Shift {

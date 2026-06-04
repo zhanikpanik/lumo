@@ -86,6 +86,7 @@ export const FloorPlanCanvas: React.FC<Props> = ({
               <>
                 <Text style={[styles.tableNumber, { fontSize }]}>{table.number}</Text>
                 {label && <Text style={[styles.tableLabel, { fontSize: 16 }]}>{label}</Text>}
+                  fontFamily: theme.fonts.regular,
               </>
             )}
           </TouchableOpacity>
@@ -106,11 +107,11 @@ const styles = StyleSheet.create({
   },
   tableNumber: {
     color: '#fff',
-    fontWeight: 'bold',
+    fontFamily: theme.fonts.medium,
   },
   tableLabel: {
     color: 'rgba(255,255,255,0.6)',
-    fontWeight: '500',
+    fontFamily: theme.fonts.medium,
     marginTop: 2,
   },
 });

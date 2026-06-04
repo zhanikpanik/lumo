@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
   menuLabel: {
     fontSize: 16,
     color: '#FFFFFF',
-    fontWeight: '400',
+    fontFamily: theme.fonts.regular,
   },
   menuLabelDisabled: {
     color: '#8E8E93',

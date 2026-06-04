@@ -287,7 +287,7 @@ export const PaidCheckScreen: React.FC<{ navigation?: any }> = ({ navigation }) 
       ? '\n\nВнимание: возврат на карту/QR клиенту пока выполняется вручную (терминал и фискализация будут подключены позже).'
       : '';
     const message =
-      `Заказ #${selectedOrder.number} будет переоткрыт, а сумма ${formatAmount(selectedOrder.totalAmount)} ₽ ` +
+      `Заказ #${selectedOrder.number} будет переоткрыт, а сумма ${formatAmount(selectedOrder.totalAmount)} c ` +
       `(${methodLabel}) будет компенсирована в учете.${extraHint}`;
 
     confirmAction('Подтвердите возврат', message, 'Выполнить возврат', () => {
@@ -300,7 +300,7 @@ export const PaidCheckScreen: React.FC<{ navigation?: any }> = ({ navigation }) 
     if (isCancelling) return;
     const message =
       `Возврат заказа #${selectedOrder.number} будет отменён. ` +
-      `Сумма ${formatAmount(selectedOrder.totalAmount)} ₽ вернётся в выручку смены, ` +
+      `Сумма ${formatAmount(selectedOrder.totalAmount)}c вернётся в выручку смены, ` +
       `а списания склада восстановятся. ` +
       `Если позиции чека менялись после возврата — отмена будет отклонена.`;
     confirmAction('Отменить возврат?', message, 'Отменить возврат', () => {
@@ -353,7 +353,7 @@ export const PaidCheckScreen: React.FC<{ navigation?: any }> = ({ navigation }) 
                   >
                     <View style={styles.listRowTop}>
                       <Text style={styles.listRowNum}>#{o.number}</Text>
-                      <Text style={styles.listRowAmount}>{formatAmount(o.totalAmount)} ₽</Text>
+                      <Text style={styles.listRowAmount}>{formatAmount(o.totalAmount)} c</Text>
                     </View>
                     <View style={styles.listRowSubRow}>
                       <Text style={styles.listRowSub}>
@@ -451,7 +451,7 @@ export const PaidCheckScreen: React.FC<{ navigation?: any }> = ({ navigation }) 
                               <Text key={m.id} style={styles.modLine}>+ {m.name}</Text>
                             ))}
                           </View>
-                          <Text style={styles.itemPrice}>{formatAmount(lineTotal(item))} ₽</Text>
+                          <Text style={styles.itemPrice}>{formatAmount(lineTotal(item))} c</Text>
                         </View>
                       </View>
                     ))}
@@ -463,7 +463,7 @@ export const PaidCheckScreen: React.FC<{ navigation?: any }> = ({ navigation }) 
                 {/* Total */}
                 <View style={styles.totalRow}>
                   <Text style={styles.totalLabel}>Итого</Text>
-                  <Text style={styles.totalAmount}>{formatAmount(selectedOrder.totalAmount)} ₽</Text>
+                  <Text style={styles.totalAmount}>{formatAmount(selectedOrder.totalAmount)} c</Text>
                 </View>
 
                 {/* Payment */}
@@ -478,7 +478,7 @@ export const PaidCheckScreen: React.FC<{ navigation?: any }> = ({ navigation }) 
                     {payment.method === 'cash' && (
                       <View style={styles.paymentRow}>
                         <Text style={styles.paymentLabel}>Сдача</Text>
-                        <Text style={styles.paymentValue}>{formatAmount(payment.change_amount)} ₽</Text>
+                        <Text style={styles.paymentValue}>{formatAmount(payment.change_amount)} c</Text>
                       </View>
                     )}
                     {payment.method === 'none' && payment.close_reason && (
@@ -559,7 +559,7 @@ const styles = StyleSheet.create({
 
   // Header
   header: {
-    height: 44,
+    height: 56,
     flexDirection: 'row',
     paddingHorizontal: PADDING,
     alignItems: 'center',
@@ -569,15 +569,16 @@ const styles = StyleSheet.create({
   headerCenter: { flex: 1, alignItems: 'center' },
   headerRight: { width: 80 },
   backBtn: {
-    height: 44,
+    height: 56,
     paddingHorizontal: 16,
     backgroundColor: theme.colors.surfaceLight,
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: theme.borderRadius,
+    minWidth: 120,
   },
-  backText: { color: theme.colors.textPrimary, fontSize: 17, fontWeight: '600' },
-  headerTitle: { color: theme.colors.textPrimary, fontSize: 17, fontWeight: '700' },
+  backText: { color: theme.colors.textPrimary, fontSize: 16, fontFamily: theme.fonts.medium },
+  headerTitle: { color: theme.colors.textPrimary, fontSize: 16, fontFamily: theme.fonts.medium },
 
   // Main layout
   mainRow: {
@@ -613,9 +614,9 @@ const styles = StyleSheet.create({
   listRowSelected: { backgroundColor: theme.colors.surfaceLight },
   listRowCancelled: { opacity: 0.6 },
   listRowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  listRowNum: { color: theme.colors.textPrimary, fontSize: 17, fontWeight: '700' },
-  listRowAmount: { color: theme.colors.textPrimary, fontSize: 17, fontWeight: '600' },
-  listRowSub: { color: theme.colors.textSecondary, fontSize: 15, flex: 1 },
+  listRowNum: { color: theme.colors.textPrimary, fontSize: 16, fontFamily: theme.fonts.medium },
+  listRowAmount: { color: theme.colors.textPrimary, fontSize: 16, fontFamily: theme.fonts.medium },
+  listRowSub: { color: theme.colors.textSecondary, fontSize: 16, fontFamily: theme.fonts.regular, flex: 1 },
   listRowSubRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   refundChip: {
     paddingHorizontal: 8,
@@ -623,9 +624,9 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: '#3D2A0A',
   },
-  refundChipText: { color: '#FFB74D', fontSize: 13, fontWeight: '700' },
+  refundChipText: { color: '#FFB74D', fontSize: 16, fontFamily: theme.fonts.medium },
   listRowPreviewWrap: { overflow: 'hidden', position: 'relative' },
-  listRowPreview: { color: theme.colors.textSecondary, fontSize: 15, opacity: 0.8 },
+  listRowPreview: { color: theme.colors.textSecondary, fontSize: 16, fontFamily: theme.fonts.regular, opacity: 0.8 },
   listRowFade: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 40 },
 
   // Right: detail panel
@@ -658,34 +659,34 @@ const styles = StyleSheet.create({
   badgeCancelledText: { color: '#FF8A80' },
   badgeRefunded: { backgroundColor: '#3D2A0A' },
   badgeRefundedText: { color: '#FFB74D' },
-  badgeText: { fontSize: 15, fontWeight: '700' },
+  badgeText: { fontSize: 16, fontFamily: theme.fonts.medium },
 
   metaBlock: { gap: 3, marginBottom: 10 },
-  metaLabel: { color: theme.colors.textPrimary, fontSize: 19, fontWeight: '700' },
+  metaLabel: { color: theme.colors.textPrimary, fontSize: 19, fontFamily: theme.fonts.medium },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' },
-  metaValue: { color: theme.colors.textSecondary, fontSize: 15 },
-  metaDot: { color: theme.colors.textSecondary, fontSize: 15 },
+  metaValue: { color: theme.colors.textSecondary, fontSize: 16, fontFamily: theme.fonts.regular },
+  metaDot: { color: theme.colors.textSecondary, fontSize: 16, fontFamily: theme.fonts.regular },
   divider: { height: 1, backgroundColor: 'rgba(255,255,255,0.08)', marginVertical: 10 },
 
   itemsListWrap: { flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden' },
   itemsList: { ...StyleSheet.absoluteFillObject },
-  emptyText: { color: theme.colors.textSecondary, fontSize: 17, padding: 8 },
+  emptyText: { color: theme.colors.textSecondary, fontSize: 16, fontFamily: theme.fonts.regular, padding: 8 },
   itemBlock: { paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.06)' },
   itemRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 4, gap: 8 },
-  itemQty: { color: theme.colors.textSecondary, fontSize: 17, width: 30, paddingTop: 2 },
+  itemQty: { color: theme.colors.textSecondary, fontSize: 16, fontFamily: theme.fonts.regular, width: 30, paddingTop: 2 },
   itemNameCol: { flex: 1, minWidth: 0 },
-  itemName: { color: theme.colors.textPrimary, fontSize: 17 },
-  modLine: { color: theme.colors.textSecondary, fontSize: 15, marginTop: 2 },
-  itemPrice: { color: theme.colors.textPrimary, fontSize: 17, fontWeight: '600', paddingTop: 2 },
+  itemName: { color: theme.colors.textPrimary, fontSize: 16, fontFamily: theme.fonts.regular },
+  modLine: { color: theme.colors.textSecondary, fontSize: 16, fontFamily: theme.fonts.regular, marginTop: 2 },
+  itemPrice: { color: theme.colors.textPrimary, fontSize: 16, fontFamily: theme.fonts.medium, paddingTop: 2 },
 
   totalRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  totalLabel: { color: theme.colors.textSecondary, fontSize: 17 },
-  totalAmount: { color: theme.colors.textPrimary, fontSize: 19, fontWeight: '700' },
+  totalLabel: { color: theme.colors.textSecondary, fontSize: 16, fontFamily: theme.fonts.regular },
+  totalAmount: { color: theme.colors.textPrimary, fontSize: 19, fontFamily: theme.fonts.medium },
 
   paymentBlock: { gap: 5 },
   paymentRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  paymentLabel: { color: theme.colors.textSecondary, fontSize: 17 },
-  paymentValue: { color: theme.colors.textPrimary, fontSize: 17, fontWeight: '600' },
+  paymentLabel: { color: theme.colors.textSecondary, fontSize: 16, fontFamily: theme.fonts.regular },
+  paymentValue: { color: theme.colors.textPrimary, fontSize: 16, fontFamily: theme.fonts.medium },
 
   actionsRow: {
     flexDirection: 'row',
@@ -693,7 +694,7 @@ const styles = StyleSheet.create({
     marginTop: GAP,
   },
   actionBtn: {
-    height: 44,
+    height: 56,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -702,10 +703,10 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius,
     paddingHorizontal: 14,
   },
-  actionText: { color: theme.colors.textPrimary, fontSize: 17, fontWeight: '600' },
+  actionText: { color: theme.colors.textPrimary, fontSize: 16, fontFamily: theme.fonts.medium },
   refundBtn: { backgroundColor: '#D32F2F' },
   cancelRefundBtn: { backgroundColor: '#F57C00' },
   refundBtnDisabled: { opacity: 0.55 },
-  refundText: { color: '#fff', fontSize: 17, fontWeight: '700' },
+  refundText: { color: '#fff', fontSize: 16, fontFamily: theme.fonts.medium },
 
 });

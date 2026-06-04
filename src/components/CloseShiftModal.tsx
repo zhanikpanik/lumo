@@ -14,7 +14,7 @@ import { theme } from '../theme/colors';
 import { useShiftStore } from '../store/shiftStore';
 
 const formatAmount = (n: number): string =>
-  n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' ₽';
+  n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' c';
 
 const formatTime = (date: Date): string =>
   `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
@@ -186,7 +186,7 @@ const styles = StyleSheet.create({
     minWidth: 340,
     maxHeight: '90%',
     backgroundColor: theme.colors.surface,
-    borderRadius: 12,
+    borderRadius: 10,
     overflow: 'hidden',
   },
   header: {
@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: theme.fonts.medium,
     color: theme.colors.textPrimary,
   },
   closeBtn: {
@@ -218,12 +218,13 @@ const styles = StyleSheet.create({
 
   reportTitle: {
     fontSize: 20,
-    fontWeight: '700',
+    fontFamily: theme.fonts.medium,
     color: theme.colors.textPrimary,
     marginBottom: 2,
   },
   reportDate: {
-    fontSize: 13,
+    fontSize: 16,
+      fontFamily: theme.fonts.regular,
     color: theme.colors.textSecondary,
   },
 
@@ -234,8 +235,8 @@ const styles = StyleSheet.create({
   },
 
   sectionTitle: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
     color: theme.colors.textSecondary,
     marginBottom: 6,
   },
@@ -247,15 +248,17 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   infoLabel: {
-    fontSize: 13,
+    fontSize: 16,
+      fontFamily: theme.fonts.regular,
     color: theme.colors.textSecondary,
   },
   infoValue: {
-    fontSize: 13,
+    fontSize: 16,
+      fontFamily: theme.fonts.regular,
     color: theme.colors.textPrimary,
   },
   bold: {
-    fontWeight: '600',
+    fontFamily: theme.fonts.medium,
     color: theme.colors.textPrimary,
   },
   accent: {
@@ -263,7 +266,8 @@ const styles = StyleSheet.create({
   },
 
   inputHint: {
-    fontSize: 13,
+    fontSize: 16,
+      fontFamily: theme.fonts.regular,
     color: theme.colors.textSecondary,
     marginBottom: 8,
   },
@@ -273,7 +277,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 20,
-    fontWeight: '500',
+    fontFamily: theme.fonts.medium,
     color: theme.colors.textPrimary,
     textAlign: 'center',
     marginBottom: 8,
@@ -297,8 +301,8 @@ const styles = StyleSheet.create({
   },
   cancelText: {
     color: theme.colors.textPrimary,
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
   },
   confirmBtn: {
     flex: 2,
@@ -313,12 +317,13 @@ const styles = StyleSheet.create({
   },
   confirmText: {
     color: '#fff',
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
   },
   warningText: {
     color: '#FF8A80',
-    fontSize: 12,
+    fontSize: 16,
+      fontFamily: theme.fonts.regular,
     textAlign: 'center',
     paddingBottom: 12,
   },

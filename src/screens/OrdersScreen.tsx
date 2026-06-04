@@ -25,8 +25,8 @@ const getCols = (width: number): number => {
   if (width < 1800) return 5;
   return 6;
 };
-const GAP = 8;
-const PADDING = 8;
+const GAP = 10;
+const PADDING = 10;
 
 const getRows = (height: number): number => {
   if (height < 800) return 4;
@@ -168,6 +168,10 @@ export const OrdersScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const handleQuickCheck = () => {
     createQuickCheck();
     navigation.navigate('Pos');
+  };
+
+  const handleNewOrder = () => {
+    navigation.navigate('TablePicker', { mode: 'new' });
   };
 
   const handleSelectOrder = (orderId: string) => {
@@ -356,10 +360,16 @@ export const OrdersScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                     style={[styles.cellWrap, colIdx < COLUMNS - 1 ? { marginRight: GAP } : undefined]}
                   >
                     {cell.kind === 'actions' && (
-                      <TouchableOpacity style={styles.actionFull} onPress={handleQuickCheck}>
-                        <Feather name="plus" size={24} color="#fff" />
-                        <Text style={styles.actionLabel}>Новый заказ</Text>
-                      </TouchableOpacity>
+                      <View style={styles.actionCell}>
+                        <TouchableOpacity style={styles.actionBtn} onPress={handleNewOrder}>
+                          <Feather name="plus" size={24} color="#fff" />
+                          <Text style={styles.actionLabel}>Новый заказ</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.actionBtn} onPress={handleQuickCheck}>
+                          <Feather name="plus" size={24} color="#fff" />
+                          <Text style={styles.actionLabel}>Быстрый чек</Text>
+                        </TouchableOpacity>
+                      </View>
                     )}
 
                     {cell.kind === 'order' && (
@@ -575,6 +585,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     margin: 0,
+  },
+  actionCell: {
+    flex: 1,
+    borderRadius: theme.borderRadius,
+    overflow: 'hidden',
+    flexDirection: 'row',
+    gap: 10,
+  },
+  actionBtn: {
+    flex: 1,
+    backgroundColor: '#00C853',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: theme.borderRadius,
   },
   actionLabel: { color: '#fff', fontSize: 16, fontWeight: '600', textAlign: 'center' },
 

@@ -1,4 +1,7 @@
+import { fonts } from './fonts';
+
 export const theme = {
+  fonts,
   colors: {
     background: '#1A1A1A',
     surface: '#2C2C2C',
@@ -31,5 +34,5 @@ export const theme = {
     drinks: '#2E7D32',
     desserts: '#6D4C41',
   },
-  borderRadius: 8,
+  borderRadius: 10,
 };

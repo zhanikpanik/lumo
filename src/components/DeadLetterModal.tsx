@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
     maxWidth: 760,
     maxHeight: '80%',
     backgroundColor: theme.colors.surface,
-    borderRadius: 12,
+    borderRadius: 10,
     overflow: 'hidden',
   },
   header: {
@@ -188,12 +188,13 @@ const styles = StyleSheet.create({
   },
   title: {
     color: theme.colors.textPrimary,
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
   },
   subtitle: {
     color: theme.colors.textSecondary,
-    fontSize: 13,
+    fontSize: 16,
+      fontFamily: theme.fonts.regular,
     marginTop: 4,
     maxWidth: 600,
   },
@@ -211,7 +212,8 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     color: theme.colors.textSecondary,
-    fontSize: 15,
+    fontSize: 16,
+      fontFamily: theme.fonts.regular,
   },
   row: {
     backgroundColor: theme.colors.surfaceLight,
@@ -226,20 +228,22 @@ const styles = StyleSheet.create({
   },
   rowMeta: {
     color: theme.colors.textSecondary,
-    fontSize: 12,
+    fontSize: 16,
+      fontFamily: theme.fonts.regular,
   },
   rowTitle: {
     color: theme.colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
   },
   rowError: {
     color: '#FF8A80',
-    fontSize: 13,
+    fontSize: 16,
+      fontFamily: theme.fonts.regular,
   },
   rowKey: {
     color: theme.colors.textSecondary,
-    fontSize: 11,
+    fontSize: 16,
     fontFamily: 'monospace',
   },
   rowActions: {
@@ -259,7 +263,7 @@ const styles = StyleSheet.create({
   retryBtn: { backgroundColor: '#1976D2' },
   ackBtn: { backgroundColor: '#455A64' },
   btnDisabled: { opacity: 0.55 },
-  actionText: { color: '#fff', fontWeight: '600', fontSize: 13 },
+  actionText: { color: '#fff', fontFamily: theme.fonts.medium, fontSize: 16 },
   statusChip: {
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -267,7 +271,7 @@ const styles = StyleSheet.create({
   },
   chipOpen: { backgroundColor: '#5A1010' },
   chipAck: { backgroundColor: '#3D3D0A' },
-  chipText: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  chipText: { color: '#fff', fontSize: 16, fontFamily: theme.fonts.medium },
   footer: {
     padding: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
@@ -286,7 +290,7 @@ const styles = StyleSheet.create({
   },
   footerText: {
     color: theme.colors.textPrimary,
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
   },
 });

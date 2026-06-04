@@ -12,7 +12,7 @@ import { theme } from '../theme/colors';
 import { useOrderStore } from '../store/orderStore';
 
 const formatAmount = (amount: number): string => {
-  return amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' ₽';
+  return amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' c';
 };
 
 interface Props {
@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
     maxWidth: 480,
     minWidth: 360,
     backgroundColor: theme.colors.surface,
-    borderRadius: 12,
+    borderRadius: 10,
     overflow: 'hidden',
     maxHeight: '80%',
   },
@@ -186,8 +186,8 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   title: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
     color: theme.colors.textPrimary,
   },
   closeBtn: {
@@ -214,8 +214,8 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.tabActive,
   },
   tabText: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
     color: theme.colors.textSecondary,
   },
   tabTextActive: {
@@ -239,14 +239,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statValue: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
     color: theme.colors.textPrimary,
     marginBottom: 4,
   },
   statLabel: {
-    fontSize: 12,
-    fontWeight: '500',
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
     color: theme.colors.textSecondary,
   },
   divider: {
@@ -261,12 +261,13 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   breakdownLabel: {
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
     color: theme.colors.textPrimary,
   },
   breakdownValue: {
-    fontSize: 14,
+    fontSize: 16,
+      fontFamily: theme.fonts.regular,
     color: theme.colors.textSecondary,
   },
   alertText: {
@@ -279,12 +280,12 @@ const styles = StyleSheet.create({
   },
   totalLabel: {
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: theme.fonts.medium,
     color: theme.colors.textPrimary,
   },
   totalValue: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
     color: theme.colors.textPrimary,
   },
 });

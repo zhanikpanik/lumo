@@ -39,6 +39,7 @@
 - [x] Order cards: Gorbunova-style clean typography, scaled text
 - [x] Table view: Poster-style floor plan with shapes (small/regular/wide/tall/bar)
 - [x] Payment screen: Cash/Card/Без оплаты with reason picker
+- [x] Font: Inter (Regular/Medium/Bold) loaded via expo-font, centralized in theme/fonts.ts
 - [x] Color scheme: #333 default, #003E21 paid, #400A0A alert
 
 ## TODO

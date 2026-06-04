@@ -3,6 +3,10 @@ import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar } fro
 import { theme } from '../theme/colors';
 import { PosHeader } from '../components/PosHeader';
 import { OrderPanel } from '../components/OrderPanel';
+import { OrderActionsMenu } from '../components/OrderActionsMenu';
+import { WaiterPickerPanel } from '../components/WaiterPickerPanel';
+import { GuestCounterPanel } from '../components/GuestCounterPanel';
+import { DeleteOrderPanel } from '../components/DeleteOrderPanel';
 import { CategoryMenu } from '../components/CategoryMenu';
 import { ProductGrid } from '../components/ProductGrid';
 import { ItemActionsMenu } from '../components/ItemActionsMenu';
@@ -16,10 +20,11 @@ import { useOrderStore } from '../store/orderStore';
 import { useShiftStore } from '../store/shiftStore';
 import { useVenueStore } from '../store/venueStore';
 import { CommentModal } from '../components/CommentModal';
+import { OrderActionType } from '../types';
 
-const GAP = 8;
-const COL_GAP = 8;
-const PADDING = 8;
+const GAP = 10;
+const COL_GAP = 10;
+const PADDING = 10;
 
 export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
   const { selectedItemId, selectedModifierId, modifierAction, items, getTotal, closeOrder, deleteOrder, tableNumber, currentOrderId, updateOrderMeta, commitDraft, cancelDraft } = useOrderStore();
@@ -33,9 +38,10 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
   const [searchMode, setSearchMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [commentVisible, setCommentVisible] = useState(false);
+  const [orderActionsMode, setOrderActionsMode] = useState(false);
+  const [selectedOrderAction, setSelectedOrderAction] = useState<OrderActionType>(null);
   const isTakeaway = useVenueStore((s) => s.venueType === 'takeaway');
 
-  // Lock: waiter viewing someone else's order
   const isLocked = useMemo(() => {
     if (!currentUser || !currentOrder) return false;
     if (currentUser.role !== 'waiter') return false;
@@ -45,8 +51,8 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
 
   const handleBack = () => {
     const comment = currentOrder?.comment || '';
-    const isEmpty = items.length === 0 && !tableNumber && !comment;
-    if (isEmpty && currentOrderId) {
+    const empty = items.length === 0 && !tableNumber && !comment;
+    if (empty && currentOrderId) {
       deleteOrder(currentOrderId);
     } else {
       closeOrder();
@@ -54,54 +60,66 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
     navigation?.navigate('Orders');
   };
 
-  const handleSearchOpen = () => {
-    setSearchMode(true);
-    setSearchQuery('');
+  const handleSearchOpen = () => { setSearchMode(true); setSearchQuery(''); };
+  const handleSearchClose = () => { setSearchMode(false); setSearchQuery(''); };
+
+  const handleOrderActionsToggle = () => {
+    if (orderActionsMode) {
+      setOrderActionsMode(false);
+      setSelectedOrderAction(null);
+    } else {
+      useOrderStore.getState().cancelDraft();
+      setOrderActionsMode(true);
+      setSelectedOrderAction(null);
+    }
   };
 
-  const handleSearchClose = () => {
-    setSearchMode(false);
-    setSearchQuery('');
+  const handleOrderActionSelect = (action: OrderActionType) => {
+    if (action === 'transfer') {
+      if (!isTakeaway) navigation?.navigate('TablePicker');
+      setOrderActionsMode(false);
+      setSelectedOrderAction(null);
+    } else {
+      setSelectedOrderAction(action);
+    }
+  };
+
+  const closeOrderActions = () => {
+    setOrderActionsMode(false);
+    setSelectedOrderAction(null);
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar hidden />
       <View style={styles.root}>
-        {/* ═══ HEADER ═══ */}
         <PosHeader
           onBack={handleBack}
+          onEditPress={handleOrderActionsToggle}
+          editActive={orderActionsMode}
           searchMode={searchMode}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           onSearchOpen={handleSearchOpen}
           onSearchClose={handleSearchClose}
-          tableNumber={tableNumber}
-          isTakeaway={isTakeaway}
-          onTablePress={() => {
-            if (isTakeaway) return;
-            navigation?.navigate('TablePicker');
-          }}
         />
 
-        {/* ═══ MAIN CONTENT ═══ */}
         {isLocked ? (
           <View style={styles.mainRow}>
             <View style={styles.takeoverCol}>
-              <TakeoverLock
-                onTakeover={(waiterName) => {
-                  updateOrderMeta({ waiter: waiterName });
-                }}
-              />
+              <TakeoverLock onTakeover={(waiterName) => { updateOrderMeta({ waiter: waiterName }); }} />
             </View>
           </View>
         ) : searchMode ? (
           <View style={styles.mainRow}>
+            <View style={styles.leftCol}>
+              <View style={styles.colContent}>
+                <OrderPanel onCommentPress={() => setCommentVisible(true)} />
+              </View>
+            </View>
+            <View style={{ width: COL_GAP }} />
             <View style={styles.searchRightCol}>
-              <SearchMode
-                searchQuery={searchQuery}
-                onSearchChange={setSearchQuery}
-              />
+              <SearchMode searchQuery={searchQuery} onSearchChange={setSearchQuery} />
             </View>
           </View>
         ) : (
@@ -116,11 +134,7 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
                   <Text style={styles.precheckText}>Пречек</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[
-                    styles.paymentBtn,
-                    isItemSelected && styles.paymentBtnSecondary,
-                    isEmpty && styles.btnDisabled,
-                  ]}
+                  style={[styles.paymentBtn, isItemSelected && styles.paymentBtnSecondary, isEmpty && styles.btnDisabled]}
                   onPress={() => navigation?.navigate('Payment')}
                   disabled={isEmpty}
                 >
@@ -132,10 +146,12 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
 
             <View style={{ width: COL_GAP }} />
 
-            {/* ── Middle: Menu / ItemActions / ModifierActions + Discount/Cancel ── */}
+            {/* ── Middle: Menu / OrderActions / ItemActions ── */}
             <View style={styles.midCol}>
               <View style={styles.colContent}>
-                {isModifierSelected ? (
+                {orderActionsMode ? (
+                  <OrderActionsMenu selectedAction={selectedOrderAction} onSelect={handleOrderActionSelect} />
+                ) : isModifierSelected ? (
                   <ModifierActionsMenu />
                 ) : isItemSelected ? (
                   <ItemActionsMenu />
@@ -144,29 +160,31 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
                 )}
               </View>
               <TouchableOpacity
-                style={[styles.colFooterBtn, (isItemSelected || isModifierSelected) && styles.colFooterBtnDanger]}
+                style={[styles.colFooterBtn, (orderActionsMode || isItemSelected || isModifierSelected) && styles.colFooterBtnDanger]}
                 onPress={() => {
-                  if (isModifierSelected) {
-                    useOrderStore.getState().selectModifier(null);
-                  } else if (isItemSelected) {
-                    cancelDraft();
-                  }
+                  if (orderActionsMode) { closeOrderActions(); }
+                  else if (isModifierSelected || isItemSelected) { cancelDraft(); }
                 }}
               >
-                <Text style={[styles.colFooterBtnText, (isItemSelected || isModifierSelected) && styles.colFooterBtnTextDanger]}>
-                  {isItemSelected || isModifierSelected ? 'Отмена' : 'Скидки'}
+                <Text style={[styles.colFooterBtnText, (orderActionsMode || isItemSelected || isModifierSelected) && styles.colFooterBtnTextDanger]}>
+                  {orderActionsMode ? 'Закрыть' : isItemSelected || isModifierSelected ? 'Отмена' : 'Скидки'}
                 </Text>
               </TouchableOpacity>
             </View>
 
             <View style={{ width: COL_GAP }} />
 
-            {/* ── Right: Products / Modifiers / Delete / Quantity ── */}
+            {/* ── Right: Products / Action panels ── */}
             <View style={styles.rightCol}>
               <View style={styles.colContent}>
-                {isModifierSelected && modifierAction === 'delete' ? (
+                {orderActionsMode ? (
+                  selectedOrderAction === 'waiter' ? <WaiterPickerPanel /> :
+                  selectedOrderAction === 'guests' ? <GuestCounterPanel /> :
+                  selectedOrderAction === 'delete' ? <DeleteOrderPanel onDeleted={closeOrderActions} /> :
+                  <ProductGrid />
+                ) : isModifierSelected && modifierAction === 'delete' ? (
                   <DeleteOptions onDone={() => useOrderStore.getState().selectModifier(null)} />
-                ) : isModifierSelected && modifierAction === 'quantity' ? (
+                ) : isModifierSelected ? (
                   <ModifierQuantityNumpad />
                 ) : isItemSelected ? (
                   <ModifierGrid />
@@ -175,11 +193,7 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
                 )}
               </View>
               <TouchableOpacity
-                style={[
-                  styles.colFooterBtn,
-                  (isItemSelected || isModifierSelected) && styles.colFooterBtnActive,
-                  isEmpty && styles.btnDisabled,
-                ]}
+                style={[styles.colFooterBtn, (isItemSelected || isModifierSelected) && styles.colFooterBtnActive, isEmpty && !isItemSelected && !isModifierSelected && styles.btnDisabled]}
                 onPress={() => {
                   if (isItemSelected || isModifierSelected) {
                     commitDraft();
@@ -190,13 +204,7 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
                 }}
                 disabled={isEmpty && !isItemSelected && !isModifierSelected}
               >
-                <Text
-                  style={[
-                    !isItemSelected && !isModifierSelected && !isEmpty && styles.colFooterBtnTextAccent,
-                    (isItemSelected || isModifierSelected) && styles.colFooterBtnTextActive,
-                    isEmpty && styles.colFooterBtnText,
-                  ]}
-                >
+                <Text style={[!isItemSelected && !isModifierSelected && !isEmpty && styles.colFooterBtnTextAccent, (isItemSelected || isModifierSelected) && styles.colFooterBtnTextActive, isEmpty && styles.colFooterBtnText]}>
                   {isItemSelected || isModifierSelected ? 'Готово' : 'Сохранить заказ'}
                 </Text>
               </TouchableOpacity>
@@ -204,11 +212,7 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
           </View>
         )}
       </View>
-
-      <CommentModal
-        visible={commentVisible}
-        onClose={() => setCommentVisible(false)}
-      />
+      <CommentModal visible={commentVisible} onClose={() => setCommentVisible(false)} />
     </SafeAreaView>
   );
 };
@@ -218,118 +222,26 @@ const formatAmount = (n: number) => n.toString().replace(/\B(?=(\d{3})+(?!\d))/g
 const styles = StyleSheet.create({
   safeArea: { flex: 1, minHeight: 0, minWidth: 0, overflow: 'hidden', backgroundColor: '#1A1A1A' },
   root: { flex: 1, minHeight: 0, minWidth: 0, overflow: 'hidden', backgroundColor: '#1A1A1A' },
-
-  mainRow: {
-    flex: 1,
-    minHeight: 0,
-    minWidth: 0,
-    flexDirection: 'row',
-    paddingHorizontal: PADDING,
-    paddingBottom: COL_GAP,
-  },
-  leftCol: {
-    flex: 0.35,
-    minHeight: 0,
-    flexDirection: 'column',
-  },
-  midCol: {
-    flex: 0.25,
-    flexDirection: 'column',
-  },
-  rightCol: {
-    flex: 0.40,
-    flexDirection: 'column',
-  },
-  colContent: {
-    flex: 1,
-    overflow: 'hidden',
-    borderRadius: theme.borderRadius,
-  },
-  colFooterBtn: {
-    height: 56,
-    marginTop: GAP,
-    backgroundColor: theme.colors.surfaceLight,
-    borderRadius: theme.borderRadius,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  colFooterBtnActive: {
-    backgroundColor: '#00C853',
-  },
-  colFooterBtnText: {
-    color: theme.colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  colFooterBtnTextAccent: {
-    color: '#00E676',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  colFooterBtnTextActive: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  colFooterBtnDanger: {
-    backgroundColor: '#D32F2F',
-  },
-  colFooterBtnTextDanger: {
-    color: '#fff',
-    fontWeight: '700',
-  },
-
-  paymentRow: {
-    height: 56,
-    flexDirection: 'row',
-    gap: GAP,
-    marginTop: GAP,
-  },
-  searchRightCol: {
-    flex: 0.65,
-  },
-  takeoverCol: {
-    flex: 0.65,
-    overflow: 'hidden',
-    borderRadius: theme.borderRadius,
-  },
-
-  paymentBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#00C853',
-    borderRadius: theme.borderRadius,
-    paddingHorizontal: 12,
-  },
-  paymentBtnSecondary: {
-    backgroundColor: theme.colors.surfaceLight,
-  },
-  btnDisabled: {
-    opacity: 0.4,
-  },
-  paymentLabel: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  paymentAmount: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  precheckBtn: {
-    flex: 0.5,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: theme.colors.surfaceLight,
-    borderRadius: theme.borderRadius,
-  },
-  precheckText: {
-    color: theme.colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-
+  mainRow: { flex: 1, minHeight: 0, minWidth: 0, flexDirection: 'row', paddingHorizontal: PADDING, paddingBottom: COL_GAP },
+  leftCol: { flex: 0.35, minHeight: 0, flexDirection: 'column' },
+  midCol: { flex: 0.25, flexDirection: 'column' },
+  rightCol: { flex: 0.40, flexDirection: 'column' },
+  colContent: { flex: 1, overflow: 'hidden', borderRadius: theme.borderRadius },
+  colFooterBtn: { height: 56, marginTop: GAP, backgroundColor: theme.colors.surfaceLight, borderRadius: theme.borderRadius, justifyContent: 'center', alignItems: 'center' },
+  colFooterBtnActive: { backgroundColor: '#00C853' },
+  colFooterBtnText: { color: theme.colors.textPrimary, fontSize: 16, fontFamily: theme.fonts.medium },
+  colFooterBtnTextAccent: { color: '#00E676', fontSize: 16, fontFamily: theme.fonts.medium },
+  colFooterBtnTextActive: { color: '#fff', fontSize: 16, fontFamily: theme.fonts.medium },
+  colFooterBtnDanger: { backgroundColor: '#D32F2F' },
+  colFooterBtnTextDanger: { color: '#fff', fontFamily: theme.fonts.medium },
+  paymentRow: { height: 56, flexDirection: 'row', gap: GAP, marginTop: GAP },
+  searchRightCol: { flex: 0.65 },
+  takeoverCol: { flex: 0.65, overflow: 'hidden', borderRadius: theme.borderRadius },
+  paymentBtn: { flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#00C853', borderRadius: theme.borderRadius, paddingHorizontal: 12 },
+  paymentBtnSecondary: { backgroundColor: theme.colors.surfaceLight },
+  btnDisabled: { opacity: 0.4 },
+  paymentLabel: { color: '#fff', fontSize: 16, fontFamily: theme.fonts.medium },
+  paymentAmount: { color: '#fff', fontSize: 16, fontFamily: theme.fonts.medium },
+  precheckBtn: { flex: 0.5, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.surfaceLight, borderRadius: theme.borderRadius },
+  precheckText: { color: theme.colors.textPrimary, fontSize: 16, fontFamily: theme.fonts.medium },
 });

@@ -129,7 +129,8 @@ const styles = StyleSheet.create({
   },
   headerText: {
     color: theme.colors.textSecondary,
-    fontSize: 14,
+    fontSize: 16,
+      fontFamily: theme.fonts.regular,
     textAlign: 'center',
   },
   displayRow: {
@@ -139,7 +140,7 @@ const styles = StyleSheet.create({
   displayText: {
     color: theme.colors.textPrimary,
     fontSize: 32,
-    fontWeight: '300',
+    fontFamily: theme.fonts.regular,
     letterSpacing: 8,
   },
   displayTextError: {
@@ -162,17 +163,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: theme.colors.surfaceLight,
-    borderRadius: 12,
+    borderRadius: 10,
   },
   keyText: {
     color: theme.colors.textPrimary,
     fontSize: 24,
-    fontWeight: '400',
+    fontFamily: theme.fonts.regular,
   },
   errorText: {
     color: '#FF8A65',
-    fontSize: 13,
+    fontSize: 16,
     textAlign: 'center',
-    fontWeight: '500',
+    fontFamily: theme.fonts.medium,
   },
 });

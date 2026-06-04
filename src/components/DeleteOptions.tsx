@@ -13,8 +13,10 @@ interface Props {
 }
 
 export const DeleteOptions: React.FC<Props> = ({ onDone }) => {
-  const { removeProduct, items, selectedItemId } = useOrderStore();
+  const { removeProduct, removeModifierFromDraft, items, selectedItemId, selectedModifierId, draftItem } = useOrderStore();
   const selectedItem = items.find(i => i.id === selectedItemId);
+  const isModifierContext = !!selectedModifierId;
+  const modifier = isModifierContext ? draftItem?.modifiers.find(m => m.id === selectedModifierId) : null;
 
   type Cell = 
     | { kind: 'action'; label: string; action: 'with_writeoff' | 'without_writeoff' }
@@ -32,7 +34,9 @@ export const DeleteOptions: React.FC<Props> = ({ onDone }) => {
   }
 
   const handleDelete = (withWriteoff: boolean) => {
-    if (selectedItem) {
+    if (isModifierContext && modifier) {
+      removeModifierFromDraft(modifier.id);
+    } else if (selectedItem) {
       removeProduct(selectedItem.id);
     }
     onDone();
@@ -42,7 +46,7 @@ export const DeleteOptions: React.FC<Props> = ({ onDone }) => {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerText} numberOfLines={1}>
-          {selectedItem?.product.name || 'Удаление'}
+          {isModifierContext ? (modifier?.name || 'Удаление') : (selectedItem?.product.name || 'Удаление')}
         </Text>
       </View>
 
@@ -81,13 +85,13 @@ export const DeleteOptions: React.FC<Props> = ({ onDone }) => {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
-    height: 44,
+    height: 56,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: theme.colors.surfaceLight,
     marginBottom: GAP,
   },
-  headerText: { color: theme.colors.textPrimary, fontSize: 18, fontWeight: '600' },
+  headerText: { color: theme.colors.textPrimary, fontSize: 16, fontFamily: theme.fonts.medium },
   grid: { flex: 1 },
   row: { flex: 1, flexDirection: 'row' },
   cellWrap: { flex: 1 },
@@ -101,7 +105,7 @@ const styles = StyleSheet.create({
   actionLabel: {
     color: theme.colors.textPrimary,
     fontSize: 16,
-    fontWeight: '500',
+    fontFamily: theme.fonts.medium,
     textAlign: 'center',
   },
   emptyCell: { flex: 1, backgroundColor: theme.colors.surfaceLight },

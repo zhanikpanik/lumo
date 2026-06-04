@@ -636,6 +636,7 @@ export const useOrderStore = create<OrderStoreState>((set, get) => ({
           items: newItems,
           selectedItemId: newItem.id,
           activeAction: 'modifiers' as ActiveAction,
+          draftItem: JSON.parse(JSON.stringify(newItem)),
           orders: syncToOrders(newState),
         };
       }
@@ -712,7 +713,7 @@ export const useOrderStore = create<OrderStoreState>((set, get) => ({
 
   selectItem: (itemId: string | null) => {
     if (!itemId) {
-      set({ selectedItemId: null, activeAction: null, draftItem: null });
+      set({ selectedItemId: null, activeAction: null, draftItem: null, selectedModifierId: null, modifierAction: null });
       return;
     }
     const item = get().items.find(i => i.id === itemId);
@@ -721,6 +722,8 @@ export const useOrderStore = create<OrderStoreState>((set, get) => ({
     set({
       selectedItemId: itemId,
       activeAction: hasModifiers ? 'modifiers' : 'quantity',
+      selectedModifierId: null,
+      modifierAction: null,
       // Snapshot for draft editing — commitDraft / cancelDraft work on this
       draftItem: JSON.parse(JSON.stringify(item)),
     });
@@ -733,28 +736,11 @@ export const useOrderStore = create<OrderStoreState>((set, get) => ({
   toggleModifier: (modifier: Modifier) => {
     set((state) => {
       if (!state.selectedItemId || !state.draftItem) return state;
-      const group = useMenuStore
-        .getState()
-        .modifierGroups.find((g) => g.modifiers.some((m) => m.id === modifier.id));
-      const siblingIds = group ? group.modifiers.map((m) => m.id) : [modifier.id];
-      const maxSelect = group?.maxSelect ?? 0;
-
       const draft = state.draftItem;
       const has = draft.modifiers.some((m) => m.id === modifier.id);
-      let newMods: Modifier[];
-      if (has) {
-        newMods = draft.modifiers.filter((m) => m.id !== modifier.id);
-      } else {
-        newMods = [...draft.modifiers, modifier];
-        if (maxSelect > 0) {
-          const inGroup = newMods.filter((m) => siblingIds.includes(m.id));
-          const overflow = inGroup.length - maxSelect;
-          if (overflow > 0) {
-            const toRemove = new Set(inGroup.slice(0, overflow).map((m) => m.id));
-            newMods = newMods.filter((m) => !toRemove.has(m.id));
-          }
-        }
-      }
+      const newMods = has
+        ? draft.modifiers.filter((m) => m.id !== modifier.id)
+        : [...draft.modifiers, modifier];
       return { draftItem: { ...draft, modifiers: newMods } };
     });
   },
@@ -790,7 +776,7 @@ export const useOrderStore = create<OrderStoreState>((set, get) => ({
   },
 
   selectModifier: (modifierId: string | null) => {
-    set({ selectedModifierId: modifierId, modifierAction: null });
+    set({ selectedModifierId: modifierId, modifierAction: modifierId ? 'quantity' : null });
   },
 
   setModifierAction: (action) => set({ modifierAction: action }),
@@ -845,6 +831,7 @@ export const useOrderStore = create<OrderStoreState>((set, get) => ({
         modifiers: draftItem.modifiers.filter(m => m.id !== modifierId),
       },
       selectedModifierId: null,
+      modifierAction: null,
     });
   },
 

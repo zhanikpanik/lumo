@@ -77,7 +77,7 @@ export const SearchMode: React.FC<Props> = ({ searchQuery }) => {
                     </View>
                   )}
                   <Text style={styles.productName} numberOfLines={2}>{product.name}</Text>
-                  <Text style={styles.productPrice}>{product.price} ₽</Text>
+                  <Text style={styles.productPrice}>{product.price} c</Text>
                 </TouchableOpacity>
               ))}
               {Array.from({ length: PRODUCT_COLS - row.length }).map((_, i) => (
@@ -128,8 +128,8 @@ const styles = StyleSheet.create({
   },
   qtyBadgeText: {
     color: '#000',
-    fontSize: 12,
-    fontWeight: '800',
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
   },
   productCardEmpty: {
     flex: 1,
@@ -137,13 +137,14 @@ const styles = StyleSheet.create({
   productName: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: theme.fonts.medium,
     textAlign: 'center',
     marginBottom: 4,
   },
   productPrice: {
     color: 'rgba(255,255,255,0.7)',
     fontSize: 16,
+      fontFamily: theme.fonts.regular,
   },
   hintWrap: {
     padding: 40,
@@ -152,5 +153,6 @@ const styles = StyleSheet.create({
   hintText: {
     color: theme.colors.textSecondary,
     fontSize: 16,
+      fontFamily: theme.fonts.regular,
   },
 });

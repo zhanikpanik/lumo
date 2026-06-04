@@ -49,7 +49,7 @@ const styles = StyleSheet.create({
     minWidth: 360,
     maxWidth: 520,
     backgroundColor: theme.colors.surface,
-    borderRadius: 12,
+    borderRadius: 10,
     overflow: 'hidden',
   },
   header: {
@@ -61,8 +61,8 @@ const styles = StyleSheet.create({
   },
   title: {
     color: theme.colors.textPrimary,
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
   },
   closeBtn: {
     width: 36,

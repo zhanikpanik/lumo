@@ -73,7 +73,7 @@ const styles = StyleSheet.create({
     maxWidth: 440,
     minWidth: 320,
     backgroundColor: theme.colors.surface,
-    borderRadius: 12,
+    borderRadius: 10,
     overflow: 'hidden',
   },
   header: {
@@ -84,8 +84,8 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   title: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
     color: theme.colors.textPrimary,
   },
   body: {
@@ -99,6 +99,7 @@ const styles = StyleSheet.create({
     padding: 16,
     color: theme.colors.textPrimary,
     fontSize: 16,
+      fontFamily: theme.fonts.regular,
     textAlignVertical: 'top',
     marginBottom: 16,
     outlineStyle: 'none',
@@ -113,6 +114,6 @@ const styles = StyleSheet.create({
   saveText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: theme.fonts.medium,
   },
 });

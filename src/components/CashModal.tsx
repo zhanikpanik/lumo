@@ -12,7 +12,7 @@ import { useShiftStore } from '../store/shiftStore';
 import { can, UserRole } from '../utils/permissions';
 
 const formatAmount = (n: number): string =>
-  n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' ₽';
+  n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' c';
 
 interface Props {
   visible: boolean;
@@ -155,7 +155,7 @@ const styles = StyleSheet.create({
     maxWidth: 520,
     minWidth: 380,
     backgroundColor: theme.colors.surface,
-    borderRadius: 12,
+    borderRadius: 10,
     overflow: 'hidden',
   },
   header: {
@@ -167,8 +167,8 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   title: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
     color: theme.colors.textPrimary,
   },
   closeBtn: {
@@ -183,7 +183,8 @@ const styles = StyleSheet.create({
   },
   empty: {
     color: theme.colors.textSecondary,
-    fontSize: 14,
+    fontSize: 16,
+    fontFamily: theme.fonts.regular,
     textAlign: 'center',
     paddingVertical: 24,
   },
@@ -195,12 +196,12 @@ const styles = StyleSheet.create({
   },
   totalLabel: {
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: theme.fonts.medium,
     color: theme.colors.textPrimary,
   },
   totalValue: {
     fontSize: 20,
-    fontWeight: '700',
+    fontFamily: theme.fonts.medium,
     color: theme.colors.textPrimary,
   },
   divider: {
@@ -215,17 +216,19 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   label: {
-    fontSize: 14,
+    fontSize: 16,
+    fontFamily: theme.fonts.regular,
     color: theme.colors.textSecondary,
   },
   value: {
-    fontSize: 14,
+    fontSize: 16,
     color: theme.colors.textPrimary,
-    fontWeight: '500',
+    fontFamily: theme.fonts.medium,
   },
   refreshing: {
     color: theme.colors.textSecondary,
-    fontSize: 12,
+    fontSize: 16,
+    fontFamily: theme.fonts.regular,
     textAlign: 'center',
     marginTop: 8,
   },
@@ -261,12 +264,13 @@ const styles = StyleSheet.create({
   },
   actionText: {
     color: '#fff',
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
   },
   warningText: {
     color: '#FF8A80',
-    fontSize: 12,
+    fontSize: 16,
+    fontFamily: theme.fonts.regular,
     textAlign: 'center',
     paddingBottom: 12,
     paddingHorizontal: 20,

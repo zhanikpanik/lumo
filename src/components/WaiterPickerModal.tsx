@@ -67,7 +67,7 @@ const styles = StyleSheet.create({
     maxWidth: 360,
     minWidth: 280,
     backgroundColor: theme.colors.surface,
-    borderRadius: 12,
+    borderRadius: 10,
     overflow: 'hidden',
   },
   header: {
@@ -78,8 +78,8 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   title: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
     color: theme.colors.textPrimary,
   },
   body: {
@@ -99,11 +99,11 @@ const styles = StyleSheet.create({
   },
   waiterText: {
     fontSize: 16,
-    fontWeight: '500',
+    fontFamily: theme.fonts.medium,
     color: theme.colors.textPrimary,
   },
   waiterTextActive: {
     color: '#fff',
-    fontWeight: '700',
+    fontFamily: theme.fonts.medium,
   },
 });

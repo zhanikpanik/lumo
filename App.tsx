@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { LogBox, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useFonts } from 'expo-font';
 import { OrdersScreen } from './src/screens/OrdersScreen';
 import { PosScreen } from './src/screens/PosScreen';
 import { PaymentScreen } from './src/screens/PaymentScreen';
@@ -10,10 +11,12 @@ import { PaidCheckScreen } from './src/screens/PaidCheckScreen';
 import { TablePickerScreen } from './src/screens/TablePickerScreen';
 import { LockScreen } from './src/screens/LockScreen';
 import { OpenShiftScreen } from './src/screens/OpenShiftScreen';
+import { OrderCardShowcase } from './src/screens/OrderCardShowcase';
 import { useShiftStore } from './src/store/shiftStore';
 import { useVenueStore } from './src/store/venueStore';
 import { useMenuStore } from './src/store/menuStore';
 import { useOrderStore } from './src/store/orderStore';
+import { theme } from './src/theme/colors';
 import { useOrderRealtime } from './src/hooks/useOrderRealtime';
 import { useSyncOutboxStore } from './src/store/syncOutboxStore';
 import { useDeadLetterStore } from './src/store/deadLetterStore';
@@ -34,6 +37,12 @@ const SHIFT_REQUIRED_ROUTES = ['Orders', 'Pos', 'Payment', 'PaidCheck', 'TablePi
 const OUTBOX_STALE_MS = 5 * 60 * 1000;
 
 export default function App() {
+  const [fontsLoaded, fontError] = useFonts({
+    'Inter-Regular': require('./assets/fonts/Inter-Regular.ttf'),
+    'Inter-Medium': require('./assets/fonts/Inter-Medium.ttf'),
+    'Inter-Bold': require('./assets/fonts/Inter-Bold.ttf'),
+  });
+
   const currentUser = useShiftStore((s) => s.currentUser);
   const hasShift = useShiftStore((s) => s.currentShift !== null);
   const currentShiftId = useShiftStore((s) => s.currentShift?.id ?? null);
@@ -118,6 +127,10 @@ export default function App() {
     return 'Orders';
   };
 
+  if (!fontsLoaded && !fontError) {
+    return null;
+  }
+
   return (
     <NavigationContainer ref={navigationRef}>
       {lastSyncError && (
@@ -182,6 +195,7 @@ export default function App() {
         <Stack.Screen name="Payment" component={PaymentScreen} />
         <Stack.Screen name="PaidCheck" component={PaidCheckScreen} />
         <Stack.Screen name="TablePicker" component={TablePickerScreen} />
+        <Stack.Screen name="Showcase" component={OrderCardShowcase} />
       </Stack.Navigator>
     </NavigationContainer>
   );
@@ -206,7 +220,7 @@ const styles = StyleSheet.create({
     flex: 1,
     color: '#fff',
     fontSize: 13,
-    fontWeight: '500',
+    fontFamily: theme.fonts.medium,
   },
   syncErrorCloseBtn: {
     height: 28,
@@ -227,7 +241,7 @@ const styles = StyleSheet.create({
   syncErrorCloseText: {
     color: '#fff',
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: theme.fonts.medium,
   },
   syncingBanner: {
     position: 'absolute',
@@ -244,7 +258,7 @@ const styles = StyleSheet.create({
   syncingText: {
     color: '#fff',
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: theme.fonts.medium,
   },
   outboxBanner: {
     position: 'absolute',
@@ -264,7 +278,7 @@ const styles = StyleSheet.create({
   outboxBannerText: {
     color: '#fff',
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: theme.fonts.medium,
   },
   deadLetterBanner: {
     position: 'absolute',
@@ -281,6 +295,6 @@ const styles = StyleSheet.create({
   deadLetterBannerText: {
     color: '#fff',
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: theme.fonts.bold,
   },
 });

@@ -7,7 +7,9 @@ import { FloorPlanCanvas } from '../components/FloorPlanCanvas';
 
 const PADDING = 8;
 
-export const TablePickerScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
+export const TablePickerScreen: React.FC<{ navigation?: any; route?: any }> = ({ navigation, route }) => {
+  const mode: 'new' | 'transfer' = route?.params?.mode || 'transfer';
+  const createOrderForTable = useOrderStore((s) => s.createOrderForTable);
   const { tableId } = useOrderStore();
   const orders = useOrderStore((s) => s.orders);
   const venueZones = useVenueStore((s) => s.zones);
@@ -22,6 +24,15 @@ export const TablePickerScreen: React.FC<{ navigation?: any }> = ({ navigation }
   };
 
   const handleSelect = (table: VenueTable) => {
+    if (mode === 'new') {
+      // Create new order for selected table, then go to Pos
+      const orderId = createOrderForTable(table.id, table.number, table.zone);
+      // Navigate to Pos with the new order
+      navigation?.replace('Pos', { orderId });
+      return;
+    }
+
+    // Transfer mode — update existing order
     const state = useOrderStore.getState();
     const total = state.items.reduce((sum, i) => sum + i.product.price * i.quantity, 0);
     useOrderStore.setState({
@@ -129,7 +140,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#1A1A1A' },
 
   header: {
-    height: 44,
+    height: 56,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: PADDING,
@@ -137,14 +148,15 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   backBtn: {
-    height: 44,
+    height: 56,
     paddingHorizontal: 16,
     backgroundColor: theme.colors.surfaceLight,
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: theme.borderRadius,
+    minWidth: 120,
   },
-  backText: { color: theme.colors.textPrimary, fontSize: 17, fontWeight: '600' },
+  backText: { color: theme.colors.textPrimary, fontSize: 16, fontFamily: theme.fonts.medium },
 
   headerCenter: { flex: 1, alignItems: 'center' },
   headerRight: { width: 80 },
@@ -166,15 +178,15 @@ const styles = StyleSheet.create({
   },
   zoneTabText: {
     color: theme.colors.textSecondary,
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
   },
   zoneTabTextActive: {
     color: '#fff',
   },
 
   emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  emptyText: { color: theme.colors.textSecondary, fontSize: 17 },
+  emptyText: { color: theme.colors.textSecondary, fontSize: 16, fontFamily: theme.fonts.regular },
 
   legend: {
     flexDirection: 'row',
@@ -184,5 +196,5 @@ const styles = StyleSheet.create({
   },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   legendDot: { width: 12, height: 12, borderRadius: 6 },
-  legendText: { color: theme.colors.textSecondary, fontSize: 14 },
+  legendText: { color: theme.colors.textSecondary, fontSize: 16, fontFamily: theme.fonts.regular },
 });

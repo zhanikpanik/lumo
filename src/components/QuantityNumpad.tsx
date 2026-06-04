@@ -6,29 +6,57 @@ import { useOrderStore } from '../store/orderStore';
 const GAP = 2;
 
 export const QuantityNumpad: React.FC = () => {
-  const { selectedItemId, items, updateQuantity } = useOrderStore();
+  const {
+    selectedItemId,
+    selectedModifierId,
+    items,
+    draftItem,
+    updateQuantity,
+    setModifierQuantity,
+  } = useOrderStore();
+
   const selectedItem = items.find(item => item.id === selectedItemId);
+  const isModifierMode = !!selectedModifierId;
+  const modifier = isModifierMode
+    ? draftItem?.modifiers.find(m => m.id === selectedModifierId)
+    : null;
 
   const [inputValue, setInputValue] = useState('');
 
-  // Reset input when item selection changes
+  // Reset input when selection changes
   useEffect(() => {
-    if (selectedItem) {
+    if (isModifierMode && modifier && draftItem) {
+      const count = draftItem.modifiers.filter(m => m.id === modifier.id).length;
+      setInputValue(String(count));
+    } else if (selectedItem) {
       setInputValue(String(selectedItem.quantity));
     } else {
       setInputValue('');
     }
-  }, [selectedItemId]);
+  }, [selectedItemId, selectedModifierId, isModifierMode]);
 
   if (!selectedItem) return null;
 
-  const displayValue = inputValue || String(selectedItem.quantity);
+  const currentQty = isModifierMode && modifier && draftItem
+    ? draftItem.modifiers.filter(m => m.id === modifier.id).length
+    : selectedItem.quantity;
+
+  const headerTitle = isModifierMode && modifier
+    ? modifier.name
+    : 'Кол-во порций';
+
+  const displayValue = inputValue || String(currentQty);
 
   const applyValue = (val: string) => {
     const newQty = parseInt(val, 10);
     if (isNaN(newQty) || newQty < 0) return;
-    const delta = newQty - selectedItem.quantity;
-    updateQuantity(selectedItem.id, delta);
+
+    if (isModifierMode && modifier) {
+      setModifierQuantity(modifier.id, newQty);
+    } else {
+      const delta = newQty - selectedItem.quantity;
+      updateQuantity(selectedItem.id, delta);
+    }
   };
 
   const handlePress = (num: string) => {
@@ -44,13 +72,12 @@ export const QuantityNumpad: React.FC = () => {
     if (newValue) {
       applyValue(newValue);
     } else {
-      // Keep at current quantity when clearing
       setInputValue('');
     }
   };
 
   const handleComma = () => {
-    // Decimal not used for quantity, but placeholder for consistency
+    // Decimal not used for quantity
   };
 
   const renderKey = (label: string, onPress: () => void) => (
@@ -65,7 +92,7 @@ export const QuantityNumpad: React.FC = () => {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerText}>Кол-во порций</Text>
+        <Text style={styles.headerText} numberOfLines={1}>{headerTitle}</Text>
       </View>
 
       {/* Display + numpad */}
@@ -123,7 +150,7 @@ const styles = StyleSheet.create({
   headerText: {
     color: theme.colors.textPrimary,
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: theme.fonts.medium,
   },
   body: {
     flex: 1,
@@ -144,7 +171,7 @@ const styles = StyleSheet.create({
   displayValue: {
     color: theme.colors.textPrimary,
     fontSize: 28,
-    fontWeight: '300',
+    fontFamily: theme.fonts.regular,
   },
   numpadRow: {
     flex: 1,
@@ -165,11 +192,11 @@ const styles = StyleSheet.create({
   keyText: {
     color: theme.colors.textPrimary,
     fontSize: 28,
-    fontWeight: '300',
+    fontFamily: theme.fonts.regular,
   },
   backspaceText: {
     color: theme.colors.textPrimary,
     fontSize: 28,
-    fontWeight: '300',
+    fontFamily: theme.fonts.regular,
   },
 });

@@ -46,7 +46,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: '#333',
     borderRadius: theme.borderRadius,
-    height: 44,
+    height: 56,
     padding: 3,
     gap: 2,
   },
@@ -62,8 +62,8 @@ const styles = StyleSheet.create({
   },
   label: {
     color: theme.colors.textSecondary,
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
   },
   labelActive: {
     color: '#00C853',

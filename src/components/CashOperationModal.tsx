@@ -115,13 +115,15 @@ export const CashOperationModal: React.FC<Props> = ({
 const styles = StyleSheet.create({
   label: {
     color: theme.colors.textSecondary,
-    fontSize: 13,
+    fontSize: 16,
+      fontFamily: theme.fonts.regular,
     marginBottom: 6,
     marginTop: 8,
   },
   hint: {
     color: theme.colors.textSecondary,
-    fontSize: 12,
+    fontSize: 16,
+      fontFamily: theme.fonts.regular,
     marginTop: 4,
     marginBottom: 4,
   },
@@ -131,10 +133,12 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surfaceLight,
     color: theme.colors.textPrimary,
     paddingHorizontal: 12,
-    fontSize: 17,
+    fontSize: 16,
+      fontFamily: theme.fonts.regular,
   },
   inputNote: {
-    fontSize: 15,
+    fontSize: 16,
+      fontFamily: theme.fonts.regular,
   },
   actions: {
     flexDirection: 'row',
@@ -157,12 +161,12 @@ const styles = StyleSheet.create({
   },
   cancelText: {
     color: theme.colors.textPrimary,
-    fontWeight: '600',
-    fontSize: 15,
+    fontFamily: theme.fonts.medium,
+    fontSize: 16,
   },
   confirmText: {
     color: '#fff',
-    fontWeight: '700',
-    fontSize: 15,
+    fontFamily: theme.fonts.medium,
+    fontSize: 16,
   },
 });
