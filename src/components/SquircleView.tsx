@@ -41,8 +41,7 @@ export const SquircleView: React.FC<Props> = ({
         <Svg
           width={width}
           height={height}
-          style={styles.svg}
-          pointerEvents="none"
+          style={[styles.svg, { pointerEvents: 'none' }]}
         >
           <Path
             d={squirclePath(width, height, r, squircleN)}

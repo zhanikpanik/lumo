@@ -17,7 +17,9 @@ import type {
 export async function finalizeOrderConsumption(
   payload: FinalizeOrderConsumptionPayload
 ): Promise<FinalizeConsumptionResult> {
-  const strict = payload.strictInsufficientStock !== false;
+  // Non-strict by default: allow sales even with dirty/negative stock data.
+  // Matches Poster's behaviour — don't block waiters because of inventory errors.
+  const strict = payload.strictInsufficientStock === true;
 
   const { data, error } = await supabase.rpc('pos_finalize_order_stock', {
     p_venue_id: payload.venueId,

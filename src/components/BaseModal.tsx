@@ -1,6 +1,6 @@
 import React from 'react';
 import { DimensionValue, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { CrossIcon } from './Icons';
 import { theme } from '../theme/colors';
 
 interface Props {
@@ -22,11 +22,12 @@ export const BaseModal: React.FC<Props> = ({
 }) => (
   <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
     <View style={styles.overlay}>
+      <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
       <View style={[styles.modal, { width }]}>
         <View style={styles.header}>
           <Text style={styles.title}>{title}</Text>
           <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-            <Feather name="x" size={22} color={theme.colors.textSecondary} />
+            <CrossIcon size={22} color={theme.colors.textSecondary} />
           </TouchableOpacity>
         </View>
 
@@ -41,7 +42,7 @@ export const BaseModal: React.FC<Props> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: theme.colors.overlay,
     justifyContent: 'center',
     alignItems: 'center',
   },

@@ -1,21 +1,25 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { theme } from '../theme/colors';
 import { useOrderStore } from '../store/orderStore';
 import { useMenuStore } from '../store/menuStore';
 
 const COLS = 2;
+const ROWS = 5;
 const GAP = 2;
+const CELLS_PER_PAGE = ROWS * COLS; // 10
 
 export const CategoryMenu: React.FC = () => {
   const { activeCategoryId, setActiveCategory } = useOrderStore();
-
-  // Build cells: categories + fill to complete grid
-  const ROWS = 5;
-  const totalCells = ROWS * COLS;
-
-  type Cell = { kind: 'category'; id: string; name: string } | { kind: 'empty' };
   const menuCategories = useMenuStore((s) => s.categories);
+  const [page, setPage] = useState(0);
+
+  // Reset page when categories shrink below current page
+  React.useEffect(() => {
+    const maxPage = Math.max(0, Math.ceil(menuCategories.length / (CELLS_PER_PAGE - 1)) - 1);
+    if (page > maxPage) setPage(0);
+  }, [menuCategories.length]);
 
   // Auto-select first category if current one doesn't exist
   React.useEffect(() => {
@@ -24,10 +28,36 @@ export const CategoryMenu: React.FC = () => {
     }
   }, [menuCategories]);
 
-  const cells: Cell[] = menuCategories.map(c => ({ kind: 'category' as const, id: c.id, name: c.name }));
-  
-  // Fill remaining with empties
-  while (cells.length < totalCells) cells.push({ kind: 'empty' });
+  const totalPages = Math.max(1, Math.ceil(menuCategories.length / (CELLS_PER_PAGE - 1)));
+  const hasNext = page < totalPages - 1;
+  const hasPrev = page > 0;
+
+  type Cell =
+    | { kind: 'category'; id: string; name: string }
+    | { kind: 'next' }
+    | { kind: 'prev' }
+    | { kind: 'empty' };
+
+  const cells: Cell[] = [];
+
+  if (hasPrev) {
+    cells.push({ kind: 'prev' });
+  }
+
+  const start = page * (CELLS_PER_PAGE - (hasPrev ? 1 : 0));
+  const catSlots = CELLS_PER_PAGE - (hasPrev ? 1 : 0) - (hasNext ? 1 : 0);
+  const pageCats = menuCategories.slice(start, start + catSlots);
+
+  for (const cat of pageCats) {
+    cells.push({ kind: 'category', id: cat.id, name: cat.name });
+  }
+
+  if (hasNext) {
+    cells.push({ kind: 'next' });
+  }
+
+  // Fill remaining
+  while (cells.length < CELLS_PER_PAGE) cells.push({ kind: 'empty' });
 
   // Build rows
   const rows: Cell[][] = [];
@@ -40,6 +70,9 @@ export const CategoryMenu: React.FC = () => {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerText}>Меню</Text>
+        {totalPages > 1 && (
+          <Text style={styles.pageIndicator}>{page + 1}/{totalPages}</Text>
+        )}
       </View>
 
       {/* Grid */}
@@ -68,6 +101,27 @@ export const CategoryMenu: React.FC = () => {
                     </Text>
                   </TouchableOpacity>
                 )}
+
+                {cell.kind === 'next' && (
+                  <TouchableOpacity
+                    style={styles.navBtn}
+                    onPress={() => setPage(p => p + 1)}
+                    activeOpacity={0.7}
+                  >
+                    <Feather name="chevron-down" size={22} color={theme.colors.textSecondary} />
+                  </TouchableOpacity>
+                )}
+
+                {cell.kind === 'prev' && (
+                  <TouchableOpacity
+                    style={styles.navBtn}
+                    onPress={() => setPage(p => p - 1)}
+                    activeOpacity={0.7}
+                  >
+                    <Feather name="chevron-up" size={22} color={theme.colors.textSecondary} />
+                  </TouchableOpacity>
+                )}
+
                 {cell.kind === 'empty' && <View style={styles.emptyCell} />}
               </View>
             ))}
@@ -82,12 +136,15 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
     height: 44,
+    flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: theme.colors.surfaceLight,
     marginBottom: GAP,
+    gap: 8,
   },
-  headerText: { color: theme.colors.textPrimary, fontSize: 18, fontWeight: '600' },
+  headerText: { color: theme.colors.textPrimary, fontSize: 16, fontFamily: theme.fonts.medium },
+  pageIndicator: { color: theme.colors.textSecondary, fontSize: 14, fontFamily: theme.fonts.regular },
 
   grid: { flex: 1 },
   row: { flex: 1, flexDirection: 'row' },
@@ -106,11 +163,19 @@ const styles = StyleSheet.create({
   categoryText: {
     color: theme.colors.textPrimary,
     fontSize: 16,
-    fontWeight: '500',
+    fontFamily: theme.fonts.medium,
     textAlign: 'center',
   },
   categoryTextActive: {
-    fontWeight: 'bold',
+    fontFamily: theme.fonts.medium,
   },
+
+  navBtn: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: theme.colors.surfaceLight,
+  },
+
   emptyCell: { flex: 1, backgroundColor: theme.colors.surfaceLight },
 });

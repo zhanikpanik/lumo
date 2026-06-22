@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surfaceLight,
     marginBottom: GAP,
   },
-  headerText: { color: theme.colors.textPrimary, fontSize: 18, fontWeight: '600' },
+  headerText: { color: theme.colors.textPrimary, fontSize: 16, fontFamily: theme.fonts.medium },
   grid: { flex: 1 },
   row: { flex: 1, flexDirection: 'row' },
   cellWrap: { flex: 1 },
@@ -105,17 +105,17 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.actionMenuPurple,
   },
   actionBtnDanger: {
-    backgroundColor: '#D32F2F',
+    backgroundColor: theme.colors.destructive,
   },
   actionText: {
     color: theme.colors.textPrimary,
     fontSize: 16,
-    fontWeight: '500',
+    fontFamily: theme.fonts.medium,
     textAlign: 'center',
   },
   actionTextDanger: {
     color: '#fff',
-    fontWeight: '700',
+    fontFamily: theme.fonts.medium,
   },
   emptyCell: { flex: 1, backgroundColor: theme.colors.surfaceLight },
 });

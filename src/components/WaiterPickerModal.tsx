@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { CrossIcon } from './Icons';
 import { theme } from '../theme/colors';
 import { useOrderStore } from '../store/orderStore';
 import { useVenueStore } from '../store/venueStore';
@@ -31,7 +31,7 @@ export const WaiterPickerModal: React.FC<Props> = ({ visible, onClose }) => {
           <View style={styles.header}>
             <Text style={styles.title}>Официант</Text>
             <TouchableOpacity onPress={onClose}>
-              <Feather name="x" size={22} color={theme.colors.textSecondary} />
+              <CrossIcon size={22} color={theme.colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -58,7 +58,7 @@ export const WaiterPickerModal: React.FC<Props> = ({ visible, onClose }) => {
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: theme.colors.overlay,
     justifyContent: 'center',
     alignItems: 'center',
   },

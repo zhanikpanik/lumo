@@ -69,7 +69,7 @@ export const ModifierQuantityNumpad: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1A1A1A' },
+  container: { flex: 1, backgroundColor: theme.colors.background },
   header: {
     height: 44,
     justifyContent: 'center',
@@ -77,7 +77,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surface,
     marginBottom: 8,
   },
-  headerText: { color: theme.colors.textPrimary, fontSize: 18, fontWeight: '600' },
+  headerText: { color: theme.colors.textPrimary, fontSize: 16, fontFamily: theme.fonts.medium },
   amountWrap: {
     backgroundColor: theme.colors.surface,
     borderRadius: theme.borderRadius,
@@ -87,9 +87,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
   },
   amount: {
-    color: '#00E676',
+    color: theme.colors.accentLight,
     fontSize: 36,
-    fontWeight: '700',
+    fontFamily: theme.fonts.medium,
   },
   numpad: {
     paddingHorizontal: 16,
@@ -114,6 +114,6 @@ const styles = StyleSheet.create({
   numText: {
     color: theme.colors.textPrimary,
     fontSize: 22,
-    fontWeight: '500',
+    fontFamily: theme.fonts.medium,
   },
 });

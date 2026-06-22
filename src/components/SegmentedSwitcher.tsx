@@ -58,7 +58,7 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   segmentActive: {
-    backgroundColor: 'rgba(0,200,83,0.18)',
+    backgroundColor: theme.colors.accentTint,
   },
   label: {
     color: theme.colors.textSecondary,
@@ -66,6 +66,6 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.medium,
   },
   labelActive: {
-    color: '#00C853',
+    color: theme.colors.accent,
   },
 });

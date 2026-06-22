@@ -1,7 +1,7 @@
 export const fonts = {
-  regular: 'Inter-Regular',
-  medium: 'Inter-Medium',
-  bold: 'Inter-Bold',
+  regular: 'Onest-Regular',
+  medium: 'Onest-Medium',
+  bold: 'Onest-Bold',
 } as const;
 
 export { fonts as default };

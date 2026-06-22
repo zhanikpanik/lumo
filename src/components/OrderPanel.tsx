@@ -1,6 +1,7 @@
 import React, { useRef, useState, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Pressable, StyleSheet, NativeSyntheticEvent, NativeScrollEvent, LayoutChangeEvent } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons'; // plus-circle, check-circle only - no Chikin yet
+import { ChevronUpIcon, ChevronDownIcon, PencilIcon, PrinterIcon } from './Icons';
 import { theme } from '../theme/colors';
 import { OrderItem } from './OrderItem';
 import { useOrderStore } from '../store/orderStore';
@@ -80,7 +81,7 @@ export const OrderPanel: React.FC<Props> = ({ onCommentPress }) => {
               <View style={styles.modifierLine} />
               <Text style={[styles.modifierText, item.id === selectedItemId && styles.modifierTextSelected]}>{mod.name}</Text>
               <Text style={[styles.modifierQty, item.id === selectedItemId && styles.modifierTextSelected]}>1</Text>
-              <Text style={[styles.modifierPrice, item.id === selectedItemId && styles.modifierTextSelected]}>{mod.price} ₽</Text>
+              <Text style={[styles.modifierPrice, item.id === selectedItemId && styles.modifierTextSelected]}>{mod.price} c</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -93,7 +94,7 @@ export const OrderPanel: React.FC<Props> = ({ onCommentPress }) => {
       {/* Order total row */}
       <View style={styles.orderHeader}>
         <Text style={styles.orderHeaderTitle}>Заказ</Text>
-        <Text style={styles.orderHeaderTotal}>{total} ₽</Text>
+        <Text style={styles.orderHeaderTotal}>{total} c</Text>
       </View>
 
       {/* Items list */}
@@ -127,7 +128,7 @@ export const OrderPanel: React.FC<Props> = ({ onCommentPress }) => {
           disabled={!canScrollUp}
           activeOpacity={0.6}
         >
-          <Feather name="chevron-up" size={22} color={canScrollUp ? theme.colors.textPrimary : theme.colors.textDisabled} />
+          <ChevronUpIcon size={22} color={canScrollUp ? theme.colors.textPrimary : theme.colors.textDisabled} />
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.scrollBtn, !canScrollDown && styles.btnDisabled]}
@@ -135,7 +136,7 @@ export const OrderPanel: React.FC<Props> = ({ onCommentPress }) => {
           disabled={!canScrollDown}
           activeOpacity={0.6}
         >
-          <Feather name="chevron-down" size={22} color={canScrollDown ? theme.colors.textPrimary : theme.colors.textDisabled} />
+          <ChevronDownIcon size={22} color={canScrollDown ? theme.colors.textPrimary : theme.colors.textDisabled} />
         </TouchableOpacity>
       </View>
 
@@ -148,10 +149,9 @@ export const OrderPanel: React.FC<Props> = ({ onCommentPress }) => {
             disabled={sentToKitchen}
             activeOpacity={0.6}
           >
-            <Feather
-              name={sentToKitchen ? 'check-circle' : 'printer'}
+            <PrinterIcon
               size={16}
-              color={sentToKitchen ? theme.colors.textSecondary : '#FFB74D'}
+              color={sentToKitchen ? theme.colors.textSecondary : theme.colors.warning}
             />
             <Text style={[styles.sendText, sentToKitchen && styles.sendTextDone]}>
               {sentToKitchen ? 'На кухне' : 'Отправить'}
@@ -174,7 +174,7 @@ export const OrderPanel: React.FC<Props> = ({ onCommentPress }) => {
             {comment || 'Комментарий'}
           </Text>
           {comment ? (
-            <Feather name="edit-2" size={16} color={theme.colors.textSecondary} />
+            <PencilIcon size={16} color={theme.colors.textSecondary} />
           ) : null}
         </TouchableOpacity>
       </View>
@@ -182,7 +182,7 @@ export const OrderPanel: React.FC<Props> = ({ onCommentPress }) => {
   );
 };
 
-const GAP = 8;
+const GAP = 10;
 
 const styles = StyleSheet.create({
   container: { flex: 1, minHeight: 0 },
@@ -200,12 +200,12 @@ const styles = StyleSheet.create({
   orderHeaderTitle: {
     color: theme.colors.textPrimary,
     fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: theme.fonts.medium,
   },
   orderHeaderTotal: {
     color: theme.colors.textPrimary,
     fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: theme.fonts.medium,
   },
 
   // Items list
@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
   emptyOrderText: {
     color: theme.colors.textDisabled,
     fontSize: 15,
-    fontWeight: '500',
+    fontFamily: theme.fonts.medium,
   },
 
   itemPressed: {
@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
     paddingRight: 16,
   },
   modifierRowSelected: {
-    backgroundColor: 'rgba(0,200,83,0.15)',
+    backgroundColor: theme.colors.accentTintSubtle,
   },
   modifierLine: {
     width: 2,
@@ -252,6 +252,7 @@ const styles = StyleSheet.create({
     flex: 1,
     color: theme.colors.textSecondary,
     fontSize: 16,
+    fontFamily: theme.fonts.regular,
   },
   modifierTextSelected: {
     color: theme.colors.textPrimary,
@@ -259,12 +260,14 @@ const styles = StyleSheet.create({
   modifierQty: {
     color: theme.colors.textSecondary,
     fontSize: 16,
+    fontFamily: theme.fonts.regular,
     width: 30,
     textAlign: 'center',
   },
   modifierPrice: {
     color: theme.colors.textSecondary,
     fontSize: 16,
+    fontFamily: theme.fonts.regular,
     width: 60,
     textAlign: 'right',
   },
@@ -299,15 +302,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#4A3A00',
+    backgroundColor: theme.colors.warningBg,
   },
   sendBtnDone: {
     backgroundColor: theme.colors.surfaceLight,
   },
   sendText: {
-    color: '#FFB74D',
+    color: theme.colors.warning,
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: theme.fonts.medium,
   },
   sendTextDone: {
     color: theme.colors.textSecondary,
@@ -330,7 +333,7 @@ const styles = StyleSheet.create({
   },
   commentText: {
     fontSize: 16,
-    fontWeight: '500',
+    fontFamily: theme.fonts.medium,
     flexShrink: 1,
     color: theme.colors.textPrimary,
     flex: 1,

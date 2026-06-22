@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, TextInput, StyleSheet, Modal } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { CrossIcon } from './Icons';
 import { theme } from '../theme/colors';
 import { useOrderStore } from '../store/orderStore';
 
@@ -31,11 +31,12 @@ export const CommentModal: React.FC<Props> = ({ visible, onClose }) => {
   return (
     <Modal visible={visible} transparent animationType="fade">
       <View style={styles.overlay}>
+        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
         <View style={styles.modal}>
           <View style={styles.header}>
             <Text style={styles.title}>Комментарий</Text>
             <TouchableOpacity onPress={onClose}>
-              <Feather name="x" size={22} color={theme.colors.textSecondary} />
+              <CrossIcon size={22} color={theme.colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -63,7 +64,7 @@ export const CommentModal: React.FC<Props> = ({ visible, onClose }) => {
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: theme.colors.overlay,
     justifyContent: 'flex-start',
     alignItems: 'center',
     paddingTop: '10%',
@@ -106,7 +107,7 @@ const styles = StyleSheet.create({
   } as any,
   saveBtn: {
     height: 48,
-    backgroundColor: '#00C853',
+    backgroundColor: theme.colors.accent,
     borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',

@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Feather } from '@expo/vector-icons';
-import { SomIcon } from './Icons';
+import { Feather } from '@expo/vector-icons'; // truck only - no Chikin yet
+import { SomIcon, PencilIcon, ExclamationIcon } from './Icons';
 import { theme } from '../theme/colors';
 import { Order } from '../types';
 import YandexIcon from '../assets/icons/yandex.svg';
@@ -38,7 +38,7 @@ export const OrderCard: React.FC<Props> = ({ order, onPress, scale = 1 }) => {
 
   const getBackgroundColor = () => {
     if (order.status === 'paid') return theme.colors.orderActive;
-    if (order.status === 'cancelled') return '#4A0A0A';
+    if (order.status === 'cancelled') return theme.colors.orderCancelled;
     if (order.status === 'alert') return theme.colors.orderAlert;
     return theme.colors.orderDefault;
   };
@@ -55,7 +55,7 @@ export const OrderCard: React.FC<Props> = ({ order, onPress, scale = 1 }) => {
     if (order.status === 'cancelled' && order.closeReason) {
       return (
         <View style={styles.heroRow}>
-          <Feather name="alert-triangle" size={22} color="#FF8A80" />
+          <ExclamationIcon size={22} color="#FF8A80" />
           <Text style={styles.cancelReason} numberOfLines={1}>{order.closeReason}</Text>
         </View>
       );
@@ -177,10 +177,10 @@ export const OrderCard: React.FC<Props> = ({ order, onPress, scale = 1 }) => {
         {showIcons ? (
           <View style={styles.iconsRow}>
             {hasEdit && (
-              <Feather name="edit-2" size={16} color="#FFB74D" />
+              <PencilIcon size={16} color="#FFB74D" />
             )}
             {hasAlert && (
-              <Feather name="alert-circle" size={16} color="#FF5252" />
+              <ExclamationIcon size={16} color="#FF5252" />
             )}
           </View>
         ) : null}
@@ -221,7 +221,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   heroLabel: {
-    color: '#ADADAD',
+    color: theme.colors.textTertiary,
     fontSize: 16,
     fontFamily: theme.fonts.regular,
   },
@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.medium,
   },
   cancelReason: {
-    color: '#ADADAD',
+    color: theme.colors.textTertiary,
     fontFamily: theme.fonts.regular,
     fontSize: 16,
     flexShrink: 1,
@@ -244,14 +244,14 @@ const styles = StyleSheet.create({
   },
 
   waiterName: {
-    color: '#ADADAD',
+    color: theme.colors.textTertiary,
     fontSize: 16,
     fontFamily: theme.fonts.regular,
     marginTop: 10,
   },
 
   infoLine: {
-    color: '#ADADAD',
+    color: theme.colors.textTertiary,
     fontSize: 16,
     fontFamily: theme.fonts.regular,
   },
@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   dishPreview: {
-    color: '#ADADAD',
+    color: theme.colors.textTertiary,
     fontSize: 16,
     fontFamily: theme.fonts.regular,
     lineHeight: 19,

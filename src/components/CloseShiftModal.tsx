@@ -9,12 +9,12 @@ import {
   TextInput,
   Alert,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { CrossIcon, SomIcon } from './Icons';
 import { theme } from '../theme/colors';
 import { useShiftStore } from '../store/shiftStore';
 
 const formatAmount = (n: number): string =>
-  n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' c';
+  n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 
 const formatTime = (date: Date): string =>
   `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
@@ -81,7 +81,7 @@ export const CloseShiftModal: React.FC<Props> = ({
           <View style={styles.header}>
             <Text style={styles.title}>Закрытие смены</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <Feather name="x" size={20} color={theme.colors.textSecondary} />
+              <CrossIcon size={20} color={theme.colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -105,21 +105,21 @@ export const CloseShiftModal: React.FC<Props> = ({
 
             {/* Totals */}
             <Row label="Заказов" value={String(currentShift.totalOrders)} bold />
-            <Row label="Выручка" value={formatAmount(currentShift.totalRevenue)} bold />
+            <Row label="Выручка" amount={currentShift.totalRevenue} bold />
 
             <View style={styles.divider} />
             <Text style={styles.sectionTitle}>По способам оплаты</Text>
 
-            <Row label="Наличные" value={`${currentShift.cashPayments} зак. · ${formatAmount(currentShift.cashTotal)}`} />
-            <Row label="Карта" value={`${currentShift.cardPayments} зак. · ${formatAmount(currentShift.cardTotal)}`} />
-            <Row label="Без оплаты" value={`${currentShift.otherPayments} зак. · ${formatAmount(currentShift.otherTotal)}`} />
+            <Row label="Наличные" value={`${currentShift.cashPayments} зак. · ${formatAmount(currentShift.cashTotal)} c`} />
+            <Row label="Карта" value={`${currentShift.cardPayments} зак. · ${formatAmount(currentShift.cardTotal)} c`} />
+            <Row label="Без оплаты" value={`${currentShift.otherPayments} зак. · ${formatAmount(currentShift.otherTotal)} c`} />
 
             <View style={styles.divider} />
             <Text style={styles.sectionTitle}>Движения наличных</Text>
 
-            <Row label="Внесения" value={`+${formatAmount(currentShift.cashFloatIn ?? 0)}`} accent />
-            <Row label="Изъятия" value={`-${formatAmount(currentShift.cashFloatOut ?? 0)}`} />
-            <Row label="Инкассация" value={`-${formatAmount(currentShift.cashCollectionsTotal ?? 0)}`} />
+            <Row label="Внесения" amount={currentShift.cashFloatIn ?? 0} accent />
+            <Row label="Изъятия" amount={currentShift.cashFloatOut ?? 0} />
+            <Row label="Инкассация" amount={currentShift.cashCollectionsTotal ?? 0} />
 
             {/* Cash count */}
             <View style={styles.divider} />
@@ -161,22 +161,32 @@ export const CloseShiftModal: React.FC<Props> = ({
 // ── Tiny row helper ──
 const Row: React.FC<{
   label: string;
-  value: string;
+  value?: string;
+  amount?: number;
   bold?: boolean;
   accent?: boolean;
-}> = ({ label, value, bold, accent }) => (
+}> = ({ label, value, amount, bold, accent }) => (
   <View style={styles.infoRow}>
     <Text style={[styles.infoLabel, bold && styles.bold]}>{label}</Text>
-    <Text style={[styles.infoValue, bold && styles.bold, accent && styles.accent]}>
-      {value}
-    </Text>
+    {amount != null ? (
+      <View style={styles.amountRow}>
+        <Text style={[styles.infoValue, bold && styles.bold, accent && styles.accent]}>
+          {formatAmount(amount)}
+        </Text>
+        <SomIcon size={9} color={accent ? theme.colors.online : '#fff'} />
+      </View>
+    ) : (
+      <Text style={[styles.infoValue, bold && styles.bold, accent && styles.accent]}>
+        {value}
+      </Text>
+    )}
   </View>
 );
 
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: theme.colors.overlay,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -230,7 +240,7 @@ const styles = StyleSheet.create({
 
   divider: {
     height: 1,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: theme.colors.subtleBorder,
     marginVertical: 10,
   },
 
@@ -262,7 +272,12 @@ const styles = StyleSheet.create({
     color: theme.colors.textPrimary,
   },
   accent: {
-    color: '#4CAF50',
+    color: theme.colors.online,
+  },
+  amountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
   },
 
   inputHint: {
@@ -288,7 +303,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 14,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.08)',
+    borderTopColor: theme.colors.subtleBorder,
     gap: 10,
   },
   cancelBtn: {
@@ -307,7 +322,7 @@ const styles = StyleSheet.create({
   confirmBtn: {
     flex: 2,
     height: 46,
-    backgroundColor: '#D32F2F',
+    backgroundColor: theme.colors.destructive,
     borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
@@ -321,7 +336,7 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.medium,
   },
   warningText: {
-    color: '#FF8A80',
+    color: theme.colors.warningSubtle,
     fontSize: 16,
       fontFamily: theme.fonts.regular,
     textAlign: 'center',

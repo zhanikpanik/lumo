@@ -8,14 +8,22 @@ const ROWS = 5;
 const GAP = 2;
 
 interface Props {
-  /** Called after delete completes — resets to category view. If false, item was deleted. */
+  /** Called after delete completes */
   onDone: () => void;
+  /** 'item' (default) for dish/modifier deletion, 'order' for whole-order deletion */
+  mode?: 'item' | 'order';
 }
 
-export const DeleteOptions: React.FC<Props> = ({ onDone }) => {
-  const { removeProduct, removeModifierFromDraft, items, selectedItemId, selectedModifierId, draftItem } = useOrderStore();
-  const selectedItem = items.find(i => i.id === selectedItemId);
-  const isModifierContext = !!selectedModifierId;
+export const DeleteOptions: React.FC<Props> = ({ onDone, mode = 'item' }) => {
+  const { removeProduct, removeModifierFromDraft, deleteOrder,
+    items, selectedItemId, selectedModifierId, draftItem,
+    orders, currentOrderId } = useOrderStore();
+
+  const isOrderMode = mode === 'order';
+  const currentOrder = isOrderMode ? orders.find(o => o.id === currentOrderId) : undefined;
+
+  const isModifierContext = !isOrderMode && !!selectedModifierId;
+  const selectedItem = !isOrderMode ? items.find(i => i.id === selectedItemId) : undefined;
   const modifier = isModifierContext ? draftItem?.modifiers.find(m => m.id === selectedModifierId) : null;
 
   type Cell = 
@@ -34,7 +42,9 @@ export const DeleteOptions: React.FC<Props> = ({ onDone }) => {
   }
 
   const handleDelete = (withWriteoff: boolean) => {
-    if (isModifierContext && modifier) {
+    if (isOrderMode && currentOrder) {
+      deleteOrder(currentOrder.id);
+    } else if (isModifierContext && modifier) {
       removeModifierFromDraft(modifier.id);
     } else if (selectedItem) {
       removeProduct(selectedItem.id);
@@ -42,11 +52,17 @@ export const DeleteOptions: React.FC<Props> = ({ onDone }) => {
     onDone();
   };
 
+  const headerTitle = isOrderMode
+    ? `Заказ №${currentOrder?.number || ''}`
+    : isModifierContext
+      ? (modifier?.name || 'Удаление')
+      : (selectedItem?.product.name || 'Удаление');
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerText} numberOfLines={1}>
-          {isModifierContext ? (modifier?.name || 'Удаление') : (selectedItem?.product.name || 'Удаление')}
+          {headerTitle}
         </Text>
       </View>
 

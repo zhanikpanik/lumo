@@ -9,15 +9,12 @@ const ROWS = 5;
 const GAP = 2;
 
 type ActionDef =
-  | { action: ActiveAction; label: string }
-  | { action: 'delete'; label: string }
-  | { action: 'duplicate'; label: string }
+  | { action: ActiveAction | 'delete' | 'duplicate'; label: string; disabled?: boolean }
   | null;
 
 const ACTIONS: ActionDef[] = [
   { action: 'modifiers', label: 'Модификатор' },
   { action: 'quantity',  label: 'Количество' },
-  { action: 'combo',     label: 'Комбо' },
   { action: 'comment',   label: 'Комментарий' },
   { action: 'delete',    label: 'Удалить' },
   { action: 'duplicate', label: 'Повторить' },
@@ -28,10 +25,18 @@ export const ItemActionsMenu: React.FC = () => {
   const selectedItem = items.find(i => i.id === selectedItemId);
   if (!selectedItem) return null;
 
-  const cells = [...ACTIONS];
+  // Disable modifier button when product has no modifiers
+  const hasModifiers = selectedItem.product.hasModifiers;
+
+  const cells: (ActionDef | null)[] = ACTIONS.map(a => {
+    if (a && a.action === 'modifiers' && !hasModifiers) {
+      return { ...a, disabled: true };
+    }
+    return a;
+  });
   while (cells.length < COLS * ROWS) cells.push(null);
 
-  const rows: (ActionDef)[][] = [];
+  const rows: (ActionDef | null)[][] = [];
   for (let r = 0; r < ROWS; r++) {
     rows.push(cells.slice(r * COLS, r * COLS + COLS));
   }
@@ -57,9 +62,11 @@ export const ItemActionsMenu: React.FC = () => {
 
               const isDelete = cell.action === 'delete';
               const isDuplicate = cell.action === 'duplicate';
-              const isActive = activeAction === cell.action;
+              const isDisabled = (cell as any).disabled;
+              const isActive = !isDisabled && activeAction === cell.action;
 
               const handlePress = () => {
+                if (isDisabled) return;
                 if (isDuplicate) {
                   duplicateItem(selectedItem.id);
                 } else {
@@ -70,11 +77,11 @@ export const ItemActionsMenu: React.FC = () => {
               return (
                 <View key={key} style={[styles.cellWrap, ci < COLS - 1 && { marginRight: GAP }]}>
                   <TouchableOpacity
-                    style={[styles.actionBtn, isActive && styles.actionActive]}
+                    style={[styles.actionBtn, isActive && styles.actionActive, isDisabled && styles.actionDisabled]}
                     onPress={handlePress}
-                    activeOpacity={0.7}
+                    activeOpacity={isDisabled ? 1 : 0.7}
                   >
-                    <Text style={[styles.actionText, isActive && styles.actionTextActive]}>
+                    <Text style={[styles.actionText, isActive && styles.actionTextActive, isDisabled && styles.actionTextDisabled]}>
                       {cell.label}
                     </Text>
                   </TouchableOpacity>
@@ -97,7 +104,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surfaceLight,
     marginBottom: GAP,
   },
-  headerText: { color: theme.colors.textPrimary, fontSize: 18, fontWeight: '600' },
+  headerText: { color: theme.colors.textPrimary, fontSize: 16, fontFamily: theme.fonts.medium },
 
   grid: { flex: 1 },
   row: { flex: 1, flexDirection: 'row' },
@@ -113,14 +120,20 @@ const styles = StyleSheet.create({
   actionActive: {
     backgroundColor: theme.colors.actionMenuPurple,
   },
+  actionDisabled: {
+    opacity: 0.3,
+  },
   actionText: {
     color: theme.colors.textPrimary,
     fontSize: 16,
-    fontWeight: '500',
+    fontFamily: theme.fonts.medium,
     textAlign: 'center',
   },
   actionTextActive: {
-    fontWeight: 'bold',
+    fontFamily: theme.fonts.medium,
+  },
+  actionTextDisabled: {
+    color: theme.colors.textDisabled,
   },
   emptyCell: { flex: 1, backgroundColor: theme.colors.surfaceLight },
 });

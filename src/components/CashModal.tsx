@@ -6,13 +6,14 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { CrossIcon, ChevronDownIcon, ChevronUpIcon, SomIcon } from './Icons';
+import { Feather } from '@expo/vector-icons'; // briefcase only - no Chikin yet
 import { theme } from '../theme/colors';
 import { useShiftStore } from '../store/shiftStore';
-import { can, UserRole } from '../utils/permissions';
+import { can, isAdmin, UserRole } from '../utils/permissions';
 
 const formatAmount = (n: number): string =>
-  n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' c';
+  n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 
 interface Props {
   visible: boolean;
@@ -50,9 +51,19 @@ export const CashModal: React.FC<Props> = ({
   if (!visible) return null;
 
   const allowed = can(role, 'cashTransaction');
+  const showExpected = isAdmin(role);
   const expectedCash = currentShift
     ? currentShift.expectedCash ?? currentShift.startingCash + currentShift.cashTotal
     : 0;
+
+  const Amount: React.FC<{ value: number; bold?: boolean; accent?: boolean }> = ({ value, bold, accent }) => (
+    <View style={styles.amountRow}>
+      <Text style={[styles.value, bold && styles.valueBold, accent && styles.valueAccent]}>
+        {formatAmount(value)}
+      </Text>
+      <SomIcon size={10} color={accent ? theme.colors.online : bold ? '#fff' : theme.colors.textSecondary} />
+    </View>
+  );
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -61,7 +72,7 @@ export const CashModal: React.FC<Props> = ({
           <View style={styles.header}>
             <Text style={styles.title}>Касса</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <Feather name="x" size={22} color={theme.colors.textSecondary} />
+              <CrossIcon size={22} color={theme.colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -70,33 +81,27 @@ export const CashModal: React.FC<Props> = ({
               <Text style={styles.empty}>Смена не открыта</Text>
             ) : (
               <>
-                <View style={styles.totalRow}>
-                  <Text style={styles.totalLabel}>Ожидаемая сумма в кассе</Text>
-                  <Text style={styles.totalValue}>{formatAmount(expectedCash)}</Text>
-                </View>
+                {showExpected && (
+                  <>
+                    <View style={styles.totalRow}>
+                      <Text style={styles.totalLabel}>Ожидаемая сумма в кассе</Text>
+                      <View style={styles.amountRow}>
+                        <Text style={styles.totalValue}>{formatAmount(expectedCash)}</Text>
+                        <SomIcon size={12} color="#fff" />
+                      </View>
+                    </View>
+                    <View style={styles.divider} />
+                  </>
+                )}
+
+                <InfoRow label="Наличные на начало" amount={currentShift.startingCash} />
+                <InfoRow label="Поступления наличными" amount={currentShift.cashTotal} />
 
                 <View style={styles.divider} />
 
-                <View style={styles.infoRow}>
-                  <Text style={styles.label}>Наличные на начало</Text>
-                  <Text style={styles.value}>{formatAmount(currentShift.startingCash)}</Text>
-                </View>
-                <View style={styles.infoRow}>
-                  <Text style={styles.label}>Поступления наличными</Text>
-                  <Text style={styles.value}>{formatAmount(currentShift.cashTotal)}</Text>
-                </View>
-                <View style={styles.infoRow}>
-                  <Text style={styles.label}>Внесения</Text>
-                  <Text style={styles.value}>{formatAmount(currentShift.cashFloatIn ?? 0)}</Text>
-                </View>
-                <View style={styles.infoRow}>
-                  <Text style={styles.label}>Изъятия</Text>
-                  <Text style={styles.value}>{formatAmount(currentShift.cashFloatOut ?? 0)}</Text>
-                </View>
-                <View style={styles.infoRow}>
-                  <Text style={styles.label}>Инкассация</Text>
-                  <Text style={styles.value}>{formatAmount(currentShift.cashCollectionsTotal ?? 0)}</Text>
-                </View>
+                <InfoRow label="Внесения" amount={currentShift.cashFloatIn ?? 0} accent />
+                <InfoRow label="Изъятия" amount={currentShift.cashFloatOut ?? 0} />
+                <InfoRow label="Инкассация" amount={currentShift.cashCollectionsTotal ?? 0} />
 
                 {refreshing ? (
                   <Text style={styles.refreshing}>Обновляем…</Text>
@@ -105,48 +110,56 @@ export const CashModal: React.FC<Props> = ({
             )}
           </View>
 
-          <View style={styles.actions}>
-            <TouchableOpacity
-              style={[styles.actionBtn, styles.actionIn, !allowed && styles.actionDisabled]}
-              onPress={onCashIn}
-              disabled={!allowed}
-              activeOpacity={0.8}
-            >
-              <Feather name="arrow-down-circle" size={20} color="#fff" />
-              <Text style={styles.actionText}>Внесение</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionBtn, styles.actionOut, !allowed && styles.actionDisabled]}
-              onPress={onCashOut}
-              disabled={!allowed}
-              activeOpacity={0.8}
-            >
-              <Feather name="arrow-up-circle" size={20} color="#fff" />
-              <Text style={styles.actionText}>Изъятие</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionBtn, styles.actionCollection, !allowed && styles.actionDisabled]}
-              onPress={onCashCollection}
-              disabled={!allowed}
-              activeOpacity={0.8}
-            >
-              <Feather name="briefcase" size={20} color="#fff" />
-              <Text style={styles.actionText}>Инкассация</Text>
-            </TouchableOpacity>
-          </View>
-          {!allowed && (
-            <Text style={styles.warningText}>Кассовые операции недоступны для вашей роли</Text>
-          )}
+          {allowed && currentShift ? (
+            <View style={styles.actions}>
+              <TouchableOpacity
+                style={[styles.actionBtn, styles.actionIn]}
+                onPress={onCashIn}
+                activeOpacity={0.8}
+              >
+                <ChevronDownIcon size={20} color="#fff" />
+                <Text style={styles.actionText}>Внесение</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionBtn, styles.actionOut]}
+                onPress={onCashOut}
+                activeOpacity={0.8}
+              >
+                <ChevronUpIcon size={20} color="#fff" />
+                <Text style={styles.actionText}>Изъятие</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionBtn, styles.actionCollection]}
+                onPress={onCashCollection}
+                activeOpacity={0.8}
+              >
+                <Feather name="briefcase" size={20} color="#fff" />
+                <Text style={styles.actionText}>Инкассация</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
         </View>
       </View>
     </Modal>
   );
 };
 
+const InfoRow: React.FC<{ label: string; amount: number; accent?: boolean }> = ({ label, amount, accent }) => (
+  <View style={styles.infoRow}>
+    <Text style={styles.label}>{label}</Text>
+    <View style={styles.amountRow}>
+      <Text style={[styles.value, accent && styles.valueAccent]}>
+        {formatAmount(amount)}
+      </Text>
+      <SomIcon size={9} color={accent ? theme.colors.online : theme.colors.textSecondary} />
+    </View>
+  </View>
+);
+
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: theme.colors.overlay,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -206,7 +219,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: theme.colors.subtleBorder,
     marginVertical: 12,
   },
   infoRow: {
@@ -220,10 +233,21 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.regular,
     color: theme.colors.textSecondary,
   },
+  amountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
   value: {
     fontSize: 16,
     color: theme.colors.textPrimary,
     fontFamily: theme.fonts.medium,
+  },
+  valueBold: {
+    color: '#fff',
+  },
+  valueAccent: {
+    color: theme.colors.online,
   },
   refreshing: {
     color: theme.colors.textSecondary,
@@ -239,7 +263,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.08)',
+    borderTopColor: theme.colors.subtleBorder,
   },
   actionBtn: {
     flex: 1,
@@ -251,28 +275,17 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   actionIn: {
-    backgroundColor: '#1976D2',
+    backgroundColor: theme.colors.info,
   },
   actionOut: {
-    backgroundColor: '#F57C00',
+    backgroundColor: theme.colors.infoOrange,
   },
   actionCollection: {
-    backgroundColor: '#D32F2F',
-  },
-  actionDisabled: {
-    opacity: 0.4,
+    backgroundColor: theme.colors.destructive,
   },
   actionText: {
     color: '#fff',
     fontSize: 16,
     fontFamily: theme.fonts.medium,
-  },
-  warningText: {
-    color: '#FF8A80',
-    fontSize: 16,
-    fontFamily: theme.fonts.regular,
-    textAlign: 'center',
-    paddingBottom: 12,
-    paddingHorizontal: 20,
   },
 });

@@ -165,7 +165,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'flex-end',
     paddingRight: 24,
-    backgroundColor: '#191919',
+    backgroundColor: theme.colors.numpadBg,
     borderRadius: theme.borderRadius,
   },
   displayValue: {
@@ -186,7 +186,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#191919',
+    backgroundColor: theme.colors.numpadBg,
     borderRadius: theme.borderRadius,
   },
   keyText: {

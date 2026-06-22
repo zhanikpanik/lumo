@@ -1,30 +1,37 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TouchableOpacity, TextInput, StyleSheet } from 'react-native';
+import { Feather } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { theme } from '../theme/colors';
 import { useOrderStore } from '../store/orderStore';
 
-const PRESETS = [
-  'Без лука',
-  'Без соуса',
-  'Острое',
-  'Не острое',
-  'Без соли',
-  'Без сахара',
-  'Medium rare',
-  'Medium',
-  'Well done',
-  'Без льда',
-  'Двойная порция',
-  'На вынос',
-];
-
 const GAP = 2;
 const COLS = 3;
+const PRESET_ROWS = 4;
+const PRESET_CELLS = COLS * PRESET_ROWS; // 12
+const PRESETS_KEY = '@comment_presets';
 
 export const DishCommentPanel: React.FC = () => {
-  const { selectedItemId, items, setItemComment } = useOrderStore();
+  const { selectedItemId, items, setItemComment, setActiveAction } = useOrderStore();
   const selectedItem = items.find(i => i.id === selectedItemId);
   const [text, setText] = useState('');
+  const [presets, setPresets] = useState<string[]>([]);
+
+  useEffect(() => {
+    AsyncStorage.getItem(PRESETS_KEY).then((raw) => {
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) setPresets(parsed);
+        } catch {}
+      }
+    });
+  }, []);
+
+  const savePresets = useCallback((next: string[]) => {
+    setPresets(next);
+    AsyncStorage.setItem(PRESETS_KEY, JSON.stringify(next));
+  }, []);
 
   useEffect(() => {
     setText(selectedItem?.comment || '');
@@ -36,16 +43,7 @@ export const DishCommentPanel: React.FC = () => {
     .split(',')
     .map((t) => t.trim())
     .filter(Boolean);
-  const activePresets = new Set(tokens.filter((t) => PRESETS.includes(t)));
-
-  const handlePreset = (preset: string) => {
-    const next = activePresets.has(preset)
-      ? tokens.filter((t) => t !== preset)
-      : [...tokens, preset];
-    const newText = next.join(', ');
-    setText(newText);
-    setItemComment(selectedItem.id, newText);
-  };
+  const activePresets = new Set(tokens.filter((t) => presets.includes(t)));
 
   const handleChangeText = (val: string) => {
     setText(val);
@@ -57,58 +55,116 @@ export const DishCommentPanel: React.FC = () => {
     setItemComment(selectedItem.id, '');
   };
 
-  const rows: string[][] = [];
-  for (let i = 0; i < PRESETS.length; i += COLS) {
-    rows.push(PRESETS.slice(i, i + COLS));
+  const handlePresetToggle = (preset: string) => {
+    const next = activePresets.has(preset)
+      ? tokens.filter((t) => t !== preset)
+      : [...tokens, preset];
+    const newText = next.join(', ');
+    setText(newText);
+    setItemComment(selectedItem.id, newText);
+  };
+
+  const handleSaveAsPreset = () => {
+    const trimmed = text.trim();
+    if (!trimmed || presets.includes(trimmed)) return;
+    savePresets([...presets, trimmed]);
+  };
+
+  const handleDeletePreset = (preset: string) => {
+    savePresets(presets.filter((p) => p !== preset));
+    if (activePresets.has(preset)) {
+      const newTokens = tokens.filter((t) => t !== preset);
+      const newText = newTokens.join(', ');
+      setText(newText);
+      setItemComment(selectedItem.id, newText);
+    }
+  };
+
+  const showSave = text.trim() && !presets.includes(text.trim());
+
+  // Grid
+  const gridCells: Array<{ kind: 'preset'; preset: string } | { kind: 'empty' }> = [];
+  for (let i = 0; i < Math.min(presets.length, PRESET_CELLS); i++) {
+    gridCells.push({ kind: 'preset', preset: presets[i] });
+  }
+  while (gridCells.length < PRESET_CELLS) gridCells.push({ kind: 'empty' });
+
+  const rows = [];
+  for (let r = 0; r < PRESET_ROWS; r++) {
+    rows.push(gridCells.slice(r * COLS, r * COLS + COLS));
   }
 
   return (
     <View style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerText}>Комментарий к блюду</Text>
-      </View>
-
-      <View style={styles.inputRow}>
-        <TextInput
-          style={styles.input}
-          value={text}
-          onChangeText={handleChangeText}
-          placeholder="Введите комментарий..."
-          placeholderTextColor={theme.colors.textSecondary}
-          multiline
-        />
-      </View>
-
-      {text ? (
-        <TouchableOpacity style={styles.clearBtn} onPress={handleClear} activeOpacity={0.7}>
-          <Text style={styles.clearText}>Очистить</Text>
+        <TouchableOpacity style={styles.headerBtn} onPress={() => setActiveAction(null)} activeOpacity={0.7}>
+          <Feather name="arrow-left" size={22} color={theme.colors.textSecondary} />
         </TouchableOpacity>
-      ) : null}
+        <Text style={styles.headerText} numberOfLines={1}>
+          {selectedItem.product.name}
+        </Text>
+        <View style={styles.headerBtn} />
+      </View>
 
-      <View style={styles.presetsGrid}>
+      {/* Input + save button */}
+      <View style={styles.inputRow}>
+        <View style={styles.inputWrap}>
+          <TextInput
+            style={styles.input}
+            value={text}
+            onChangeText={handleChangeText}
+            placeholder="Комментарий..."
+            placeholderTextColor={theme.colors.textSecondary}
+          />
+          {text ? (
+            <TouchableOpacity style={styles.clearBtn} onPress={handleClear} activeOpacity={0.7}>
+              <Feather name="x" size={18} color={theme.colors.textSecondary} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+        {showSave && (
+          <TouchableOpacity style={styles.saveBtn} onPress={handleSaveAsPreset} activeOpacity={0.7}>
+            <Text style={styles.saveBtnText}>Сохранить как пресет</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* 4-row grid */}
+      <View style={styles.grid}>
         {rows.map((row, ri) => (
-          <View key={ri} style={[styles.presetRow, ri < rows.length - 1 && { marginBottom: GAP }]}>
-            {row.map((preset, ci) => {
-              const isActive = activePresets.has(preset);
+          <View key={ri} style={[styles.row, ri < PRESET_ROWS - 1 && { marginBottom: GAP }]}>
+            {row.map((cell, ci) => {
+              const key = `${ri}-${ci}`;
+              const marginRight = ci < COLS - 1 ? GAP : 0;
+
+              if (cell.kind === 'preset') {
+                const isActive = activePresets.has(cell.preset);
+                return (
+                  <View key={key} style={[styles.cellWrap, { marginRight }]}>
+                    <TouchableOpacity
+                      style={[styles.presetCell, isActive && styles.presetCellActive]}
+                      onPress={() => handlePresetToggle(cell.preset)}
+                      onLongPress={() => handleDeletePreset(cell.preset)}
+                      activeOpacity={0.7}
+                    >
+                      <Text
+                        style={[styles.presetText, isActive && styles.presetTextActive]}
+                        numberOfLines={2}
+                      >
+                        {cell.preset}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              }
+
               return (
-                <View key={preset} style={[styles.presetWrap, ci < COLS - 1 && { marginRight: GAP }]}>
-                  <TouchableOpacity
-                    style={[styles.presetBtn, isActive && styles.presetBtnActive]}
-                    onPress={() => handlePreset(preset)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={[styles.presetText, isActive && styles.presetTextActive]}>{preset}</Text>
-                  </TouchableOpacity>
+                <View key={key} style={[styles.cellWrap, { marginRight }]}>
+                  <View style={styles.emptyCell} />
                 </View>
               );
             })}
-            {row.length < COLS &&
-              Array.from({ length: COLS - row.length }).map((_, i) => (
-                <View key={`empty-${i}`} style={[styles.presetWrap, { marginRight: i < COLS - row.length - 1 ? GAP : 0 }]}>
-                  <View style={styles.emptyCell} />
-                </View>
-              ))
-            }
           </View>
         ))}
       </View>
@@ -118,70 +174,86 @@ export const DishCommentPanel: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+
   header: {
     height: 44,
-    justifyContent: 'center',
+    flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: theme.colors.surfaceLight,
     marginBottom: GAP,
   },
+  headerBtn: { width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
   headerText: {
+    flex: 1,
     color: theme.colors.textPrimary,
     fontSize: 15,
-    fontWeight: '600',
+    fontFamily: theme.fonts.medium,
+    textAlign: 'center',
   },
+
   inputRow: {
-    height: 80,
+    flex: 1,
     backgroundColor: theme.colors.surfaceLight,
     marginBottom: GAP,
-    padding: 12,
+    padding: 8,
+  },
+  inputWrap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
   },
   input: {
     flex: 1,
     color: theme.colors.textPrimary,
     fontSize: 16,
+    fontFamily: theme.fonts.regular,
     textAlignVertical: 'top',
+    paddingTop: 4,
     outlineStyle: 'none',
   } as any,
   clearBtn: {
-    height: 40,
-    backgroundColor: theme.colors.surfaceLight,
+    width: 32,
+    height: 32,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: GAP,
   },
-  clearText: {
-    color: theme.colors.textSecondary,
+  saveBtn: {
+    marginTop: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 8,
+    backgroundColor: '#2A2A2A',
+  },
+  saveBtnText: {
+    color: theme.colors.textPrimary,
     fontSize: 14,
+    fontFamily: theme.fonts.medium,
   },
-  presetsGrid: {
-    flex: 1,
-  },
-  presetRow: {
-    flex: 1,
-    flexDirection: 'row',
-  },
-  presetWrap: { flex: 1 },
-  presetBtn: {
+
+  grid: { flex: PRESET_ROWS },
+  row: { flex: 1, flexDirection: 'row' },
+  cellWrap: { flex: 1 },
+
+  presetCell: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: theme.colors.surfaceLight,
     paddingHorizontal: 4,
   },
-  presetBtnActive: {
+  presetCellActive: {
     backgroundColor: theme.colors.accent,
   },
   presetText: {
     color: theme.colors.textPrimary,
     fontSize: 14,
-    fontWeight: '500',
+    fontFamily: theme.fonts.medium,
     textAlign: 'center',
   },
   presetTextActive: {
     color: '#fff',
-    fontWeight: '600',
   },
+
   emptyCell: {
     flex: 1,
     backgroundColor: theme.colors.surfaceLight,

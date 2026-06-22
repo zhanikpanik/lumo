@@ -13,6 +13,7 @@
     "preset": "jest-expo/web"
   },
   "dependencies": {
+    "@expo-google-fonts/onest": "^0.4.1",
     "@expo/metro-runtime": "~4.0.1",
     "@expo/vector-icons": "~14.0.4",
     "@react-native-async-storage/async-storage": "1.23.1",

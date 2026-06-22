@@ -29,7 +29,7 @@ export const OrderItem: React.FC<Props> = ({ item, isSelected }) => {
       </Text>
       
       <Text style={[styles.price, isSelected && styles.selectedText]}>
-        {itemTotal} ₽
+        {itemTotal} c
       </Text>
     </View>
   );
@@ -55,10 +55,12 @@ const styles = StyleSheet.create({
   name: {
     color: theme.colors.textPrimary,
     fontSize: 16,
+    fontFamily: theme.fonts.regular,
   },
   comment: {
     color: theme.colors.textSecondary,
     fontSize: 12,
+    fontFamily: theme.fonts.regular,
     marginTop: 2,
   },
   commentSelected: {
@@ -68,18 +70,20 @@ const styles = StyleSheet.create({
   quantity: {
     color: theme.colors.textPrimary,
     fontSize: 16,
+    fontFamily: theme.fonts.regular,
     width: 30,
     textAlign: 'center',
   },
   price: {
     color: theme.colors.textPrimary,
     fontSize: 16,
+    fontFamily: theme.fonts.regular,
     width: 60,
     textAlign: 'right',
   },
   selectedText: {
     color: theme.colors.orderItemActiveText,
-    fontWeight: 'bold',
+    fontFamily: theme.fonts.medium,
   },
 
 });

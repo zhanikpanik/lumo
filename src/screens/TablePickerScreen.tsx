@@ -137,7 +137,7 @@ export const TablePickerScreen: React.FC<{ navigation?: any; route?: any }> = ({
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: theme.colors.background },
-  root: { flex: 1, backgroundColor: '#1A1A1A' },
+  root: { flex: 1, backgroundColor: theme.colors.background },
 
   header: {
     height: 56,

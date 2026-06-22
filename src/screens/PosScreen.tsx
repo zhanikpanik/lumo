@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar } from 'react-native';
 import { theme } from '../theme/colors';
 import { PosHeader } from '../components/PosHeader';
@@ -6,28 +6,28 @@ import { OrderPanel } from '../components/OrderPanel';
 import { OrderActionsMenu } from '../components/OrderActionsMenu';
 import { WaiterPickerPanel } from '../components/WaiterPickerPanel';
 import { GuestCounterPanel } from '../components/GuestCounterPanel';
-import { DeleteOrderPanel } from '../components/DeleteOrderPanel';
 import { CategoryMenu } from '../components/CategoryMenu';
 import { ProductGrid } from '../components/ProductGrid';
 import { ItemActionsMenu } from '../components/ItemActionsMenu';
 import { ModifierGrid } from '../components/ModifierGrid';
 import { ModifierActionsMenu } from '../components/ModifierActionsMenu';
-import { ModifierQuantityNumpad } from '../components/ModifierQuantityNumpad';
+import { Numpad } from '../components/Numpad';
 import { DeleteOptions } from '../components/DeleteOptions';
-import { SearchMode } from '../components/SearchMode';
 import { TakeoverLock } from '../components/TakeoverLock';
 import { useOrderStore } from '../store/orderStore';
 import { useShiftStore } from '../store/shiftStore';
 import { useVenueStore } from '../store/venueStore';
 import { CommentModal } from '../components/CommentModal';
+import { NotificationModal } from '../components/NotificationModal';
 import { OrderActionType } from '../types';
+import { useNotificationStore } from '../store/notificationStore';
 
 const GAP = 10;
 const COL_GAP = 10;
 const PADDING = 10;
 
 export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
-  const { selectedItemId, selectedModifierId, modifierAction, items, getTotal, closeOrder, deleteOrder, tableNumber, currentOrderId, updateOrderMeta, commitDraft, cancelDraft } = useOrderStore();
+  const { selectedItemId, selectedModifierId, modifierAction, items, getTotal, closeOrder, deleteOrder, tableNumber, currentOrderId, updateOrderMeta, commitDraft, cancelDraft, draftItem, setModifierQuantity } = useOrderStore();
   const isModifierSelected = !!selectedModifierId;
   const currentOrder = useOrderStore((s) => s.orders.find(o => o.id === s.currentOrderId));
   const selectedItem = items.find(i => i.id === selectedItemId);
@@ -41,6 +41,13 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
   const [orderActionsMode, setOrderActionsMode] = useState(false);
   const [selectedOrderAction, setSelectedOrderAction] = useState<OrderActionType>(null);
   const isTakeaway = useVenueStore((s) => s.venueType === 'takeaway');
+  const [notificationVisible, setNotificationVisible] = useState(false);
+
+  // Realtime notification subscription
+  useEffect(() => {
+    const unsub = useNotificationStore.getState().subscribe();
+    return unsub;
+  }, []);
 
   const isLocked = useMemo(() => {
     if (!currentUser || !currentOrder) return false;
@@ -102,6 +109,8 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
           onSearchChange={setSearchQuery}
           onSearchOpen={handleSearchOpen}
           onSearchClose={handleSearchClose}
+          onNotificationPress={() => setNotificationVisible(true)}
+          hideRight={orderActionsMode && !!selectedOrderAction}
         />
 
         {isLocked ? (
@@ -116,10 +125,23 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
               <View style={styles.colContent}>
                 <OrderPanel onCommentPress={() => setCommentVisible(true)} />
               </View>
+              <View style={styles.paymentRow}>
+                <TouchableOpacity style={styles.precheckBtn}>
+                  <Text style={styles.precheckText}>Пречек</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.paymentBtn, isEmpty && styles.btnDisabled]}
+                  onPress={() => navigation?.navigate('Payment')}
+                  disabled={isEmpty}
+                >
+                  <Text style={styles.paymentLabel}>Оплата</Text>
+                  <Text style={styles.paymentAmount}>{formatAmount(total)} c</Text>
+                </TouchableOpacity>
+              </View>
             </View>
             <View style={{ width: COL_GAP }} />
             <View style={styles.searchRightCol}>
-              <SearchMode searchQuery={searchQuery} onSearchChange={setSearchQuery} />
+              <ProductGrid searchQuery={searchQuery} />
             </View>
           </View>
         ) : (
@@ -139,7 +161,7 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
                   disabled={isEmpty}
                 >
                   <Text style={styles.paymentLabel}>Оплата</Text>
-                  <Text style={styles.paymentAmount}>{formatAmount(total)} ₽</Text>
+                  <Text style={styles.paymentAmount}>{formatAmount(total)} c</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -180,12 +202,25 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
                 {orderActionsMode ? (
                   selectedOrderAction === 'waiter' ? <WaiterPickerPanel /> :
                   selectedOrderAction === 'guests' ? <GuestCounterPanel /> :
-                  selectedOrderAction === 'delete' ? <DeleteOrderPanel onDeleted={closeOrderActions} /> :
+                  selectedOrderAction === 'delete' ? <DeleteOptions mode="order" onDone={closeOrderActions} /> :
                   <ProductGrid />
                 ) : isModifierSelected && modifierAction === 'delete' ? (
                   <DeleteOptions onDone={() => useOrderStore.getState().selectModifier(null)} />
                 ) : isModifierSelected ? (
-                  <ModifierQuantityNumpad />
+                  (() => {
+                    const mod = draftItem?.modifiers.find(m => m.id === selectedModifierId);
+                    if (!mod || !selectedModifierId) return null;
+                    const count = draftItem!.modifiers.filter(m => m.id === selectedModifierId).length;
+                    return (
+                      <Numpad
+                        mode="quantity"
+                        value={String(count)}
+                        onChange={(v) => setModifierQuantity(selectedModifierId, parseInt(v) || 0)}
+                        title={mod.name}
+                        accumulate={false}
+                      />
+                    );
+                  })()
                 ) : isItemSelected ? (
                   <ModifierGrid />
                 ) : (
@@ -213,6 +248,7 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
         )}
       </View>
       <CommentModal visible={commentVisible} onClose={() => setCommentVisible(false)} />
+      <NotificationModal visible={notificationVisible} onClose={() => setNotificationVisible(false)} />
     </SafeAreaView>
   );
 };
@@ -220,28 +256,28 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
 const formatAmount = (n: number) => n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, minHeight: 0, minWidth: 0, overflow: 'hidden', backgroundColor: '#1A1A1A' },
-  root: { flex: 1, minHeight: 0, minWidth: 0, overflow: 'hidden', backgroundColor: '#1A1A1A' },
+  safeArea: { flex: 1, minHeight: 0, minWidth: 0, overflow: 'hidden', backgroundColor: theme.colors.background },
+  root: { flex: 1, minHeight: 0, minWidth: 0, overflow: 'hidden', backgroundColor: theme.colors.background },
   mainRow: { flex: 1, minHeight: 0, minWidth: 0, flexDirection: 'row', paddingHorizontal: PADDING, paddingBottom: COL_GAP },
   leftCol: { flex: 0.35, minHeight: 0, flexDirection: 'column' },
   midCol: { flex: 0.25, flexDirection: 'column' },
   rightCol: { flex: 0.40, flexDirection: 'column' },
   colContent: { flex: 1, overflow: 'hidden', borderRadius: theme.borderRadius },
   colFooterBtn: { height: 56, marginTop: GAP, backgroundColor: theme.colors.surfaceLight, borderRadius: theme.borderRadius, justifyContent: 'center', alignItems: 'center' },
-  colFooterBtnActive: { backgroundColor: '#00C853' },
+  colFooterBtnActive: { backgroundColor: theme.colors.accent },
   colFooterBtnText: { color: theme.colors.textPrimary, fontSize: 16, fontFamily: theme.fonts.medium },
-  colFooterBtnTextAccent: { color: '#00E676', fontSize: 16, fontFamily: theme.fonts.medium },
-  colFooterBtnTextActive: { color: '#fff', fontSize: 16, fontFamily: theme.fonts.medium },
-  colFooterBtnDanger: { backgroundColor: '#D32F2F' },
-  colFooterBtnTextDanger: { color: '#fff', fontFamily: theme.fonts.medium },
+  colFooterBtnTextAccent: { color: theme.colors.accentLight, fontSize: 16, fontFamily: theme.fonts.medium },
+  colFooterBtnTextActive: { color: theme.colors.white, fontSize: 16, fontFamily: theme.fonts.medium },
+  colFooterBtnDanger: { backgroundColor: theme.colors.destructive },
+  colFooterBtnTextDanger: { color: theme.colors.white, fontFamily: theme.fonts.medium },
   paymentRow: { height: 56, flexDirection: 'row', gap: GAP, marginTop: GAP },
   searchRightCol: { flex: 0.65 },
   takeoverCol: { flex: 0.65, overflow: 'hidden', borderRadius: theme.borderRadius },
-  paymentBtn: { flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#00C853', borderRadius: theme.borderRadius, paddingHorizontal: 12 },
+  paymentBtn: { flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: theme.colors.accent, borderRadius: theme.borderRadius, paddingHorizontal: 12 },
   paymentBtnSecondary: { backgroundColor: theme.colors.surfaceLight },
   btnDisabled: { opacity: 0.4 },
-  paymentLabel: { color: '#fff', fontSize: 16, fontFamily: theme.fonts.medium },
-  paymentAmount: { color: '#fff', fontSize: 16, fontFamily: theme.fonts.medium },
+  paymentLabel: { color: theme.colors.white, fontSize: 22, fontFamily: theme.fonts.medium },
+  paymentAmount: { color: theme.colors.white, fontSize: 22, fontFamily: theme.fonts.medium },
   precheckBtn: { flex: 0.5, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.surfaceLight, borderRadius: theme.borderRadius },
   precheckText: { color: theme.colors.textPrimary, fontSize: 16, fontFamily: theme.fonts.medium },
 });

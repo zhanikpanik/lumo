@@ -58,7 +58,6 @@ export const FloorPlan: React.FC<Props> = ({ onTablePress, zoneIdx = 0 }) => {
               <Text style={[styles.tableNumber, { fontSize }]}>{table.number}</Text>
               {order && (
                 <Text style={[styles.tableAmount, { fontSize: 16 }]}>
-                  fontFamily: theme.fonts.regular,
                   {formatAmount(order.totalAmount)} c
                 </Text>
               )}

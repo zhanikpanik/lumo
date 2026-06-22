@@ -1,11 +1,12 @@
 import React from 'react';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, G } from 'react-native-svg';
 
 interface IconProps {
   size?: number;
   color?: string;
 }
 
+// ─── Lock (closed) ───
 export const LockIcon: React.FC<IconProps> = ({ size = 24, color = '#fff' }) => (
   <Svg width={size} height={size} viewBox="0 0 150 150" fill="none">
     <Path
@@ -17,6 +18,31 @@ export const LockIcon: React.FC<IconProps> = ({ size = 24, color = '#fff' }) => 
   </Svg>
 );
 
+// ─── Lock (open) ───
+export const UnlockIcon: React.FC<IconProps> = ({ size = 24, color = '#fff' }) => (
+  <Svg width={size} height={size} viewBox="0 0 150 150" fill="none">
+    <Path
+      fillRule="evenodd"
+      clipRule="evenodd"
+      d="M113.585 69.9507C113.585 69.9507 113.494 51.292 113.494 50.6253C113.494 34.4529 86.2105 32.9046 86.1878 51.0547C86.1878 51.9475 86.1878 59.6777 86.1878 66.8767H88.2744C96.4731 66.8767 98.4802 72.0189 98.4802 77.7487V83.6706L24.1134 83.5011V77.2966C24.1134 71.3747 27.2999 67.2723 35.2151 67.2723L73.0109 66.9784C73.0109 59.8472 73.113 51.0208 73.113 49.2126C73.113 15.636 126.785 18.5066 126.751 48.4102C126.751 52.5126 127 70.0411 127 70.0411L113.585 69.9507ZM98.3668 103.855L24 104.138V91.706L98.3668 90.3611V103.855ZM98.3668 115.767C98.3668 121.519 95.9174 125 88.0929 125C84.5095 125 37.0635 124.604 34.2739 124.604C26.4041 124.604 24 120.728 24 114.761V110.67L98.3668 112.003V115.767Z"
+      fill={color}
+    />
+  </Svg>
+);
+
+// ─── Search / Magnifier ───
+export const SearchIcon: React.FC<IconProps> = ({ size = 24, color = '#fff' }) => (
+  <Svg width={size} height={size} viewBox="0 0 150 150" fill="none">
+    <Path
+      fillRule="evenodd"
+      clipRule="evenodd"
+      d="M90.8032 118.231L83.0512 101.995L102.799 93.5934L111.117 109.386C116.515 122.227 95.6015 129.936 90.8032 118.231ZM61.3005 29.1503C104.632 11.0754 132.313 75.9045 89.9884 93.5593C43.6577 112.895 17.7876 47.3047 61.3005 29.1503ZM64.8652 37.6655C32.737 51.0741 51.8057 99.4973 86.0502 85.2144C117.307 72.1691 96.8803 24.3023 64.8652 37.6655Z"
+      fill={color}
+    />
+  </Svg>
+);
+
+// ─── Notification / Bell ───
 export const NotificationIcon: React.FC<IconProps> = ({ size = 24, color = '#fff' }) => (
   <Svg width={size} height={size} viewBox="0 0 150 150" fill="none">
     <Path
@@ -28,6 +54,7 @@ export const NotificationIcon: React.FC<IconProps> = ({ size = 24, color = '#fff
   </Svg>
 );
 
+// ─── Som currency ───
 export const SomIcon: React.FC<IconProps> = ({ size = 24, color = '#fff' }) => (
   <Svg width={size} height={size * 1.42} viewBox="0 0 146 208" fill="none">
     <Path
@@ -37,12 +64,185 @@ export const SomIcon: React.FC<IconProps> = ({ size = 24, color = '#fff' }) => (
   </Svg>
 );
 
-export const SearchIcon: React.FC<IconProps> = ({ size = 24, color = '#fff' }) => (
-  <Svg width={size} height={size} viewBox="0 0 150 150" fill="none">
+// ─── Hamburger / Menu ───
+export const HamburgerIcon: React.FC<IconProps> = ({ size = 24, color = '#fff' }) => (
+  <Svg width={size} height={size * (38 / 30)} viewBox="0 0 30 38" fill="none">
     <Path
       fillRule="evenodd"
       clipRule="evenodd"
-      d="M90.8032 118.231L83.0512 101.995L102.799 93.5934L111.117 109.386C116.515 122.227 95.6015 129.936 90.8032 118.231ZM61.3005 29.1503C104.632 11.0754 132.313 75.9045 89.9884 93.5593C43.6577 112.895 17.7876 47.3047 61.3005 29.1503ZM64.8652 37.6655C32.737 51.0741 51.8057 99.4973 86.0502 85.2144C117.307 72.1691 96.8803 24.3023 64.8652 37.6655Z"
+      d="M7 13H23V15H7V13ZM7 21H23V23H7V21ZM7 29H23V31H7V29Z"
+      fill={color}
+    />
+  </Svg>
+);
+
+// ─── Close / Cross ───
+export const CrossIcon: React.FC<IconProps> = ({ size = 24, color = '#fff' }) => (
+  <Svg width={size} height={size * (38 / 30)} viewBox="0 0 30 38" fill="none">
+    <Path
+      fillRule="evenodd"
+      clipRule="evenodd"
+      d="M23.0359 26.166L20.4259 28.822L14.9879 23.21L9.70187 28.904L7.04587 26.304L12.6279 20.904L6.96387 15.614L9.46987 12.916L14.9359 18.54L20.2519 12.834L22.9519 15.34L17.2999 20.838L23.0359 26.166Z"
+      fill={color}
+    />
+  </Svg>
+);
+
+// ─── Chevron Up ───
+export const ChevronUpIcon: React.FC<IconProps> = ({ size = 24, color = '#fff' }) => (
+  <Svg width={size} height={size * (38 / 30)} viewBox="0 0 30 38" fill="none">
+    <Path
+      fillRule="evenodd"
+      clipRule="evenodd"
+      d="M16.3359 16.4999L16.7259 29.3999H13.1699L13.3239 16.5999L9.79991 20.9659L7.46191 18.7199L14.7259 11.7319L22.5379 18.6279L20.2879 20.9799L16.3359 16.4999Z"
+      fill={color}
+    />
+  </Svg>
+);
+
+// ─── Chevron Down ───
+export const ChevronDownIcon: React.FC<IconProps> = ({ size = 24, color = '#fff' }) => (
+  <Svg width={size} height={size * (38 / 30)} viewBox="0 0 30 38" fill="none">
+    <Path
+      fillRule="evenodd"
+      clipRule="evenodd"
+      d="M7.46191 23.358L9.71191 21L13.6639 25.48L13.2739 12.584H16.8299L16.6759 25.384L20.1999 21.022L22.5419 23.266L15.2779 30.266L7.46191 23.358Z"
+      fill={color}
+    />
+  </Svg>
+);
+
+// ─── Chevron Left (rotated ChevronUp) ───
+export const ChevronLeftIcon: React.FC<IconProps> = ({ size = 24, color = '#fff' }) => (
+  <Svg width={size * (38 / 30)} height={size} viewBox="0 0 38 30" fill="none">
+    <G rotation={-90} originX={19} originY={15}>
+      <Path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M16.3359 16.4999L16.7259 29.3999H13.1699L13.3239 16.5999L9.79991 20.9659L7.46191 18.7199L14.7259 11.7319L22.5379 18.6279L20.2879 20.9799L16.3359 16.4999Z"
+        fill={color}
+      />
+    </G>
+  </Svg>
+);
+
+// ─── Chevron Right (rotated ChevronUp) ───
+export const ChevronRightIcon: React.FC<IconProps> = ({ size = 24, color = '#fff' }) => (
+  <Svg width={size * (38 / 30)} height={size} viewBox="0 0 38 30" fill="none">
+    <G rotation={90} originX={19} originY={15}>
+      <Path
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M16.3359 16.4999L16.7259 29.3999H13.1699L13.3239 16.5999L9.79991 20.9659L7.46191 18.7199L14.7259 11.7319L22.5379 18.6279L20.2879 20.9799L16.3359 16.4999Z"
+        fill={color}
+      />
+    </G>
+  </Svg>
+);
+
+// ─── Refresh ───
+export const RefreshIcon: React.FC<IconProps> = ({ size = 24, color = '#fff' }) => (
+  <Svg width={size} height={size * (38 / 30)} viewBox="0 0 30 38" fill="none">
+    <Path
+      fillRule="evenodd"
+      clipRule="evenodd"
+      d="M13.8935 19.1421L18.3995 17.6441C17.5715 16.9581 16.3695 16.7181 14.9615 16.7181C8.54952 16.7181 8.58952 26.5181 14.8515 26.5181C17.6035 26.5181 19.4315 24.9381 20.0515 23.0481L22.6515 23.8481C21.9195 27.0641 19.4235 29.8001 14.7435 29.8001C4.28552 29.8001 4.21752 13.5521 14.9275 13.5521C16.5595 13.5521 17.8555 14.1301 18.9535 14.8821L16.4835 10.7121L19.4095 9.28613L23.1015 18.0421L15.3175 22.0561L13.8935 19.1421Z"
+      fill={color}
+    />
+  </Svg>
+);
+
+// ─── Printer ───
+export const PrinterIcon: React.FC<IconProps> = ({ size = 24, color = '#fff' }) => (
+  <Svg width={size} height={size * (38 / 30)} viewBox="0 0 30 38" fill="none">
+    <Path
+      fillRule="evenodd"
+      clipRule="evenodd"
+      d="M5.87962 20.7599C5.87962 19.5859 6.39962 19.2899 7.39162 19.2999L9.19162 19.3159V12.8779L17.6776 12.8379L20.9096 16.0379L20.9996 19.3999L23.1996 19.4179C23.7876 19.4179 24.2416 19.9439 24.2416 20.9039V29.5479L5.76562 29.4319C5.76562 29.4319 5.87962 21.9339 5.87962 20.7599ZM19.8396 16.8919L16.9156 16.9639L17.1016 13.9819H10.3236L10.1996 21.9199L19.9256 21.7739L19.8396 16.8919ZM9.26363 28.1499L21.0836 28.3099L20.9756 25.8359L9.17563 25.7179L9.26363 28.1499ZM8.02362 23.5239C9.00962 23.5239 9.02362 21.9799 8.00562 21.9799C6.98762 21.9799 6.94162 23.5239 8.02362 23.5239Z"
+      fill={color}
+    />
+  </Svg>
+);
+
+// ─── Trash ───
+export const TrashIcon: React.FC<IconProps> = ({ size = 24, color = '#fff' }) => (
+  <Svg width={size} height={size * (38 / 30)} viewBox="0 0 30 38" fill="none">
+    <Path
+      fillRule="evenodd"
+      clipRule="evenodd"
+      d="M21.4277 17.5218L8.58374 17.4938C8.58374 17.4938 8.54574 17.0818 8.53374 16.5838C8.51374 15.6778 9.05774 15.0318 10.0937 14.9958C10.2357 14.9958 11.0577 14.9958 12.1677 14.9958C12.1557 14.7278 12.1397 14.3358 12.1337 14.0358C12.1117 13.1298 12.6577 12.7078 13.6917 12.6718C14.1837 12.6558 15.8917 12.6898 16.5057 12.6898C17.6197 12.6898 18.0597 13.1278 18.0657 13.8578C18.0657 14.1798 18.0517 14.6858 18.0397 15.0118H19.7677C20.8817 15.0118 21.4597 15.6738 21.4657 16.4118C21.4697 16.9118 21.4277 17.5218 21.4277 17.5218ZM16.4897 14.1998L13.6897 14.1718V14.9998H16.4897V14.1998ZM20.0577 29.4958L10.0577 29.5858L9.37374 18.6998H20.6757L20.0577 29.4958Z"
+      fill={color}
+    />
+  </Svg>
+);
+
+// ─── Person / Face ───
+export const PersonIcon: React.FC<IconProps> = ({ size = 24, color = '#fff' }) => (
+  <Svg width={size} height={size * (38 / 30)} viewBox="0 0 30 38" fill="none">
+    <Path
+      fillRule="evenodd"
+      clipRule="evenodd"
+      d="M24.168 28.2619L23.898 29.3759L6.07603 29.4219L5.83203 28.2959L11.412 26.2959L11.656 24.1619C11.2558 23.5792 10.9475 22.9384 10.742 22.2619C9.09603 20.5619 9.34203 18.3479 10.21 18.2759C10.21 17.9219 10.196 17.5519 10.196 17.1679C10.196 14.5999 11.836 12.2739 14.996 12.2739C18.156 12.2739 19.736 14.5239 19.736 17.5619C19.736 17.8079 19.736 18.0459 19.736 18.2759C20.648 18.1959 20.98 20.3739 19.438 22.1099C19.2799 22.8903 18.9693 23.6318 18.524 24.2919L18.868 26.3659L24.168 28.2619ZM17.704 27.2619C17.672 26.8719 17.622 25.9919 17.586 25.3579C17.0922 25.8207 16.5618 26.2427 16 26.6199L14.306 26.5999C13.7145 26.2192 13.1589 25.7854 12.646 25.3039C12.612 26.0039 12.56 27.0359 12.542 27.4499C12.484 28.7999 17.826 28.8159 17.704 27.2639V27.2619ZM18.684 17.0739C18.684 16.0926 18.2942 15.1515 17.6003 14.4576C16.9064 13.7637 15.9653 13.3739 14.984 13.3739C14.0027 13.3739 13.0616 13.7637 12.3677 14.4576C11.6739 15.1515 11.284 16.0926 11.284 17.0739C11.284 21.8739 11.86 23.5759 14.646 25.3819L15.592 25.4099C18.256 23.5999 18.684 21.8399 18.684 17.0759V17.0739Z"
+      fill={color}
+    />
+  </Svg>
+);
+
+// ─── Pencil / Edit ───
+export const PencilIcon: React.FC<IconProps> = ({ size = 24, color = '#fff' }) => (
+  <Svg width={size} height={size} viewBox="0 0 30 30" fill="none">
+    <Path
+      fillRule="evenodd"
+      clipRule="evenodd"
+      d="M19.6889 6.71845L13.0044 5.57169C13.2377 4.40398 13.4422 3.49809 13.5804 3.02682C14.381 0.429581 20.622 1.41664 20.0719 4.50085C19.9999 4.925 19.8646 5.70784 19.6889 6.71845ZM16.9327 22.7627L12.5638 27.0879L10.2598 21.4641C10.2598 21.4641 11.6047 13.0073 12.6358 7.44107L19.3548 8.59307C18.413 14.0965 16.9327 22.7627 16.9327 22.7627Z"
+      fill={color}
+    />
+  </Svg>
+);
+
+// ─── Document / Sheet ───
+export const DocumentIcon: React.FC<IconProps> = ({ size = 24, color = '#fff' }) => (
+  <Svg width={size} height={size} viewBox="0 0 30 30" fill="none">
+    <Path
+      fillRule="evenodd"
+      clipRule="evenodd"
+      d="M5.25488 25.3187L6.4472 4.33398L19.508 4.41777L24.7467 10.0469L24.1707 25.5701L5.25488 25.3187ZM17.7858 11.1517L17.8808 5.84467L8.0888 5.81326L6.84752 23.8525L22.555 24.1353L23.131 11.1805L17.7858 11.1517Z"
+      fill={color}
+    />
+  </Svg>
+);
+
+// ─── Exclamation / Alert ───
+export const ExclamationIcon: React.FC<IconProps> = ({ size = 24, color = '#fff' }) => (
+  <Svg width={size} height={size} viewBox="0 0 30 30" fill="none">
+    <Path
+      fillRule="evenodd"
+      clipRule="evenodd"
+      d="M17.4771 1.15234L17.1966 19.9216H13.9426L13.6621 1.15234H17.4771ZM15.5696 27.4702C14.8776 27.4702 14.2839 27.2449 13.7883 26.7944C13.2927 26.3438 13.0449 25.8041 13.0449 25.175C13.0449 24.546 13.2927 24.0062 13.7883 23.5557C14.2839 23.1051 14.8776 22.8799 15.5696 22.8799C16.2615 22.8799 16.8553 23.1051 17.3509 23.5557C17.8465 24.0062 18.0943 24.546 18.0943 25.175C18.0943 25.5915 17.9774 25.9741 17.7436 26.3226C17.5192 26.6711 17.2153 26.9516 16.8319 27.1642C16.4579 27.3682 16.0371 27.4702 15.5696 27.4702Z"
+      fill={color}
+    />
+  </Svg>
+);
+
+// ─── Table ───
+export const TableIcon: React.FC<IconProps> = ({ size = 24, color = '#fff' }) => (
+  <Svg width={size} height={size} viewBox="0 0 32 32" fill="none">
+    <Path
+      fillRule="evenodd"
+      clipRule="evenodd"
+      d="M15.9574 16.9781C-1.67074 16.9781 -0.871921 6 15.6765 6C32.1605 6 32.0574 16.9781 15.9574 16.9781ZM8.79378 18.0293L4.13486 26.2162L3.03456 26.0585L6.02884 16.7757L8.79378 18.0293ZM18.712 26.5999H17.6091L16.3001 18.4525L19.6087 18.3211L18.712 26.5999ZM28.6921 26.0112L27.7618 26.3161L22.652 17.6141L25.5458 16.6259L28.6921 26.0112Z"
+      fill={color}
+    />
+  </Svg>
+);
+
+// ─── Lightning ───
+export const LightningIcon: React.FC<IconProps> = ({ size = 24, color = '#fff' }) => (
+  <Svg width={size} height={size} viewBox="0 0 32 32" fill="none">
+    <Path
+      fillRule="evenodd"
+      clipRule="evenodd"
+      d="M13.4307 30.9L14.4961 16.7742L10 16.1613L11.4237 1L21.1895 2.11935L18.561 10.471L23 11.4903L13.4307 30.9Z"
       fill={color}
     />
   </Svg>

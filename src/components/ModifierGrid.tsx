@@ -1,10 +1,10 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { ChevronLeftIcon, ChevronRightIcon } from './Icons';
 import { theme } from '../theme/colors';
 import { useOrderStore } from '../store/orderStore';
 import { Modifier } from '../types';
-import { QuantityNumpad } from './QuantityNumpad';
+import { Numpad } from './Numpad';
 import { DishCommentPanel } from './DishCommentPanel';
 import { DeleteOptions } from './DeleteOptions';
 import { useMenuStore } from '../store/menuStore';
@@ -16,13 +16,39 @@ const MODIFIER_CELLS = COLS * MODIFIER_ROWS;
 const GAP = 2;
 
 export const ModifierGrid: React.FC = () => {
-  const { items, selectedItemId, draftItem, activeAction, activeModifierGroupId, setActiveModifierGroup, toggleModifier, selectItem } = useOrderStore();
+  const { items, selectedItemId, draftItem, selectedModifierId, activeAction, activeModifierGroupId, setActiveModifierGroup, toggleModifier, selectItem, setModifierQuantity, updateQuantity } = useOrderStore();
   const modifierGroups = useMenuStore((s) => s.modifierGroups);
   const selectedItem = draftItem || items.find(i => i.id === selectedItemId);
 
   // Quantity mode → numpad
   if (activeAction === 'quantity' && selectedItem) {
-    return <QuantityNumpad />;
+    const isMod = !!selectedModifierId;
+    let currentQty = selectedItem.quantity;
+    let displayTitle = 'Кол-во порций';
+
+    if (isMod && draftItem && selectedModifierId) {
+      const mod = draftItem.modifiers.find(m => m.id === selectedModifierId);
+      currentQty = draftItem.modifiers.filter(m => m.id === selectedModifierId).length;
+      displayTitle = mod?.name ?? 'Кол-во порций';
+    }
+
+    return (
+      <Numpad
+        mode="quantity"
+        value={String(currentQty)}
+        onChange={(v) => {
+          const newQty = parseInt(v) || 0;
+          if (isMod && selectedModifierId) {
+            setModifierQuantity(selectedModifierId, newQty);
+          } else {
+            const delta = newQty - currentQty;
+            updateQuantity(selectedItem.id, delta);
+          }
+        }}
+        title={displayTitle}
+        accumulate={false}
+      />
+    );
   }
 
   // Comment mode → dish comment panel
@@ -121,12 +147,12 @@ export const ModifierGrid: React.FC = () => {
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.headerBack} onPress={handlePrevGroup}>
-          <Feather name="chevron-left" size={22} color={currentGroupIdx > 0 ? theme.colors.textPrimary : theme.colors.textSecondary} />
+          <ChevronLeftIcon size={22} color={currentGroupIdx > 0 ? theme.colors.textPrimary : theme.colors.textSecondary} />
         </TouchableOpacity>
         <Text style={styles.headerText}>{headerTitle}</Text>
         <TouchableOpacity style={styles.headerBack} onPress={handleNextGroup}>
           {currentGroupIdx < availableGroups.length - 1 && (
-            <Feather name="chevron-right" size={22} color={theme.colors.textPrimary} />
+            <ChevronRightIcon size={22} color={theme.colors.textPrimary} />
           )}
         </TouchableOpacity>
       </View>
@@ -148,7 +174,7 @@ const styles = StyleSheet.create({
     marginBottom: GAP,
   },
   headerBack: { width: 44, justifyContent: 'center', alignItems: 'center' },
-  headerText: { flex: 1, color: theme.colors.textPrimary, fontSize: 18, fontWeight: '600', textAlign: 'center' },
+  headerText: { flex: 1, color: theme.colors.textPrimary, fontSize: 16, fontFamily: theme.fonts.medium, textAlign: 'center' },
 
   grid: { flex: 1 },
   row: { flex: 1, flexDirection: 'row' },
@@ -162,16 +188,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   modActive: {
-    backgroundColor: '#fff',
+    backgroundColor: theme.colors.white,
   },
   modText: {
     color: theme.colors.textPrimary,
     fontSize: 16,
+    fontFamily: theme.fonts.regular,
     textAlign: 'center',
   },
   modTextActive: {
-    color: '#000',
-    fontWeight: 'bold',
+    color: theme.colors.textDark,
+    fontFamily: theme.fonts.medium,
   },
   emptyCell: { flex: 1, backgroundColor: theme.colors.surfaceLight },
 

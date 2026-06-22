@@ -8,7 +8,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons'; // check only - no Chikin yet
+import { CrossIcon, RefreshIcon } from './Icons';
 import { theme } from '../theme/colors';
 import { useDeadLetterStore } from '../store/deadLetterStore';
 import { useShiftStore } from '../store/shiftStore';
@@ -94,7 +95,7 @@ export const DeadLetterModal: React.FC<Props> = ({ visible, onClose }) => {
               <ActivityIndicator color="#fff" />
             ) : (
               <>
-                <Feather name="refresh-cw" size={16} color="#fff" />
+                <RefreshIcon size={16} color="#fff" />
                 <Text style={styles.actionText}>Повторить</Text>
               </>
             )}
@@ -126,7 +127,7 @@ export const DeadLetterModal: React.FC<Props> = ({ visible, onClose }) => {
               </Text>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <Feather name="x" size={22} color={theme.colors.textSecondary} />
+              <CrossIcon size={22} color={theme.colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -150,7 +151,7 @@ export const DeadLetterModal: React.FC<Props> = ({ visible, onClose }) => {
 
           <View style={styles.footer}>
             <TouchableOpacity onPress={() => void refresh()} style={styles.footerBtn}>
-              <Feather name="refresh-cw" size={16} color={theme.colors.textPrimary} />
+              <RefreshIcon size={16} color={theme.colors.textPrimary} />
               <Text style={styles.footerText}>Обновить</Text>
             </TouchableOpacity>
           </View>
@@ -163,7 +164,7 @@ export const DeadLetterModal: React.FC<Props> = ({ visible, onClose }) => {
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: theme.colors.overlay,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -184,7 +185,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     gap: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255,255,255,0.08)',
+    borderBottomColor: theme.colors.subtleBorder,
   },
   title: {
     color: theme.colors.textPrimary,
@@ -237,7 +238,7 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.medium,
   },
   rowError: {
-    color: '#FF8A80',
+    color: theme.colors.warningSubtle,
     fontSize: 16,
       fontFamily: theme.fonts.regular,
   },
@@ -260,22 +261,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 8,
   },
-  retryBtn: { backgroundColor: '#1976D2' },
-  ackBtn: { backgroundColor: '#455A64' },
+  retryBtn: { backgroundColor: theme.colors.info },
+  ackBtn: { backgroundColor: theme.colors.chipRetryBg },
   btnDisabled: { opacity: 0.55 },
-  actionText: { color: '#fff', fontFamily: theme.fonts.medium, fontSize: 16 },
+  actionText: { color: theme.colors.white, fontFamily: theme.fonts.medium, fontSize: 16 },
   statusChip: {
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
   },
-  chipOpen: { backgroundColor: '#5A1010' },
-  chipAck: { backgroundColor: '#3D3D0A' },
+  chipOpen: { backgroundColor: theme.colors.chipError },
+  chipAck: { backgroundColor: theme.colors.chipAck },
   chipText: { color: '#fff', fontSize: 16, fontFamily: theme.fonts.medium },
   footer: {
     padding: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(255,255,255,0.08)',
+    borderTopColor: theme.colors.subtleBorder,
     flexDirection: 'row',
     justifyContent: 'flex-end',
   },

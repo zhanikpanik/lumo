@@ -1,23 +1,44 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { ChevronDownIcon } from './Icons';
 import { theme } from '../theme/colors';
 import { useOrderStore } from '../store/orderStore';
 import { useMenuStore } from '../store/menuStore';
 import { Product } from '../types';
 
 const COLS = 3;
+const SEARCH_COLS = 5;
 const ROWS = 5;
 const GAP = 2;
 const TOTAL_CELLS = COLS * ROWS;
+const SEARCH_TOTAL_CELLS = SEARCH_COLS * ROWS;
 
-export const ProductGrid: React.FC = () => {
+interface Props {
+  searchQuery?: string;
+}
+
+export const ProductGrid: React.FC<Props> = ({ searchQuery }) => {
   const { activeCategoryId, addProduct, items } = useOrderStore();
   const menuProducts = useMenuStore((s) => s.products);
   const menuCategories = useMenuStore((s) => s.categories);
-  const products = menuProducts[activeCategoryId] || [];
-  const category = menuCategories.find(c => c.id === activeCategoryId);
-  const categoryName = category?.name || '';
+
+  // In search mode (even with empty query), filter all products.
+  // Empty query = no results yet, shows hint.
+  const isSearch = searchQuery !== undefined;
+  const query = (searchQuery || '').trim().toLowerCase();
+
+  const products: Product[] = isSearch
+    ? (query.length > 0
+        ? Object.values(menuProducts).flat().filter(p =>
+            p.name.toLowerCase().includes(query))
+        : [])
+    : (menuProducts[activeCategoryId] || []);
+
+  const cols = isSearch ? SEARCH_COLS : COLS;
+  const totalCells = isSearch ? SEARCH_TOTAL_CELLS : TOTAL_CELLS;
+  const categoryName = isSearch
+    ? (query.length > 0 ? `Поиск: ${searchQuery}` : '')
+    : (menuCategories.find(c => c.id === activeCategoryId)?.name || '');
 
   // Map productId → total quantity already in order (for green tint + count badge)
   const orderedQty = new Map<string, number>();
@@ -29,38 +50,42 @@ export const ProductGrid: React.FC = () => {
   type Cell = { kind: 'product'; product: Product } | { kind: 'pageDown' } | { kind: 'empty' };
   const cells: Cell[] = products.map((p) => ({ kind: 'product' as const, product: p }));
 
-  const needsPagination = products.length > TOTAL_CELLS;
+  const needsPagination = products.length > totalCells;
   // Fill remaining with empties (or pagination arrow if overflow)
   if (needsPagination) {
-    while (cells.length < TOTAL_CELLS - 1) cells.push({ kind: 'empty' });
+    while (cells.length < totalCells - 1) cells.push({ kind: 'empty' });
     cells.push({ kind: 'pageDown' });
   } else {
-    while (cells.length < TOTAL_CELLS) cells.push({ kind: 'empty' });
+    while (cells.length < totalCells) cells.push({ kind: 'empty' });
   }
 
   // Build rows
   const rows: Cell[][] = [];
   for (let r = 0; r < ROWS; r++) {
-    rows.push(cells.slice(r * COLS, r * COLS + COLS));
+    rows.push(cells.slice(r * cols, r * cols + cols));
   }
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerText}>{categoryName}</Text>
-      </View>
+      {/* Header — hidden in search mode */}
+      {!isSearch && (
+        <View style={styles.header}>
+          <Text style={styles.headerText}>{categoryName}</Text>
+        </View>
+      )}
 
       {/* Grid */}
       <View style={styles.grid}>
         {products.length === 0 ? (
           <View style={styles.emptyCat}>
-            <Text style={styles.emptyCatText}>Нет блюд в категории</Text>
+            <Text style={styles.emptyCatText}>
+              {isSearch ? (query.length > 0 ? 'Ничего не найдено' : 'Введите название блюда') : 'Нет блюд в категории'}
+            </Text>
           </View>
         ) : rows.map((row, ri) => (
           <View key={ri} style={[styles.row, ri < ROWS - 1 && { marginBottom: GAP }]}>
             {row.map((cell, ci) => (
-              <View key={ci} style={[styles.cellWrap, ci < COLS - 1 && { marginRight: GAP }]}>
+              <View key={ci} style={[styles.cellWrap, ci < cols - 1 && { marginRight: GAP }]}>
                 {cell.kind === 'product' && (() => {
                   const qty = orderedQty.get(cell.product.id) || 0;
                   const isOrdered = qty > 0;
@@ -79,14 +104,14 @@ export const ProductGrid: React.FC = () => {
                         {cell.product.name}
                       </Text>
                       <Text style={[styles.productPrice, isOrdered && styles.productPriceOrdered]}>
-                        {cell.product.price} ₽
+                        {cell.product.price} c
                       </Text>
                     </TouchableOpacity>
                   );
                 })()}
                 {cell.kind === 'pageDown' && (
                   <TouchableOpacity style={styles.pageBtn} activeOpacity={0.7}>
-                    <Feather name="chevron-down" size={24} color={theme.colors.textSecondary} />
+                    <ChevronDownIcon size={24} color={theme.colors.textSecondary} />
                   </TouchableOpacity>
                 )}
                 {cell.kind === 'empty' && <View style={styles.emptyCell} />}
@@ -100,7 +125,7 @@ export const ProductGrid: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#1A1A1A' },
+  container: { flex: 1, backgroundColor: theme.colors.background },
   header: {
     height: 44,
     justifyContent: 'center',
@@ -108,7 +133,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.surface,
     marginBottom: GAP,
   },
-  headerText: { color: theme.colors.textPrimary, fontSize: 18, fontWeight: '600' },
+  headerText: { color: theme.colors.textPrimary, fontSize: 16, fontFamily: theme.fonts.medium },
 
   grid: { flex: 1 },
   row: { flex: 1, flexDirection: 'row' },
@@ -123,30 +148,31 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   productBtnOrdered: {
-    backgroundColor: '#003E21',
+    backgroundColor: theme.colors.orderedBg,
   },
   productName: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: theme.fonts.medium,
     textAlign: 'center',
     marginBottom: 2,
   },
   productNameOrdered: {
-    color: '#A5D6A7',
+    color: theme.colors.orderedName,
   },
   productPrice: {
-    color: 'rgba(255,255,255,0.85)',
+    color: theme.colors.whiteAlpha85,
     fontSize: 14,
+    fontFamily: theme.fonts.regular,
   },
   productPriceOrdered: {
-    color: 'rgba(255,255,255,0.65)',
+    color: theme.colors.whiteAlpha65,
   },
   qtyBadge: {
     position: 'absolute',
     top: 4,
     right: 6,
-    backgroundColor: '#00E676',
+    backgroundColor: theme.colors.accentLight,
     borderRadius: 10,
     paddingHorizontal: 6,
     paddingVertical: 1,
@@ -154,7 +180,7 @@ const styles = StyleSheet.create({
   qtyBadgeText: {
     color: '#000',
     fontSize: 12,
-    fontWeight: '800',
+    fontFamily: theme.fonts.medium,
   },
   pageBtn: {
     flex: 1,
@@ -164,5 +190,5 @@ const styles = StyleSheet.create({
   },
   emptyCell: { flex: 1, backgroundColor: theme.colors.surface },
   emptyCat: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  emptyCatText: { color: theme.colors.textDisabled, fontSize: 15 },
+  emptyCatText: { color: theme.colors.textDisabled, fontSize: 15, fontFamily: theme.fonts.regular },
 });

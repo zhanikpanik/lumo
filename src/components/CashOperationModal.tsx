@@ -22,19 +22,19 @@ const CONFIG: Record<CashOpMode, {
   collection: {
     title: 'Инкассация',
     cta: 'Списать из кассы',
-    ctaColor: '#D32F2F',
+    ctaColor: theme.colors.destructive,
     notePlaceholder: 'Причина инкассации',
   },
   in: {
     title: 'Внесение в кассу',
     cta: 'Внести',
-    ctaColor: '#1976D2',
+    ctaColor: theme.colors.info,
     notePlaceholder: 'Например: размен в начале смены',
   },
   out: {
     title: 'Изъятие из кассы',
     cta: 'Изъять',
-    ctaColor: '#F57C00',
+    ctaColor: theme.colors.infoOrange,
     notePlaceholder: 'Например: размен / возврат сдачи',
     hint: 'Сумма не может превысить наличку в кассе.',
   },

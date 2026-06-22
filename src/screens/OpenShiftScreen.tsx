@@ -8,11 +8,9 @@ import {
   StatusBar,
 } from 'react-native';
 import { theme } from '../theme/colors';
+import { Numpad } from '../components/Numpad';
 import { useShiftStore } from '../store/shiftStore';
 import { can } from '../utils/permissions';
-
-const formatAmount = (n: number): string =>
-  n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 
 interface Props {
   navigation: any;
@@ -24,36 +22,11 @@ export const OpenShiftScreen: React.FC<Props> = ({ navigation }) => {
   const currentUser = useShiftStore((s) => s.currentUser);
   const canOpenShift = can(currentUser?.role, 'openShift');
 
-  const handleDigit = (digit: string) => {
-    if (amount === '0') {
-      setAmount(digit);
-    } else {
-      setAmount(amount + digit);
-    }
-  };
-
-  const handleBackspace = () => {
-    if (amount.length <= 1) {
-      setAmount('0');
-    } else {
-      setAmount(amount.slice(0, -1));
-    }
-  };
-
-  const handleClear = () => setAmount('0');
-
   const handleOpen = () => {
     if (!canOpenShift) return;
     openShift(parseInt(amount) || 0);
     navigation.replace('Orders');
   };
-
-  const keys = [
-    ['1', '2', '3'],
-    ['4', '5', '6'],
-    ['7', '8', '9'],
-    ['C', '0', '⌫'],
-  ];
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -64,40 +37,14 @@ export const OpenShiftScreen: React.FC<Props> = ({ navigation }) => {
           <Text style={styles.cashierName}>{currentUser?.name}</Text>
           <Text style={styles.subtitle}>Введите сумму наличных в кассе</Text>
 
-          {/* Amount display */}
-          <View style={styles.amountWrap}>
-            <Text style={styles.amount}>{formatAmount(parseInt(amount) || 0)} c</Text>
-          </View>
-
-          {/* Numpad */}
-          <View style={styles.numpad}>
-            {keys.map((row, rowIdx) => (
-              <View key={rowIdx} style={styles.numRow}>
-                {row.map((key) => (
-                  <TouchableOpacity
-                    key={key}
-                    style={[
-                      styles.numKey,
-                      key === 'C' && styles.numKeySpecial,
-                      key === '⌫' && styles.numKeySpecial,
-                    ]}
-                    onPress={() => {
-                      if (key === 'C') handleClear();
-                      else if (key === '⌫') handleBackspace();
-                      else handleDigit(key);
-                    }}
-                    activeOpacity={0.6}
-                  >
-                    <Text style={[
-                      styles.numText,
-                      (key === 'C' || key === '⌫') && styles.numTextSpecial,
-                    ]}>
-                      {key}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            ))}
+          <View style={styles.numpadWrap}>
+            <Numpad
+              mode="amount"
+              value={amount}
+              onChange={setAmount}
+              currency="c"
+              showClear
+            />
           </View>
 
           {/* Open button */}
@@ -113,19 +60,6 @@ export const OpenShiftScreen: React.FC<Props> = ({ navigation }) => {
             disabled={!canOpenShift}
           >
             <Text style={styles.openBtnText}>Открыть смену</Text>
-          </TouchableOpacity>
-
-          {/* Skip */}
-          <TouchableOpacity
-            style={styles.skipBtn}
-            onPress={() => {
-              if (!canOpenShift) return;
-              openShift(0);
-              navigation.replace('Orders');
-            }}
-            disabled={!canOpenShift}
-          >
-            <Text style={styles.skipText}>Пропустить (0c в кассе)</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -147,6 +81,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: 320,
   },
+  numpadWrap: {
+    width: '100%',
+    height: 340,
+    marginBottom: 16,
+  },
   title: {
     fontSize: 28,
     fontFamily: theme.fonts.medium,
@@ -163,81 +102,33 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: theme.fonts.regular,
     color: theme.colors.textSecondary,
-    marginBottom: 32,
-  },
-  amountWrap: {
-    width: '100%',
-    backgroundColor: theme.colors.surface,
-    borderRadius: 10,
-    paddingVertical: 20,
-    alignItems: 'center',
     marginBottom: 24,
-  },
-  amount: {
-    fontSize: 36,
-    fontFamily: theme.fonts.medium,
-    color: theme.colors.textPrimary,
-  },
-  numpad: {
-    gap: 10,
-    marginBottom: 24,
-  },
-  numRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  numKey: {
-    width: 96,
-    height: 64,
-    borderRadius: 10,
-    backgroundColor: theme.colors.surface,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  numKeySpecial: {
-    backgroundColor: theme.colors.surfaceLight,
-  },
-  numText: {
-    fontSize: 24,
-    fontFamily: theme.fonts.medium,
-    color: theme.colors.textPrimary,
-  },
-  numTextSpecial: {
-    fontSize: 20,
-    fontFamily: theme.fonts.regular,
-    color: theme.colors.textSecondary,
   },
   openBtn: {
     width: '100%',
     height: 56,
-    backgroundColor: '#00C853',
+    backgroundColor: theme.colors.accent,
     borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
+    marginTop: 16,
     marginBottom: 16,
   },
   btnDisabled: {
     opacity: 0.45,
   },
   waiterHint: {
-    color: '#FF8A80',
+    color: theme.colors.warningSubtle,
     fontSize: 16,
     fontFamily: theme.fonts.regular,
     textAlign: 'center',
-    marginBottom: 12,
+    marginTop: 12,
+    marginBottom: 4,
     lineHeight: 20,
   },
   openBtnText: {
-    color: '#fff',
+    color: theme.colors.white,
     fontSize: 16,
     fontFamily: theme.fonts.medium,
-  },
-  skipBtn: {
-    padding: 12,
-  },
-  skipText: {
-    color: theme.colors.textSecondary,
-    fontSize: 16,
-    fontFamily: theme.fonts.regular,
   },
 });

@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>r_keeper POS — сравнение шрифтов</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Onest:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #111;
+  color: #fff;
+  padding: 40px;
+  font-family: 'Inter', sans-serif;
+}
+h1 { font-size: 28px; margin-bottom: 8px; }
+h2 { font-size: 18px; color: #999; font-weight: 400; margin-bottom: 32px; }
+
+.compare-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 48px;
+  overflow-x: auto;
+}
+.font-card {
+  flex: 1;
+  min-width: 360px;
+  background: #1A1A1A;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #2C2C2C;
+}
+.font-label {
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #5B4FE8;
+  background: #2C2C2C;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.font-label .meta { font-size: 12px; color: #8E8E93; font-weight: 400; }
+
+/* Order card mocks */
+.orders-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 8px;
+  padding: 10px;
+}
+.order-card {
+  background: #333;
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 100px;
+}
+.order-card.active { background: #003E21; }
+.order-card.alert { background: #400A0A; }
+.order-card.paid { background: #003E21; opacity: 0.6; }
+.card-top { display: flex; justify-content: space-between; align-items: flex-start; }
+.card-table { font-size: 24px; font-weight: 600; }
+.card-amount { font-size: 15px; font-weight: 500; color: #fff; }
+.card-label { font-size: 15px; color: #ADADAD; }
+.card-info { font-size: 15px; color: #ADADAD; margin-top: 6px; }
+.card-dishes { font-size: 15px; color: #ADADAD; margin-top: 2px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+/* Payment button */
+.payment-row {
+  display: flex; gap: 8px; padding: 10px;
+}
+.payment-btn {
+  flex: 1;
+  background: #00C853;
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.payment-label { font-size: 24px; font-weight: 500; color: #fff; }
+.payment-amount { font-size: 24px; font-weight: 500; color: #fff; }
+
+/* Category buttons */
+.cat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  padding: 10px;
+}
+.cat-btn {
+  background: #333;
+  padding: 14px;
+  text-align: center;
+  font-size: 15px;
+  color: #fff;
+}
+.cat-btn.active {
+  background: #8B7FF9;
+  font-weight: 600;
+}
+
+/* Amount comparison */
+.amount-compare {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.amount-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 18px;
+  padding: 6px 0;
+  border-bottom: 1px solid #2C2C2C;
+}
+.amount-row .num { font-weight: 600; }
+.amount-row .label { color: #999; font-weight: 400; }
+
+/* Tabular figures test */
+.tab-figs {
+  padding: 10px;
+}
+.tab-grid {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 4px 16px;
+  font-size: 16px;
+}
+.tab-grid .fig { text-align: right; font-variant-numeric: tabular-nums; }
+.tab-grid .label { color: #999; }
+
+/* Selection highlight */
+.selected { border: 2px solid #5B4FE8; }
+
+/* Font-specific overrides */
+.font-inter { font-family: 'Inter', sans-serif; }
+.font-onest { font-family: 'Onest', sans-serif; }
+.font-manrope { font-family: 'Manrope', sans-serif; }
+.font-ibm { font-family: 'IBM Plex Sans', sans-serif; }
+
+.section-label {
+  font-size: 13px;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 8px 14px 4px;
+}
+
+/* Recommendation badge */
+.rec { 
+  background: #5B4FE8; 
+  color: #fff; 
+  padding: 2px 8px; 
+  border-radius: 4px; 
+  font-size: 11px; 
+  font-weight: 600;
+}
+</style>
+</head>
+<body>
+
+<h1>r_keeper POS — Сравнение шрифтов</h1>
+<h2>Текущий: Inter. Альтернативы: Onest, Manrope, IBM Plex Sans. Грузинская кириллица, высокий x-height, tabular figures.</h2>
+
+<!-- ORDER CARDS -->
+<div class="compare-row">
+  <div class="font-card font-inter">
+    <div class="font-label">Inter <span class="meta">сейчас • x-height: средний</span></div>
+    <div class="section-label">Карточки заказов (16px)</div>
+    <div class="orders-grid">
+      <div class="order-card">
+        <div><div class="card-top"><span class="card-table">12</span><span class="card-amount">1 240</span></div></div>
+        <div class="card-info">Айжан • 14:32</div>
+        <div class="card-dishes">Латте, Круассан</div>
+      </div>
+      <div class="order-card active">
+        <div><div class="card-top"><span class="card-table">3</span><span class="card-amount">3 850</span></div></div>
+        <div class="card-info">Бек • 14:28</div>
+        <div class="card-dishes">Паста Карбонара</div>
+      </div>
+      <div class="order-card alert">
+        <div><div class="card-top"><span class="card-table">8</span><span class="card-amount">680</span></div></div>
+        <div class="card-info">14:45 • Бар</div>
+        <div class="card-dishes">Эспрессо x3</div>
+      </div>
+      <div class="order-card paid">
+        <div><div class="card-top"><span class="card-table">5</span><span class="card-amount">2 100</span></div></div>
+        <div class="card-info">14:15 • Терраса</div>
+        <div class="card-dishes">Стейк, Салат</div>
+      </div>
+    </div>
+    
+    <div class="section-label">Кнопка Оплата (24px)</div>
+    <div class="payment-row">
+      <div class="payment-btn">
+        <span class="payment-label">Оплата</span>
+        <span class="payment-amount">4 560 c</span>
+      </div>
+    </div>
+
+    <div class="section-label">Категории</div>
+    <div class="cat-grid">
+      <div class="cat-btn">Кофе</div>
+      <div class="cat-btn active">Горячее</div>
+      <div class="cat-btn">Напитки</div>
+      <div class="cat-btn">Десерты</div>
+    </div>
+
+    <div class="section-label">Цифры — tabular?</div>
+    <div class="tab-figs">
+      <div class="tab-grid">
+        <span class="fig">1 240</span><span class="label">Латте</span>
+        <span class="fig">3 850</span><span class="label">Паста</span>
+        <span class="fig">680</span><span class="label">Эспрессо</span>
+        <span class="fig">12 500</span><span class="label">Банкет</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="font-card font-onest selected">
+    <div class="font-label">Onest <span class="rec">рекомендую</span><span class="meta">x-height: высокий • геометричный • кириллица с душой</span></div>
+    <div class="section-label">Карточки заказов (16px)</div>
+    <div class="orders-grid">
+      <div class="order-card">
+        <div><div class="card-top"><span class="card-table">12</span><span class="card-amount">1 240</span></div></div>
+        <div class="card-info">Айжан • 14:32</div>
+        <div class="card-dishes">Латте, Круассан</div>
+      </div>
+      <div class="order-card active">
+        <div><div class="card-top"><span class="card-table">3</span><span class="card-amount">3 850</span></div></div>
+        <div class="card-info">Бек • 14:28</div>
+        <div class="card-dishes">Паста Карбонара</div>
+      </div>
+      <div class="order-card alert">
+        <div><div class="card-top"><span class="card-table">8</span><span class="card-amount">680</span></div></div>
+        <div class="card-info">14:45 • Бар</div>
+        <div class="card-dishes">Эспрессо x3</div>
+      </div>
+      <div class="order-card paid">
+        <div><div class="card-top"><span class="card-table">5</span><span class="card-amount">2 100</span></div></div>
+        <div class="card-info">14:15 • Терраса</div>
+        <div class="card-dishes">Стейк, Салат</div>
+      </div>
+    </div>
+    
+    <div class="section-label">Кнопка Оплата (24px)</div>
+    <div class="payment-row">
+      <div class="payment-btn">
+        <span class="payment-label">Оплата</span>
+        <span class="payment-amount">4 560 c</span>
+      </div>
+    </div>
+
+    <div class="section-label">Категории</div>
+    <div class="cat-grid">
+      <div class="cat-btn">Кофе</div>
+      <div class="cat-btn active">Горячее</div>
+      <div class="cat-btn">Напитки</div>
+      <div class="cat-btn">Десерты</div>
+    </div>
+
+    <div class="section-label">Цифры — tabular?</div>
+    <div class="tab-figs">
+      <div class="tab-grid">
+        <span class="fig">1 240</span><span class="label">Латте</span>
+        <span class="fig">3 850</span><span class="label">Паста</span>
+        <span class="fig">680</span><span class="label">Эспрессо</span>
+        <span class="fig">12 500</span><span class="label">Банкет</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="font-card font-manrope">
+    <div class="font-label">Manrope <span class="meta">x-height: средний • геометричный • современный</span></div>
+    <div class="section-label">Карточки заказов (16px)</div>
+    <div class="orders-grid">
+      <div class="order-card">
+        <div><div class="card-top"><span class="card-table">12</span><span class="card-amount">1 240</span></div></div>
+        <div class="card-info">Айжан • 14:32</div>
+        <div class="card-dishes">Латте, Круассан</div>
+      </div>
+      <div class="order-card active">
+        <div><div class="card-top"><span class="card-table">3</span><span class="card-amount">3 850</span></div></div>
+        <div class="card-info">Бек • 14:28</div>
+        <div class="card-dishes">Паста Карбонара</div>
+      </div>
+      <div class="order-card alert">
+        <div><div class="card-top"><span class="card-table">8</span><span class="card-amount">680</span></div></div>
+        <div class="card-info">14:45 • Бар</div>
+        <div class="card-dishes">Эспрессо x3</div>
+      </div>
+      <div class="order-card paid">
+        <div><div class="card-top"><span class="card-table">5</span><span class="card-amount">2 100</span></div></div>
+        <div class="card-info">14:15 • Терраса</div>
+        <div class="card-dishes">Стейк, Салат</div>
+      </div>
+    </div>
+    
+    <div class="section-label">Кнопка Оплата (24px)</div>
+    <div class="payment-row">
+      <div class="payment-btn">
+        <span class="payment-label">Оплата</span>
+        <span class="payment-amount">4 560 c</span>
+      </div>
+    </div>
+
+    <div class="section-label">Категории</div>
+    <div class="cat-grid">
+      <div class="cat-btn">Кофе</div>
+      <div class="cat-btn active">Горячее</div>
+      <div class="cat-btn">Напитки</div>
+      <div class="cat-btn">Десерты</div>
+    </div>
+
+    <div class="section-label">Цифры — tabular?</div>
+    <div class="tab-figs">
+      <div class="tab-grid">
+        <span class="fig">1 240</span><span class="label">Латте</span>
+        <span class="fig">3 850</span><span class="label">Паста</span>
+        <span class="fig">680</span><span class="label">Эспрессо</span>
+        <span class="fig">12 500</span><span class="label">Банкет</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="font-card font-ibm">
+    <div class="font-label">IBM Plex Sans <span class="meta">x-height: низкий • гуманистичный • супер-читаемый</span></div>
+    <div class="section-label">Карточки заказов (16px)</div>
+    <div class="orders-grid">
+      <div class="order-card">
+        <div><div class="card-top"><span class="card-table">12</span><span class="card-amount">1 240</span></div></div>
+        <div class="card-info">Айжан • 14:32</div>
+        <div class="card-dishes">Латте, Круассан</div>
+      </div>
+      <div class="order-card active">
+        <div><div class="card-top"><span class="card-table">3</span><span class="card-amount">3 850</span></div></div>
+        <div class="card-info">Бек • 14:28</div>
+        <div class="card-dishes">Паста Карбонара</div>
+      </div>
+      <div class="order-card alert">
+        <div><div class="card-top"><span class="card-table">8</span><span class="card-amount">680</span></div></div>
+        <div class="card-info">14:45 • Бар</div>
+        <div class="card-dishes">Эспрессо x3</div>
+      </div>
+      <div class="order-card paid">
+        <div><div class="card-top"><span class="card-table">5</span><span class="card-amount">2 100</span></div></div>
+        <div class="card-info">14:15 • Терраса</div>
+        <div class="card-dishes">Стейк, Салат</div>
+      </div>
+    </div>
+    
+    <div class="section-label">Кнопка Оплата (24px)</div>
+    <div class="payment-row">
+      <div class="payment-btn">
+        <span class="payment-label">Оплата</span>
+        <span class="payment-amount">4 560 c</span>
+      </div>
+    </div>
+
+    <div class="section-label">Категории</div>
+    <div class="cat-grid">
+      <div class="cat-btn">Кофе</div>
+      <div class="cat-btn active">Горячее</div>
+      <div class="cat-btn">Напитки</div>
+      <div class="cat-btn">Десерты</div>
+    </div>
+
+    <div class="section-label">Цифры — tabular?</div>
+    <div class="tab-figs">
+      <div class="tab-grid">
+        <span class="fig">1 240</span><span class="label">Латте</span>
+        <span class="fig">3 850</span><span class="label">Паста</span>
+        <span class="fig">680</span><span class="label">Эспрессо</span>
+        <span class="fig">12 500</span><span class="label">Банкет</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Allow clicking to select a font card
+document.querySelectorAll('.font-card').forEach(card => {
+  card.addEventListener('click', () => {
+    document.querySelectorAll('.font-card').forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+  });
+});
+</script>
+</body>
+</html>

@@ -7,6 +7,7 @@ import {
   Animated,
 } from 'react-native';
 import { theme } from '../theme/colors';
+import { can, isAdmin, UserRole } from '../utils/permissions';
 
 const POPOVER_WIDTH = 280;
 const ARROW_SIZE = 10;
@@ -17,35 +18,28 @@ interface MenuItem {
   onPress?: () => void;
   disabled?: boolean;
   destructive?: boolean;
+  subtitle?: string;
 }
 
 interface Props {
   visible: boolean;
   onClose: () => void;
+  role: UserRole;
   onOpenShift: () => void;
   onOpenChecksArchive: () => void;
   onOpenCash: () => void;
   onCloseShift: () => void;
-  onCashCollection: () => void;
-  onCashIn: () => void;
-  onCashOut: () => void;
-  canCloseShift?: boolean;
-  canCashTransaction?: boolean;
   onLogout: () => void;
 }
 
 export const FunctionsModal: React.FC<Props> = ({
   visible,
   onClose,
+  role,
   onOpenShift,
   onOpenChecksArchive,
   onOpenCash,
   onCloseShift,
-  onCashCollection,
-  onCashIn,
-  onCashOut,
-  canCloseShift = true,
-  canCashTransaction = true,
   onLogout,
 }) => {
   const scaleAnim = useRef(new Animated.Value(0)).current;
@@ -97,11 +91,17 @@ export const FunctionsModal: React.FC<Props> = ({
 
   if (!shouldRender) return null;
 
+  const isWaiter = role === 'waiter';
+  const canCash = can(role, 'cashTransaction');
+  const canClose = can(role, 'closeShift');
+
   const groups: MenuItem[][] = [
+    // Group 1: Shift & Orders
     [
       {
         id: 'shift',
         label: 'Смена',
+        subtitle: !isWaiter ? undefined : 'Только кассир',
         onPress: () => { onClose(); setTimeout(onOpenShift, 200); },
       },
       {
@@ -112,46 +112,22 @@ export const FunctionsModal: React.FC<Props> = ({
       {
         id: 'closeShift',
         label: 'Закрыть смену',
-        disabled: !canCloseShift,
+        subtitle: !canClose ? 'Только кассир' : undefined,
+        disabled: !canClose,
         onPress: () => { onClose(); setTimeout(onCloseShift, 200); },
       },
     ],
+    // Group 2: Cash
     [
       {
         id: 'cash',
         label: 'Касса',
+        subtitle: !canCash ? 'Только кассир' : undefined,
+        disabled: !canCash,
         onPress: () => { onClose(); setTimeout(onOpenCash, 200); },
       },
-      {
-        id: 'cashIn',
-        label: 'Внесение в кассу',
-        disabled: !canCashTransaction,
-        onPress: () => { onClose(); setTimeout(onCashIn, 200); },
-      },
-      {
-        id: 'cashOut',
-        label: 'Изъятие из кассы',
-        disabled: !canCashTransaction,
-        onPress: () => { onClose(); setTimeout(onCashOut, 200); },
-      },
-      {
-        id: 'cashDrawer',
-        label: 'Инкассация',
-        onPress: () => { onClose(); setTimeout(onCashCollection, 200); },
-      },
     ],
-    [
-      {
-        id: 'devices',
-        label: 'Принтеры и устройства',
-        disabled: true,
-      },
-      {
-        id: 'clearCache',
-        label: 'Обновить данные',
-        disabled: true,
-      },
-    ],
+    // Group 3: Logout
     [
       {
         id: 'logout',
@@ -163,25 +139,20 @@ export const FunctionsModal: React.FC<Props> = ({
   ];
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents={visible ? 'auto' : 'none'}>
-      {/* Overlay — subtle, not heavy */}
+    <View style={[StyleSheet.absoluteFill, { pointerEvents: visible ? 'auto' : 'none' }]}>
       <Animated.View style={[styles.overlay, { opacity: overlayAnim }]}>
         <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
       </Animated.View>
 
-      {/* Popover positioned above the ≡ button (bottom-left) */}
       <Animated.View
         style={[
           styles.popover,
           {
             opacity: opacityAnim,
-            transform: [
-              { scale: scaleAnim },
-            ],
+            transform: [{ scale: scaleAnim }],
           },
         ]}
       >
-        {/* Menu groups */}
         {groups.map((group, gi) => (
           <View key={gi} style={[styles.group, gi < groups.length - 1 && styles.groupSpacing]}>
             {group.map((item, ii) => (
@@ -196,21 +167,25 @@ export const FunctionsModal: React.FC<Props> = ({
                 disabled={item.disabled}
                 activeOpacity={0.6}
               >
-                <Text
-                  style={[
-                    styles.menuLabel,
-                    item.disabled && styles.menuLabelDisabled,
-                    item.destructive && styles.menuLabelDestructive,
-                  ]}
-                >
-                  {item.label}
-                </Text>
+                <View style={styles.menuItemContent}>
+                  <Text
+                    style={[
+                      styles.menuLabel,
+                      item.disabled && styles.menuLabelDisabled,
+                      item.destructive && styles.menuLabelDestructive,
+                    ]}
+                  >
+                    {item.label}
+                  </Text>
+                  {item.subtitle ? (
+                    <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
+                  ) : null}
+                </View>
               </TouchableOpacity>
             ))}
           </View>
         ))}
 
-        {/* Arrow pointing down to ≡ button */}
         <View style={styles.arrow} />
       </Animated.View>
     </View>
@@ -220,53 +195,59 @@ export const FunctionsModal: React.FC<Props> = ({
 const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.25)',
+    backgroundColor: theme.colors.overlayLight,
   },
   popover: {
     position: 'absolute',
     bottom: 84,
     left: 14,
     width: POPOVER_WIDTH,
-    backgroundColor: '#2C2C2E',
+    backgroundColor: theme.colors.iOSSurface,
     borderRadius: 14,
     paddingVertical: 4,
-    // iOS-style shadow
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 24,
+    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)',
     elevation: 20,
   },
   group: {
-    backgroundColor: '#2C2C2E',
+    backgroundColor: theme.colors.iOSSurface,
     borderRadius: 0,
     overflow: 'hidden',
   },
   groupSpacing: {
     borderBottomWidth: 8,
-    borderBottomColor: '#1C1C1E',
+    borderBottomColor: theme.colors.iOSBorder,
   },
   menuItem: {
-    paddingVertical: 14,
+    paddingVertical: 13,
     paddingHorizontal: 18,
   },
   menuItemBorder: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255,255,255,0.1)',
+    borderBottomColor: theme.colors.pageDivider,
   },
   menuItemDisabled: {
-    opacity: 0.35,
+    opacity: 0.4,
+  },
+  menuItemContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   menuLabel: {
     fontSize: 16,
-    color: '#FFFFFF',
+    color: theme.colors.white,
     fontFamily: theme.fonts.regular,
   },
   menuLabelDisabled: {
-    color: '#8E8E93',
+    color: theme.colors.iOSTextSecondary,
   },
   menuLabelDestructive: {
-    color: '#FF453A',
+    color: theme.colors.iOSDestructive,
+  },
+  menuSubtitle: {
+    fontSize: 16,
+    color: theme.colors.iOSTextSecondary,
+    fontFamily: theme.fonts.regular,
   },
   arrow: {
     position: 'absolute',
@@ -279,6 +260,6 @@ const styles = StyleSheet.create({
     borderTopWidth: ARROW_SIZE,
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
-    borderTopColor: '#2C2C2E',
+    borderTopColor: theme.colors.iOSBorderTop,
   },
 });

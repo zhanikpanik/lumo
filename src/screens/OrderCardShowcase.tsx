@@ -139,7 +139,7 @@ const styles = StyleSheet.create({
   title: {
     color: '#fff',
     fontSize: 24,
-    fontFamily: theme.fonts.bold,
+    fontFamily: theme.fonts.medium,
     marginBottom: 16,
   },
   grid: {
@@ -151,7 +151,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   label: {
-    color: 'rgba(255,255,255,0.5)',
+    color: theme.colors.whiteAlpha50,
     fontSize: 13,
     fontFamily: theme.fonts.regular,
     marginBottom: 4,

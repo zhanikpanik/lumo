@@ -115,13 +115,13 @@ const styles = StyleSheet.create({
   },
   productCardOrdered: {
     borderWidth: 3,
-    borderColor: '#00E676',
+    borderColor: theme.colors.accentLight,
   },
   qtyBadge: {
     position: 'absolute',
     top: 4,
     right: 6,
-    backgroundColor: '#00E676',
+    backgroundColor: theme.colors.accentLight,
     borderRadius: 10,
     paddingHorizontal: 6,
     paddingVertical: 1,
@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   productPrice: {
-    color: 'rgba(255,255,255,0.7)',
+    color: theme.colors.whiteAlpha70,
     fontSize: 16,
       fontFamily: theme.fonts.regular,
   },

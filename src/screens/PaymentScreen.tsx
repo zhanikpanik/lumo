@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, Alert } from 'react-native';
 import { theme } from '../theme/colors';
+import { Numpad } from '../components/Numpad';
 import { useOrderStore } from '../store/orderStore';
 import { useShiftStore } from '../store/shiftStore';
 import { useSyncOutboxStore, formatRpcError } from '../store/syncOutboxStore';
@@ -10,6 +11,7 @@ import { insertPayment } from '../api/payments';
 import { VENUE_ID } from '../config';
 import { saleConsumptionIdempotencyKey } from '../types/inventory';
 import { logger } from '../utils/logger';
+import { supabase } from '../utils/supabase';
 import type { Order } from '../types';
 
 const formatAmount = (n: number) => n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
@@ -61,15 +63,6 @@ export const PaymentScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
   const canPay = method === 'card'
     || (method === 'none' && canCloseWithoutPayment && closeReason !== null)
     || (method === 'cash' && cashAmount >= total);
-
-  const handleNumPress = (num: string) => {
-    if (cashInput.length > 7) return;
-    setCashInput(prev => prev + num);
-  };
-
-  const handleBackspace = () => {
-    setCashInput(prev => prev.slice(0, -1));
-  };
 
   const handleExact = () => {
     setCashInput(String(total));
@@ -192,6 +185,28 @@ export const PaymentScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
       }
 
       useOrderStore.getState().closeOrder();
+
+      // Log order event (paid or cancelled)
+      if (newStatus === 'cancelled') {
+        supabase.from('order_events').insert({
+          order_id: currentOrderId,
+          action: 'cancelled',
+          occurred_at: closedAt,
+          venue_id: VENUE_ID,
+        }).then(({ error }) => {
+          if (error) logger.error('payment.orderEvents.cancelled', error, { orderId: currentOrderId });
+        });
+      } else if (newStatus === 'paid') {
+        supabase.from('order_events').insert({
+          order_id: currentOrderId,
+          action: 'paid',
+          occurred_at: closedAt,
+          venue_id: VENUE_ID,
+        }).then(({ error }) => {
+          if (error) logger.error('payment.orderEvents.paid', error, { orderId: currentOrderId });
+        });
+      }
+
       navigation?.navigate('Orders');
     } finally {
       setIsProcessing(false);
@@ -201,14 +216,6 @@ export const PaymentScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
   const handleCancel = () => {
     navigation?.goBack();
   };
-
-  const renderKey = (label: string, onPress: () => void, flex = 1) => (
-    <View style={[styles.keyWrap, { flex }]}>
-      <TouchableOpacity style={styles.key} onPress={onPress} activeOpacity={0.6}>
-        <Text style={styles.keyText}>{label}</Text>
-      </TouchableOpacity>
-    </View>
-  );
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -333,50 +340,22 @@ export const PaymentScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
         {/* ── Right Panel: Numpad ── */}
         <View style={styles.rightPanel}>
           {method === 'cash' ? (
-            <>
-              {/* Display */}
-              <View style={styles.numpadDisplay}>
-                <Text style={styles.displayValue}>
-                  {cashInput ? formatAmount(parseInt(cashInput, 10)) : '0'}
-                </Text>
-                <Text style={styles.displayCurrency}>c</Text>
-              </View>
-
-              {/* Quick exact button */}
-              <View style={styles.quickRow}>
-                <TouchableOpacity style={styles.exactBtn} onPress={handleExact} activeOpacity={0.6}>
-                  <Text style={styles.exactText}>Без сдачи — {formatAmount(total)} c</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Numpad */}
-              <View style={styles.numpad}>
-                <View style={styles.numRow}>
-                  {renderKey('7', () => handleNumPress('7'))}
-                  {renderKey('8', () => handleNumPress('8'))}
-                  {renderKey('9', () => handleNumPress('9'))}
-                </View>
-                <View style={styles.numRow}>
-                  {renderKey('4', () => handleNumPress('4'))}
-                  {renderKey('5', () => handleNumPress('5'))}
-                  {renderKey('6', () => handleNumPress('6'))}
-                </View>
-                <View style={styles.numRow}>
-                  {renderKey('1', () => handleNumPress('1'))}
-                  {renderKey('2', () => handleNumPress('2'))}
-                  {renderKey('3', () => handleNumPress('3'))}
-                </View>
-                <View style={styles.numRow}>
-                  {renderKey('0', () => handleNumPress('0'))}
-                  {renderKey('00', () => handleNumPress('00'))}
-                  <View style={styles.keyWrap}>
-                    <TouchableOpacity style={styles.key} onPress={handleBackspace} activeOpacity={0.6}>
-                      <Text style={styles.keyText}>←</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
-            </>
+            <Numpad
+              mode="amount"
+              value={cashInput}
+              onChange={setCashInput}
+              currency="c"
+              maxDigits={7}
+            >
+              {/* Exact amount — between value and keys */}
+              <TouchableOpacity
+                style={[styles.exactBtn, { borderRadius: 0 }]}
+                onPress={handleExact}
+                activeOpacity={0.6}
+              >
+                <Text style={styles.exactText}>Без сдачи — {formatAmount(total)} c</Text>
+              </TouchableOpacity>
+            </Numpad>
           ) : method === 'card' ? (
             <View style={styles.cardMode}>
               <Text style={styles.cardIcon}>💳</Text>
@@ -452,7 +431,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.actionMenuPurple,
   },
   methodActiveRed: {
-    backgroundColor: '#D32F2F',
+    backgroundColor: theme.colors.destructive,
   },
   methodText: {
     color: theme.colors.textPrimary,
@@ -460,14 +439,14 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.medium,
   },
   methodTextActive: {
-    color: '#fff',
+    color: theme.colors.white,
     fontFamily: theme.fonts.medium,
   },
   methodBtnDisabled: {
     opacity: 0.45,
   },
   permissionHint: {
-    color: '#FF8A80',
+    color: theme.colors.warningSubtle,
     fontSize: 16,
     fontFamily: theme.fonts.regular,
     marginBottom: 12,
@@ -488,7 +467,7 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.regular,
   },
   changeAmount: {
-    color: '#00C853',
+    color: theme.colors.accent,
     fontSize: 28,
     fontFamily: theme.fonts.medium,
   },
@@ -516,7 +495,7 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.actionMenuPurple,
   },
   checkmark: {
-    color: '#fff',
+    color: theme.colors.white,
     fontSize: 16,
     fontFamily: theme.fonts.medium,
   },
@@ -532,26 +511,26 @@ const styles = StyleSheet.create({
   },
   cancelBtn: {
     flex: 1,
-    backgroundColor: '#D32F2F',
+    backgroundColor: theme.colors.destructive,
     borderRadius: theme.borderRadius,
     justifyContent: 'center',
     alignItems: 'center',
   },
   cancelText: {
-    color: '#fff',
+    color: theme.colors.white,
     fontSize: 16,
     fontFamily: theme.fonts.medium,
   },
   payBtn: {
     flex: 1.5,
-    backgroundColor: '#00C853',
+    backgroundColor: theme.colors.accent,
     borderRadius: theme.borderRadius,
     justifyContent: 'center',
     alignItems: 'center',
   },
   payBtnRed: {
     flex: 1.5,
-    backgroundColor: '#D32F2F',
+    backgroundColor: theme.colors.destructive,
     borderRadius: theme.borderRadius,
     justifyContent: 'center',
     alignItems: 'center',
@@ -560,7 +539,7 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
   payText: {
-    color: '#fff',
+    color: theme.colors.white,
     fontSize: 16,
     fontFamily: theme.fonts.medium,
   },
@@ -574,7 +553,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'baseline',
-    backgroundColor: '#191919',
+    backgroundColor: theme.colors.numpadBg,
     borderRadius: theme.borderRadius,
     padding: 24,
     marginBottom: 8,
@@ -621,7 +600,7 @@ const styles = StyleSheet.create({
   },
   key: {
     flex: 1,
-    backgroundColor: '#191919',
+    backgroundColor: theme.colors.numpadBg,
     borderRadius: theme.borderRadius,
     justifyContent: 'center',
     alignItems: 'center',
@@ -637,7 +616,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#191919',
+    backgroundColor: theme.colors.numpadBg,
     borderRadius: theme.borderRadius,
   },
   cardIcon: {
@@ -663,7 +642,7 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.regular,
   },
   confirmWarning: {
-    color: '#FF5252',
+    color: theme.colors.destructiveLight,
     fontSize: 16,
     fontFamily: theme.fonts.medium,
   },
@@ -686,7 +665,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   reasonBtnActive: {
-    backgroundColor: '#D32F2F',
+    backgroundColor: theme.colors.destructive,
   },
   reasonText: {
     color: theme.colors.textPrimary,
@@ -694,7 +673,7 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.regular,
   },
   reasonTextActive: {
-    color: '#fff',
+    color: theme.colors.white,
     fontFamily: theme.fonts.medium,
   },
 });

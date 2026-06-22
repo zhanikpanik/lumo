@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons'; // minus-circle only - no Chikin yet
+import { ExclamationIcon, TrashIcon, CrossIcon } from './Icons';
 import { theme } from '../theme/colors';
 import { useOrderStore } from '../store/orderStore';
 
@@ -25,7 +26,7 @@ export const DeleteOrderPanel: React.FC<Props> = ({ onDeleted }) => {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <Feather name="alert-triangle" size={16} color="#FF5252" />
+          <ExclamationIcon size={16} color="#FF5252" />
           <Text style={styles.headerDangerText}>Удаление заказа</Text>
         </View>
         <View style={styles.body}>
@@ -47,7 +48,7 @@ export const DeleteOrderPanel: React.FC<Props> = ({ onDeleted }) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Feather name="trash-2" size={16} color="#FF5252" />
+        <TrashIcon size={16} color="#FF5252" />
         <Text style={styles.headerDangerText}>Способ удаления</Text>
       </View>
       <View style={styles.body}>
@@ -56,7 +57,7 @@ export const DeleteOrderPanel: React.FC<Props> = ({ onDeleted }) => {
           onPress={() => handleDelete(false)}
           activeOpacity={0.7}
         >
-          <Feather name="x-circle" size={20} color={theme.colors.textPrimary} />
+          <CrossIcon size={20} color={theme.colors.textPrimary} />
           <View style={styles.optionTextWrap}>
             <Text style={styles.optionTitle}>Без списания</Text>
             <Text style={styles.optionDesc}>Блюда вернутся на склад</Text>
@@ -99,7 +100,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#333',
   },
   headerDangerText: {
-    color: '#FF5252',
+    color: theme.colors.destructiveLight,
     fontSize: 16,
     fontFamily: theme.fonts.medium,
   },
@@ -118,7 +119,7 @@ const styles = StyleSheet.create({
   },
   confirmBtn: {
     height: 52,
-    backgroundColor: '#D32F2F',
+    backgroundColor: theme.colors.destructive,
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
@@ -134,13 +135,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     height: 72,
     paddingHorizontal: 10,
-    backgroundColor: '#1A1A1A',
+    backgroundColor: theme.colors.background,
     borderRadius: 8,
     gap: 10,
   },
   optionBtnDanger: {
     borderWidth: 1,
-    borderColor: '#D32F2F',
+    borderColor: theme.colors.destructive,
   },
   optionTextWrap: {
     flex: 1,
@@ -151,7 +152,7 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.medium,
   },
   optionTitleDanger: {
-    color: '#FF5252',
+    color: theme.colors.destructiveLight,
   },
   optionDesc: {
     color: theme.colors.textSecondary,

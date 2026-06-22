@@ -72,6 +72,19 @@ export type ActiveAction = 'modifiers' | 'quantity' | 'course' | 'combo' | 'move
 
 export type OrderActionType = 'transfer' | 'waiter' | 'guests' | 'delete' | null;
 
+// ── Notifications ──
+export type NotificationType = 'shift_ending' | 'order_stuck' | 'low_stock' | 'sync_error' | 'subscription';
+
+export interface AppNotification {
+  id: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  orderId?: string;
+  createdAt: string; // ISO
+  read: boolean;
+}
+
 export * from './inventory';
 
 export interface Shift {

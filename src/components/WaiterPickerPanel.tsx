@@ -1,9 +1,14 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { PersonIcon } from './Icons';
 import { theme } from '../theme/colors';
 import { useOrderStore } from '../store/orderStore';
 import { useVenueStore } from '../store/venueStore';
+
+const COLS = 3;
+const ROWS = 5;
+const GAP = 2;
+const TOTAL_CELLS = COLS * ROWS;
 
 export const WaiterPickerPanel: React.FC = () => {
   const currentOrder = useOrderStore((s) => s.orders.find(o => o.id === s.currentOrderId));
@@ -11,64 +16,106 @@ export const WaiterPickerPanel: React.FC = () => {
   const updateOrderMeta = useOrderStore((s) => s.updateOrderMeta);
   const currentWaiter = currentOrder?.waiter || '';
 
+  type Cell = 
+    | { kind: 'waiter'; name: string; id: string }
+    | { kind: 'empty' };
+
+  const cells: Cell[] = waiters.map(w => ({ kind: 'waiter' as const, name: w.name, id: w.id }));
+  while (cells.length < TOTAL_CELLS) cells.push({ kind: 'empty' });
+
+  const rows: Cell[][] = [];
+  for (let r = 0; r < ROWS; r++) {
+    rows.push(cells.slice(r * COLS, r * COLS + COLS));
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Feather name="user" size={16} color={theme.colors.textSecondary} />
+        <PersonIcon size={16} color={theme.colors.textSecondary} />
         <Text style={styles.headerText}>Выберите официанта</Text>
       </View>
-      <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
-        {waiters.map((w) => (
-          <TouchableOpacity
-            key={w.id}
-            style={[styles.waiterBtn, currentWaiter === w.name && styles.waiterBtnActive]}
-            onPress={() => updateOrderMeta({ waiter: w.name })}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.waiterText, currentWaiter === w.name && styles.waiterTextActive]}>
-              {w.name}
-            </Text>
-          </TouchableOpacity>
+
+      <View style={styles.grid}>
+        {rows.map((row, ri) => (
+          <View key={ri} style={[styles.row, ri < ROWS - 1 && { marginBottom: GAP }]}>
+            {row.map((cell, ci) => {
+              const key = `${ri}-${ci}`;
+              if (cell.kind === 'empty') {
+                return (
+                  <View key={key} style={[styles.cellWrap, ci < COLS - 1 && { marginRight: GAP }]}>
+                    <View style={styles.emptyCell} />
+                  </View>
+                );
+              }
+
+              const isActive = currentWaiter === cell.name;
+
+              return (
+                <View key={key} style={[styles.cellWrap, ci < COLS - 1 && { marginRight: GAP }]}>
+                  <TouchableOpacity
+                    style={[styles.waiterBtn, isActive && styles.waiterBtnActive]}
+                    onPress={() => updateOrderMeta({ waiter: cell.name })}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[styles.waiterText, isActive && styles.waiterTextActive]}
+                      numberOfLines={2}
+                    >
+                      {cell.name}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
+          </View>
         ))}
-      </ScrollView>
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.surfaceLight, borderRadius: theme.borderRadius, overflow: 'hidden' },
+  container: { flex: 1 },
   header: {
-    height: 56,
+    height: 44,
     flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    gap: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#333',
+    gap: 8,
+    backgroundColor: theme.colors.surfaceLight,
+    marginBottom: GAP,
   },
   headerText: {
     color: theme.colors.textPrimary,
     fontSize: 16,
     fontFamily: theme.fonts.medium,
   },
-  list: { flex: 1 },
-  listContent: { padding: 10, gap: 10 },
+
+  grid: { flex: 1 },
+  row: { flex: 1, flexDirection: 'row' },
+  cellWrap: { flex: 1 },
+
   waiterBtn: {
-    height: 52,
+    flex: 1,
     justifyContent: 'center',
-    paddingHorizontal: 10,
-    backgroundColor: '#1A1A1A',
-    borderRadius: 8,
+    alignItems: 'center',
+    backgroundColor: theme.colors.surfaceLight,
+    paddingHorizontal: 6,
   },
   waiterBtnActive: {
     backgroundColor: theme.colors.tabActive,
   },
   waiterText: {
-    fontSize: 16,
-    fontFamily: theme.fonts.medium,
     color: theme.colors.textPrimary,
+    fontSize: 15,
+    fontFamily: theme.fonts.medium,
+    textAlign: 'center',
   },
   waiterTextActive: {
-    color: '#fff',
+    color: theme.colors.white,
+  },
+  emptyCell: {
+    flex: 1,
+    backgroundColor: theme.colors.surfaceLight,
   },
 });

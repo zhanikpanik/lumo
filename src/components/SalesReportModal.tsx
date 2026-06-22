@@ -7,7 +7,7 @@ import {
   Modal,
   ScrollView,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { CrossIcon } from './Icons';
 import { theme } from '../theme/colors';
 import { useOrderStore } from '../store/orderStore';
 
@@ -87,7 +87,7 @@ export const SalesReportModal: React.FC<Props> = ({ visible, onClose }) => {
           <View style={styles.header}>
             <Text style={styles.title}>Отчёт по продажам</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <Feather name="x" size={22} color={theme.colors.textSecondary} />
+              <CrossIcon size={22} color={theme.colors.textSecondary} />
             </TouchableOpacity>
           </View>
 
@@ -164,7 +164,7 @@ export const SalesReportModal: React.FC<Props> = ({ visible, onClose }) => {
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: theme.colors.overlay,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: theme.colors.subtleBorder,
     marginVertical: 16,
   },
   breakdownRow: {
@@ -271,7 +271,7 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
   },
   alertText: {
-    color: '#D32F2F',
+    color: theme.colors.destructive,
   },
   totalRow: {
     flexDirection: 'row',

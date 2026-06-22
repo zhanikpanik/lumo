@@ -1,24 +1,22 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, View, StyleSheet, Text, TextInput, TouchableOpacity, SafeAreaView, StatusBar, useWindowDimensions } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { View, StyleSheet, Text, TextInput, TouchableOpacity, SafeAreaView, StatusBar, useWindowDimensions } from 'react-native';
+import { Feather } from '@expo/vector-icons'; // plus only - no Chikin yet
 import { theme } from '../theme/colors';
-import { SearchIcon, NotificationIcon } from '../components/Icons';
+import { SearchIcon, CrossIcon, ChevronUpIcon, ChevronDownIcon } from '../components/Icons';
+import { NotificationBell } from '../components/NotificationBell';
+import { NotificationModal } from '../components/NotificationModal';
 import { OrderCard } from '../components/OrderCard';
 import { FloorPlan } from '../components/FloorPlan';
 import { BottomTabBar } from '../components/BottomTabBar';
 import { SegmentedSwitcher } from '../components/SegmentedSwitcher';
 import { FunctionsModal } from '../components/FunctionsModal';
 import { SalesReportModal } from '../components/SalesReportModal';
-import { CloseShiftModal } from '../components/CloseShiftModal';
-import { CashOperationModal } from '../components/CashOperationModal';
-import { CashModal } from '../components/CashModal';
 import { useShiftStore } from '../store/shiftStore';
 import { useOrderStore } from '../store/orderStore';
 import { useVenueStore, VenueTable } from '../store/venueStore';
 import { useNotificationStore } from '../store/notificationStore';
 import { useOrdersUiStore } from '../store/ordersUiStore';
 import { Order } from '../types';
-import { can } from '../utils/permissions';
 
 const getCols = (width: number): number => {
   if (width < 1200) return 4;
@@ -67,25 +65,22 @@ export const OrdersScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const statusFilter = useOrdersUiStore((s) => s.statusFilter);
   const setStatusFilter = useOrdersUiStore((s) => s.setStatusFilter);
   const [reportVisible, setReportVisible] = useState(false);
-  const [closeShiftVisible, setCloseShiftVisible] = useState(false);
-  const [cashOpVisible, setCashOpVisible] = useState(false);
-  const [cashOpMode, setCashOpMode] = useState<'collection' | 'in' | 'out'>('collection');
-  const [cashModalVisible, setCashModalVisible] = useState(false);
   const [searchActive, setSearchActive] = useState(false);
   const sortMode = useOrdersUiStore((s) => s.sortMode);
   const setSortMode = useOrdersUiStore((s) => s.setSortMode);
-  const closeShift = useShiftStore((s) => s.closeShift);
-  const addCashCollection = useShiftStore((s) => s.addCashCollection);
-  const addCashTransaction = useShiftStore((s) => s.addCashTransaction);
-  const refreshShiftCashSummary = useShiftStore((s) => s.refreshShiftCashSummary);
   const logout = useShiftStore((s) => s.logout);
   const currentUser = useShiftStore((s) => s.currentUser);
   const [searchQuery, setSearchQuery] = useState('');
   const venueType = useVenueStore((s) => s.venueType);
   const isTakeaway = venueType === 'takeaway';
   const isOrders = isTakeaway || activeTab === 'orders';
-  const canCloseShift = can(currentUser?.role, 'closeShift');
-  const canCashTransaction = can(currentUser?.role, 'cashTransaction');
+  const [notificationVisible, setNotificationVisible] = useState(false);
+
+  // Realtime notification subscription
+  useEffect(() => {
+    const unsub = useNotificationStore.getState().subscribe();
+    return unsub;
+  }, []);
   const venueZones = useVenueStore((s) => s.zones);
   const [waiterFilter, setWaiterFilter] = useState(false);
 
@@ -106,6 +101,7 @@ export const OrdersScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const COLUMNS = getCols(width);
   const CELLS_PER_PAGE = COLUMNS * ROWS;
   const ORDER_SLOTS = CELLS_PER_PAGE - 1; // cell 0 = action buttons
+  const rightGroupWidth = Math.round((width - 2 * PADDING) * 0.40); // same proportion as PosScreen
 
   // ── Scale factor for card text ──
   // Available grid height = screen - header(44+GAP) - tabbar(~56) - padding
@@ -195,60 +191,6 @@ export const OrdersScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
   const handlePageUp = () => setPage((p) => Math.max(0, p - 1));
   const handlePageDown = () => setPage((p) => Math.min(totalPages - 1, p + 1));
 
-  const cashTransactionErrorMessage = (
-    err: string,
-    detail?: Record<string, unknown>,
-  ): { title: string; message: string } => {
-    switch (err) {
-      case 'shift_not_open':
-      case 'shift_not_found':
-        return { title: 'Смена не открыта', message: 'Откройте смену и повторите.' };
-      case 'invalid_amount':
-        return { title: 'Ошибка', message: 'Сумма должна быть больше нуля.' };
-      case 'invalid_kind':
-        return { title: 'Ошибка', message: 'Тип транзакции не распознан.' };
-      case 'insufficient_cash': {
-        const available = Number(detail?.available ?? 0);
-        return {
-          title: 'Недостаточно наличных',
-          message: `Доступно: ${formatAmount(available)} ₽. Уменьшите сумму или сначала проведите внесение.`,
-        };
-      }
-      case 'actor_forbidden_role':
-      case 'actor_not_allowed':
-      case 'forbidden':
-        return { title: 'Недостаточно прав', message: 'Эта операция недоступна для вашей роли.' };
-      default:
-        return { title: 'Ошибка', message: `Не удалось провести операцию: ${err}` };
-    }
-  };
-
-  const handleCashTransaction = async (
-    kind: 'in' | 'out',
-    amount: number,
-    note?: string,
-  ): Promise<{ ok: boolean }> => {
-    if (!canCashTransaction) {
-      Alert.alert('Недостаточно прав', 'Эта операция недоступна для вашей роли.');
-      return { ok: false };
-    }
-    const shift = useShiftStore.getState().currentShift;
-    if (!shift) {
-      Alert.alert('Смена не открыта', 'Откройте смену и повторите.');
-      return { ok: false };
-    }
-    const res = await addCashTransaction(kind, amount, note, currentUser?.id ?? null);
-    if (!res.ok) {
-      const { title, message } = cashTransactionErrorMessage(
-        res.error ?? 'cash_transaction_failed',
-        res.detail,
-      );
-      Alert.alert(title, message);
-      return { ok: false };
-    }
-    return { ok: true };
-  };
-
   // ── Build flat cell list for orders grid ──
   type Cell =
     | { kind: 'actions' }
@@ -273,10 +215,50 @@ export const OrdersScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
       <View style={styles.root}>
 
         {/* ═══ HEADER ROW ═══ */}
-        <View style={[styles.headerRow, { marginHorizontal: PADDING, marginBottom: GAP }]}>
+        <View style={[styles.headerRow, { marginHorizontal: PADDING }]}>
+          {/* Filters — visible in orders mode, hidden in table view */}
+          {isOrders && (
+            <SegmentedSwitcher
+              options={[
+                { value: 'all', label: STATUS_LABELS.all },
+                { value: 'active', label: STATUS_LABELS.active },
+                { value: 'paid', label: STATUS_LABELS.paid },
+              ]}
+              value={statusFilter}
+              onChange={(v) => { setStatusFilter(v); setPage(0); }}
+            />
+          )}
+
+          {isOrders && currentUser && (
+            <SegmentedSwitcher
+              style={{ marginLeft: GAP }}
+              options={[
+                { value: 'false', label: 'Все' },
+                { value: 'true', label: 'Мои' },
+              ]}
+              value={String(waiterFilter)}
+              onChange={(v) => { setWaiterFilter(v === 'true'); setPage(0); }}
+            />
+          )}
+
+          {isOrders && !isTakeaway && (
+            <SegmentedSwitcher
+              style={{ marginLeft: GAP }}
+              options={[
+                { value: 'time', label: SORT_LABELS.time },
+                { value: 'table', label: SORT_LABELS.table },
+              ]}
+              value={sortMode}
+              onChange={setSortMode}
+            />
+          )}
+
+          <View style={{ flex: 1 }} />
+
+          {/* Right: search input or user/notification/search chips */}
           {searchActive ? (
-            <View style={styles.searchInputWrap}>
-              <SearchIcon size={18} color={theme.colors.textSecondary} />
+            <View style={[styles.searchInputWrap, { width: rightGroupWidth }]}>
+              <SearchIcon size={22} color={theme.colors.textSecondary} />
               <TextInput
                 style={styles.searchInput}
                 placeholder="Номер, стол, официант, блюдо, сумма…"
@@ -286,68 +268,32 @@ export const OrdersScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                 autoFocus
               />
               <TouchableOpacity onPress={() => { setSearchActive(false); setSearchQuery(''); setPage(0); }} style={styles.searchCloseBtn}>
-                <Feather name="x" size={18} color={theme.colors.textSecondary} />
+                <CrossIcon size={18} color={theme.colors.textSecondary} />
               </TouchableOpacity>
             </View>
           ) : (
-            <>
-              <SegmentedSwitcher
-                options={[
-                  { value: 'all', label: STATUS_LABELS.all },
-                  { value: 'active', label: STATUS_LABELS.active },
-                  { value: 'paid', label: STATUS_LABELS.paid },
-                ]}
-                value={statusFilter}
-                onChange={(v) => { setStatusFilter(v); setPage(0); }}
-              />
-
-              {currentUser && (
-                <SegmentedSwitcher
-                  style={{ marginLeft: GAP }}
-                  options={[
-                    { value: 'false', label: 'Все' },
-                    { value: 'true', label: 'Мои' },
-                  ]}
-                  value={String(waiterFilter)}
-                  onChange={(v) => { setWaiterFilter(v === 'true'); setPage(0); }}
-                />
-              )}
-
-              {isOrders && !isTakeaway && (
-                <SegmentedSwitcher
-                  style={{ marginLeft: GAP }}
-                  options={[
-                    { value: 'time', label: SORT_LABELS.time },
-                    { value: 'table', label: SORT_LABELS.table },
-                  ]}
-                  value={sortMode}
-                  onChange={setSortMode}
-                />
-              )}
-
-              <View style={{ flex: 1 }} />
-
-              {currentUser && (
+            <View style={[styles.rightGroup, { width: rightGroupWidth }]}>
+              {currentUser ? (
                 <View style={styles.userChip}>
-                  <View style={[styles.onlineDot, { backgroundColor: '#4CAF50' }]} />
-                  <Text style={styles.userChipText} numberOfLines={1}>{currentUser.name}</Text>
+                  <View style={styles.onlineDot} />
+                  <Text style={styles.chipText} numberOfLines={1}>{currentUser.name}</Text>
                 </View>
+              ) : (
+                <View style={styles.iconBtn} />
               )}
-
-              <TouchableOpacity style={[styles.iconBtn, { marginRight: GAP }]}>
-                <NotificationIcon size={22} color={theme.colors.textPrimary} />
+              <TouchableOpacity style={styles.iconBtn} onPress={() => setNotificationVisible(true)}>
+                <NotificationBell size={28} />
               </TouchableOpacity>
-
               <TouchableOpacity style={styles.iconBtn} onPress={() => { setSearchActive(true); }}>
-                <SearchIcon size={22} color={theme.colors.textPrimary} />
+                <SearchIcon size={28} color={theme.colors.textPrimary} />
               </TouchableOpacity>
-            </>
+            </View>
           )}
         </View>
 
         {/* ═══ CONTENT ═══ */}
         {isOrders ? (
-          /* Orders grid */
+          /* Orders grid — always rendered so action buttons stay in place */
           <View style={[styles.gridArea, { marginHorizontal: PADDING }]}>
             {rows.map((row, rowIdx) => (
               <View
@@ -383,7 +329,7 @@ export const OrdersScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                           onPress={handlePageUp}
                           disabled={page === 0}
                         >
-                          <Feather name="chevron-up" size={28} color={page === 0 ? '#999' : theme.colors.tabActive} />
+                          <ChevronUpIcon size={28} color={page === 0 ? '#999' : theme.colors.tabActive} />
                         </TouchableOpacity>
                         <View style={styles.pageDivider} />
                         <TouchableOpacity
@@ -391,7 +337,7 @@ export const OrdersScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                           onPress={handlePageDown}
                           disabled={page >= totalPages - 1}
                         >
-                          <Feather name="chevron-down" size={28} color={page >= totalPages - 1 ? '#999' : theme.colors.tabActive} />
+                          <ChevronDownIcon size={28} color={page >= totalPages - 1 ? '#999' : theme.colors.tabActive} />
                         </TouchableOpacity>
                       </View>
                     )}
@@ -399,6 +345,12 @@ export const OrdersScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
                 ))}
               </View>
             ))}
+            {sortedOrders.length === 0 && (
+              <View style={[styles.emptyOverlay, { pointerEvents: 'none' }]}>
+                <Feather name="inbox" size={48} color={theme.colors.textDisabled} />
+                <Text style={styles.emptyOrdersText}>Нет заказов</Text>
+              </View>
+            )}
           </View>
         ) : (
           /* Floor plan */
@@ -423,86 +375,18 @@ export const OrdersScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         <FunctionsModal
           visible={menuVisible}
           onClose={() => setMenuVisible(false)}
+          role={currentUser?.role ?? null}
           onOpenShift={() => setReportVisible(true)}
           onOpenChecksArchive={() => navigation.navigate('PaidCheck')}
-          onOpenCash={() => {
-            void refreshShiftCashSummary();
-            setCashModalVisible(true);
-          }}
-          onCloseShift={() => {
-            if (!canCloseShift) return;
-            void refreshShiftCashSummary();
-            setCloseShiftVisible(true);
-          }}
-          onCashCollection={() => {
-            void refreshShiftCashSummary();
-            setCashOpMode('collection'); setCashOpVisible(true);
-          }}
-          onCashIn={() => {
-            if (!canCashTransaction) return;
-            void refreshShiftCashSummary();
-            setCashOpMode('in'); setCashOpVisible(true);
-          }}
-          onCashOut={() => {
-            if (!canCashTransaction) return;
-            void refreshShiftCashSummary();
-            setCashOpMode('out'); setCashOpVisible(true);
-          }}
-          canCloseShift={canCloseShift}
-          canCashTransaction={canCashTransaction}
+          onOpenCash={() => navigation.navigate('Cash')}
+          onCloseShift={() => navigation.navigate('CloseShift')}
           onLogout={() => {
             logout();
             navigation.replace('Lock');
           }}
         />
         <SalesReportModal visible={reportVisible} onClose={() => setReportVisible(false)} />
-        <CashModal
-          visible={cashModalVisible}
-          onClose={() => setCashModalVisible(false)}
-          role={currentUser?.role ?? null}
-          onCashIn={() => {
-            if (!canCashTransaction) return;
-            setCashOpMode('in'); setCashOpVisible(true);
-          }}
-          onCashOut={() => {
-            if (!canCashTransaction) return;
-            setCashOpMode('out'); setCashOpVisible(true);
-          }}
-          onCashCollection={() => { setCashOpMode('collection'); setCashOpVisible(true); }}
-        />
-        <CloseShiftModal
-          visible={closeShiftVisible}
-          onClose={() => setCloseShiftVisible(false)}
-          canConfirmClose={canCloseShift}
-          onConfirmClose={async (counted) => {
-            if (!canCloseShift) return;
-            const closed = await closeShift(counted);
-            if (!closed) {
-              Alert.alert('Ошибка', 'Не удалось закрыть смену. Проверьте соединение и попробуйте снова.');
-              return;
-            }
-            setCloseShiftVisible(false);
-            navigation.replace('OpenShift');
-          }}
-        />
-        <CashOperationModal
-          visible={cashOpVisible}
-          mode={cashOpMode}
-          onClose={() => setCashOpVisible(false)}
-          onConfirm={async (amount, note) => {
-            if (cashOpMode === 'collection') {
-              const res = await addCashCollection(amount, note);
-              if (!res.ok) {
-                Alert.alert('Ошибка', res.error ?? 'Не удалось провести инкассацию');
-                return;
-              }
-            } else {
-              const res = await handleCashTransaction(cashOpMode, amount, note);
-              if (!res.ok) return;
-            }
-            setCashOpVisible(false);
-          }}
-        />
+        <NotificationModal visible={notificationVisible} onClose={() => setNotificationVisible(false)} />
       </View>
     </SafeAreaView>
   );
@@ -511,49 +395,31 @@ export const OrdersScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
 const formatAmount = (n: number) => Number(n).toLocaleString('ru-RU');
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, minWidth: 0, overflow: 'hidden', backgroundColor: '#1A1A1A' },
-  root: { flex: 1, minWidth: 0, overflow: 'hidden', backgroundColor: '#1A1A1A' },
+  safeArea: { flex: 1, minWidth: 0, overflow: 'hidden', backgroundColor: theme.colors.background },
+  root: { flex: 1, minWidth: 0, overflow: 'hidden', backgroundColor: theme.colors.background },
 
   headerRow: {
-    height: 44,
+    minHeight: 56,
     flexDirection: 'row',
     alignItems: 'stretch',
     marginTop: PADDING,
     zIndex: 1000,
-    overflow: 'visible',
-  },
-  iconBtn: {
-    width: 44,
-    height: 44,
-    backgroundColor: '#333',
-    borderRadius: theme.borderRadius,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  userChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 6,
-    marginRight: 8,
-  },
-  onlineDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  userChipText: {
-    color: theme.colors.textPrimary,
-    fontSize: 13,
-    fontWeight: '500',
-    maxWidth: 100,
   },
 
+  // Right group: user chip + notification + search (matching PosHeader)
+  rightGroup: {
+    flexDirection: 'row',
+    gap: GAP,
+  },
+  iconBtn: { flex: 1, height: 56, backgroundColor: theme.colors.surfaceLight, borderRadius: theme.borderRadius, justifyContent: 'center', alignItems: 'center' },
+  userChip: { flex: 1, height: 56, justifyContent: 'center', alignItems: 'center', flexDirection: 'row', gap: 6 },
+  onlineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: theme.colors.online },
+  chipText: { color: theme.colors.textPrimary, fontSize: 16, fontFamily: theme.fonts.regular, maxWidth: 120 },
+
   searchInputWrap: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#333',
+    backgroundColor: theme.colors.surfaceLight,
     borderRadius: theme.borderRadius,
     paddingHorizontal: 12,
     gap: 8,
@@ -563,23 +429,25 @@ const styles = StyleSheet.create({
     flex: 1,
     color: theme.colors.textPrimary,
     fontSize: 15,
+    fontFamily: theme.fonts.regular,
     paddingVertical: 0,
     outlineStyle: 'none',
   } as any,
   searchCloseBtn: { padding: 4 },
 
-  gridArea: { flex: 1, marginBottom: GAP },
+  gridArea: { flex: 1, marginTop: GAP, marginBottom: GAP },
   gridRow: { flex: 1, flexDirection: 'row' },
   cellWrap: { flex: 1, borderRadius: theme.borderRadius, overflow: 'hidden' },
 
   floorPlanArea: {
     flex: 1,
+    marginTop: GAP,
     marginBottom: GAP,
   },
 
   actionFull: {
     flex: 1,
-    backgroundColor: '#00C853',
+    backgroundColor: theme.colors.accent,
     borderRadius: theme.borderRadius,
     justifyContent: 'center',
     alignItems: 'center',
@@ -595,22 +463,31 @@ const styles = StyleSheet.create({
   },
   actionBtn: {
     flex: 1,
-    backgroundColor: '#00C853',
+    backgroundColor: theme.colors.accent,
     justifyContent: 'center',
     alignItems: 'center',
     gap: 4,
     borderRadius: theme.borderRadius,
   },
-  actionLabel: { color: '#fff', fontSize: 16, fontWeight: '600', textAlign: 'center' },
+  actionLabel: { color: theme.colors.white, fontSize: 16, fontFamily: theme.fonts.medium, textAlign: 'center' },
 
   paginationCell: {
     flex: 1,
     flexDirection: 'row',
-    backgroundColor: '#333',
+    backgroundColor: theme.colors.surfaceLight,
     borderRadius: theme.borderRadius,
     overflow: 'hidden',
   },
   pageHalf: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   pageDisabled: { opacity: 0.4 },
-  pageDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.1)' },
+  pageDivider: { width: 1, backgroundColor: theme.colors.pageDivider },
+  emptyOrders: { justifyContent: 'center', alignItems: 'center', gap: 16 },
+  emptyOverlay: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+  },
+  emptyOrdersText: { color: theme.colors.textDisabled, fontSize: 18, fontFamily: theme.fonts.medium },
 });

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, ActivityIndicator, Alert, Platform } from 'react-native';
-import { Feather } from '@expo/vector-icons';
+import { PrinterIcon, RefreshIcon } from '../components/Icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { theme } from '../theme/colors';
 import { useOrderStore } from '../store/orderStore';
@@ -56,7 +56,7 @@ const orderListPreview = (o: Order) =>
       const modPart = i.modifiers.map((m) => m.name).join(', ');
       return modPart ? `${i.product.name}: ${modPart}` : i.product.name;
     })
-    .join(' · ');
+    .join(', ');
 
 export const PaidCheckScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
   const { currentOrderId, orders, closeOrder } = useOrderStore();
@@ -371,7 +371,7 @@ export const PaidCheckScreen: React.FC<{ navigation?: any }> = ({ navigation }) 
                           {orderListPreview(o)}
                         </Text>
                         <LinearGradient
-                          colors={[selectedOrder?.id === o.id ? 'rgba(51,51,51,0)' : 'rgba(42,42,42,0)', selectedOrder?.id === o.id ? theme.colors.surfaceLight : theme.colors.surface]}
+                          colors={[selectedOrder?.id === o.id ? 'transparent' : 'transparent', selectedOrder?.id === o.id ? theme.colors.surfaceLight : theme.colors.surface]}
                           start={{ x: 0, y: 0 }}
                           end={{ x: 1, y: 0 }}
                           style={styles.listRowFade}
@@ -495,7 +495,7 @@ export const PaidCheckScreen: React.FC<{ navigation?: any }> = ({ navigation }) 
                 {/* Actions */}
                 <View style={styles.actionsRow}>
                   <TouchableOpacity style={[styles.actionBtn, { flex: 1 }]}>
-                    <Feather name="printer" size={18} color={theme.colors.textPrimary} />
+                    <PrinterIcon size={18} color={theme.colors.textPrimary} />
                     <Text style={styles.actionText}>Напечатать чек</Text>
                   </TouchableOpacity>
 
@@ -514,7 +514,7 @@ export const PaidCheckScreen: React.FC<{ navigation?: any }> = ({ navigation }) 
                         <ActivityIndicator color="#fff" />
                       ) : (
                         <>
-                          <Feather name="rotate-cw" size={18} color="#fff" />
+                          <RefreshIcon size={18} color="#fff" />
                           <Text style={styles.refundText}>Отменить возврат</Text>
                         </>
                       )}
@@ -536,7 +536,7 @@ export const PaidCheckScreen: React.FC<{ navigation?: any }> = ({ navigation }) 
                         <ActivityIndicator color="#fff" />
                       ) : (
                         <>
-                          <Feather name="rotate-ccw" size={18} color="#fff" />
+                          <RefreshIcon size={18} color="#fff" />
                           <Text style={styles.refundText}>Возврат</Text>
                         </>
                       )}
@@ -555,7 +555,7 @@ export const PaidCheckScreen: React.FC<{ navigation?: any }> = ({ navigation }) 
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, minHeight: 0, minWidth: 0, overflow: 'hidden', backgroundColor: theme.colors.background },
-  root: { flex: 1, minHeight: 0, minWidth: 0, overflow: 'hidden', backgroundColor: '#1A1A1A' },
+  root: { flex: 1, minHeight: 0, minWidth: 0, overflow: 'hidden', backgroundColor: theme.colors.background },
 
   // Header
   header: {
@@ -622,9 +622,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 6,
-    backgroundColor: '#3D2A0A',
+    backgroundColor: theme.colors.badgeRefunded,
   },
-  refundChipText: { color: '#FFB74D', fontSize: 16, fontFamily: theme.fonts.medium },
+  refundChipText: { color: theme.colors.warning, fontSize: 16, fontFamily: theme.fonts.medium },
   listRowPreviewWrap: { overflow: 'hidden', position: 'relative' },
   listRowPreview: { color: theme.colors.textSecondary, fontSize: 16, fontFamily: theme.fonts.regular, opacity: 0.8 },
   listRowFade: { position: 'absolute', right: 0, top: 0, bottom: 0, width: 40 },
@@ -653,12 +653,12 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius,
     marginBottom: 6,
   },
-  badgePaid: { backgroundColor: '#0A3D1F' },
-  badgePaidText: { color: '#00C853' },
-  badgeCancelled: { backgroundColor: '#3D0A0A' },
-  badgeCancelledText: { color: '#FF8A80' },
-  badgeRefunded: { backgroundColor: '#3D2A0A' },
-  badgeRefundedText: { color: '#FFB74D' },
+  badgePaid: { backgroundColor: theme.colors.badgePaid },
+  badgePaidText: { color: theme.colors.accent },
+  badgeCancelled: { backgroundColor: theme.colors.badgeCancelled },
+  badgeCancelledText: { color: theme.colors.warningSubtle },
+  badgeRefunded: { backgroundColor: theme.colors.badgeRefunded },
+  badgeRefundedText: { color: theme.colors.warning },
   badgeText: { fontSize: 16, fontFamily: theme.fonts.medium },
 
   metaBlock: { gap: 3, marginBottom: 10 },
@@ -666,12 +666,12 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flexWrap: 'wrap' },
   metaValue: { color: theme.colors.textSecondary, fontSize: 16, fontFamily: theme.fonts.regular },
   metaDot: { color: theme.colors.textSecondary, fontSize: 16, fontFamily: theme.fonts.regular },
-  divider: { height: 1, backgroundColor: 'rgba(255,255,255,0.08)', marginVertical: 10 },
+  divider: { height: 1, backgroundColor: theme.colors.subtleBorder, marginVertical: 10 },
 
   itemsListWrap: { flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden' },
   itemsList: { ...StyleSheet.absoluteFillObject },
   emptyText: { color: theme.colors.textSecondary, fontSize: 16, fontFamily: theme.fonts.regular, padding: 8 },
-  itemBlock: { paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.06)' },
+  itemBlock: { paddingVertical: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.colors.hairlineBorder },
   itemRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 4, gap: 8 },
   itemQty: { color: theme.colors.textSecondary, fontSize: 16, fontFamily: theme.fonts.regular, width: 30, paddingTop: 2 },
   itemNameCol: { flex: 1, minWidth: 0 },
@@ -704,8 +704,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   actionText: { color: theme.colors.textPrimary, fontSize: 16, fontFamily: theme.fonts.medium },
-  refundBtn: { backgroundColor: '#D32F2F' },
-  cancelRefundBtn: { backgroundColor: '#F57C00' },
+  refundBtn: { backgroundColor: theme.colors.destructive },
+  cancelRefundBtn: { backgroundColor: theme.colors.infoOrange },
   refundBtnDisabled: { opacity: 0.55 },
   refundText: { color: '#fff', fontSize: 16, fontFamily: theme.fonts.medium },
 

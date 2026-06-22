@@ -99,6 +99,14 @@ const syncUpdateOrderAwait = async (order: Order) => {
 
 const syncOrderItems = async (orderId: string, items: OrderItem[]) => {
   try {
+    // Fetch existing item IDs before the delete (for diff-based event logging)
+    const { data: prevItems } = await supabase
+      .from('order_items')
+      .select('id, product_id, product_name, quantity, product_price')
+      .eq('order_id', orderId);
+    const prevIds = new Set((prevItems || []).map((i: any) => i.id));
+    const prevById = new Map((prevItems || []).map((i: any) => [i.id, i]));
+
     if (items.length > 0) {
       await supabase.from('order_item_modifiers')
         .delete()
@@ -126,14 +134,12 @@ const syncOrderItems = async (orderId: string, items: OrderItem[]) => {
           orderId,
           code: itemsError.code,
         });
-        // 23503 — FK violation (например, product_id больше нет в products после правок в админке).
-        // Инвалидируем кэш меню — далее пользователь увидит свежие позиции.
         if (itemsError.code === '23503') {
           useMenuStore.getState().fetchMenu(true).catch((err: any) => {
             logger.error('orderStore.syncOrderItems.menuReload', err);
           });
         }
-        return; // без order_items нет смысла пытаться вставлять модификаторы
+        return;
       }
 
       const modRows: any[] = [];
@@ -148,7 +154,6 @@ const syncOrderItems = async (orderId: string, items: OrderItem[]) => {
         });
       });
       if (modRows.length > 0) {
-        // id генерится сервером, поэтому простой insert (без бессмысленного onConflict: 'id').
         const { error: modError } = await supabase.from('order_item_modifiers').insert(modRows);
         if (modError) {
           logger.error('orderStore.syncOrderItems.insertModifiers', modError, {
@@ -156,13 +161,56 @@ const syncOrderItems = async (orderId: string, items: OrderItem[]) => {
             code: modError.code,
           });
           if (modError.code === '23503') {
-            // FK на modifier_id отвалился — кэш меню устарел (модификаторы пересоздали в админке).
-            // Принудительно обновляем — на следующей попытке клиент возьмёт актуальные UUID.
             useMenuStore.getState().fetchMenu(true).catch((err: any) => {
               logger.error('orderStore.syncOrderItems.modifierReload', err);
             });
           }
         }
+      }
+    }
+
+    // Diff: insert order_events for added and removed items
+    const newIds = new Set(items.map(i => i.id));
+    const now = new Date().toISOString();
+    const eventRows: any[] = [];
+
+    // Items removed: were in prevIds but NOT in newIds
+    for (const id of prevIds) {
+      if (!newIds.has(id)) {
+        const prev = prevById.get(id);
+        eventRows.push({
+          order_id: orderId,
+          action: 'item_removed',
+          product_id: prev?.product_id ?? null,
+          product_name: prev?.product_name ?? null,
+          quantity: prev?.quantity ?? null,
+          unit_price: prev?.product_price ?? null,
+          occurred_at: now,
+          venue_id: VENUE_ID,
+        });
+      }
+    }
+
+    // Items added: are in newIds but NOT in prevIds
+    for (const item of items) {
+      if (!prevIds.has(item.id)) {
+        eventRows.push({
+          order_id: orderId,
+          action: 'item_added',
+          product_id: item.product.id,
+          product_name: item.product.name,
+          quantity: item.quantity,
+          unit_price: item.product.price,
+          occurred_at: now,
+          venue_id: VENUE_ID,
+        });
+      }
+    }
+
+    if (eventRows.length > 0) {
+      const { error: evtError } = await supabase.from('order_events').insert(eventRows);
+      if (evtError) {
+        logger.error('orderStore.syncOrderItems.orderEvents', evtError, { orderId });
       }
     }
   } catch (e) {
@@ -589,6 +637,16 @@ export const useOrderStore = create<OrderStoreState>((set, get) => ({
     );
     set({ orders: updatedOrders });
     syncUpdateOrder(updated);
+
+    // Log precheck_printed event
+    supabase.from('order_events').insert({
+      order_id: state.currentOrderId,
+      action: 'precheck_printed',
+      occurred_at: new Date().toISOString(),
+      venue_id: VENUE_ID,
+    }).then(({ error }) => {
+      if (error) logger.error('orderStore.sendToKitchen.orderEvents', error, { orderId: state.currentOrderId });
+    });
   },
 
   updateOrderMeta: (patch) => {

@@ -90,7 +90,7 @@ export const OrderActionsMenu: React.FC<Props> = ({ selectedAction, onSelect }) 
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
-    height: 56,
+    height: 44,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: theme.colors.surfaceLight,
@@ -116,7 +116,7 @@ const styles = StyleSheet.create({
   actionBtnActive: {
     backgroundColor: theme.colors.actionMenuPurple,
   },
-  actionBtnDanger: {},
+  actionBtnDanger: { backgroundColor: theme.colors.dangerTint },
   actionText: {
     color: theme.colors.textPrimary,
     fontSize: 16,
@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.medium,
   },
   actionTextDanger: {
-    color: '#FF5252',
+    color: theme.colors.destructiveLight,
   },
   emptyCell: {
     flex: 1,

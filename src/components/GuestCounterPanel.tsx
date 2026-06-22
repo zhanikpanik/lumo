@@ -16,8 +16,7 @@ export const GuestCounterPanel: React.FC = () => {
         <Text style={styles.headerText}>Количество гостей</Text>
       </View>
       <View style={styles.body}>
-        <Text style={styles.count}>{guestCount}</Text>
-        <View style={styles.buttons}>
+        <View style={styles.stepper}>
           <TouchableOpacity
             style={[styles.btn, guestCount <= 1 && styles.btnDisabled]}
             onPress={() => setGuestCount(-1)}
@@ -26,16 +25,19 @@ export const GuestCounterPanel: React.FC = () => {
           >
             <Feather
               name="minus"
-              size={28}
+              size={24}
               color={guestCount <= 1 ? theme.colors.textDisabled : theme.colors.textPrimary}
             />
           </TouchableOpacity>
+
+          <Text style={styles.count}>{guestCount}</Text>
+
           <TouchableOpacity
             style={styles.btn}
             onPress={() => setGuestCount(1)}
             activeOpacity={0.7}
           >
-            <Feather name="plus" size={28} color={theme.colors.textPrimary} />
+            <Feather name="plus" size={24} color={theme.colors.textPrimary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -44,15 +46,15 @@ export const GuestCounterPanel: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.colors.surfaceLight, borderRadius: theme.borderRadius, overflow: 'hidden' },
+  container: { flex: 1 },
   header: {
-    height: 56,
+    height: 44,
     flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    gap: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#333',
+    gap: 8,
+    backgroundColor: theme.colors.surfaceLight,
+    marginBottom: 2,
   },
   headerText: {
     color: theme.colors.textPrimary,
@@ -63,22 +65,24 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 10,
+  },
+  stepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
   },
   count: {
     color: theme.colors.textPrimary,
-    fontSize: 48,
+    fontSize: 32,
     fontFamily: theme.fonts.medium,
-  },
-  buttons: {
-    flexDirection: 'row',
-    gap: 10,
+    minWidth: 48,
+    textAlign: 'center',
   },
   btn: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: '#1A1A1A',
+    width: 56,
+    height: 56,
+    borderRadius: theme.borderRadius,
+    backgroundColor: theme.colors.surfaceLight,
     justifyContent: 'center',
     alignItems: 'center',
   },

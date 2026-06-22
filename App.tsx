@@ -4,6 +4,11 @@ import { NavigationContainer, createNavigationContainerRef } from '@react-naviga
 import { createStackNavigator } from '@react-navigation/stack';
 import { LogBox, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useFonts } from 'expo-font';
+import {
+  Onest_400Regular,
+  Onest_500Medium,
+  Onest_700Bold,
+} from '@expo-google-fonts/onest';
 import { OrdersScreen } from './src/screens/OrdersScreen';
 import { PosScreen } from './src/screens/PosScreen';
 import { PaymentScreen } from './src/screens/PaymentScreen';
@@ -11,6 +16,8 @@ import { PaidCheckScreen } from './src/screens/PaidCheckScreen';
 import { TablePickerScreen } from './src/screens/TablePickerScreen';
 import { LockScreen } from './src/screens/LockScreen';
 import { OpenShiftScreen } from './src/screens/OpenShiftScreen';
+import { CashScreen } from './src/screens/CashScreen';
+import { CloseShiftScreen } from './src/screens/CloseShiftScreen';
 import { OrderCardShowcase } from './src/screens/OrderCardShowcase';
 import { useShiftStore } from './src/store/shiftStore';
 import { useVenueStore } from './src/store/venueStore';
@@ -38,9 +45,9 @@ const OUTBOX_STALE_MS = 5 * 60 * 1000;
 
 export default function App() {
   const [fontsLoaded, fontError] = useFonts({
-    'Inter-Regular': require('./assets/fonts/Inter-Regular.ttf'),
-    'Inter-Medium': require('./assets/fonts/Inter-Medium.ttf'),
-    'Inter-Bold': require('./assets/fonts/Inter-Bold.ttf'),
+    'Onest-Regular': Onest_400Regular,
+    'Onest-Medium': Onest_500Medium,
+    'Onest-Bold': Onest_700Bold,
   });
 
   const currentUser = useShiftStore((s) => s.currentUser);
@@ -132,7 +139,8 @@ export default function App() {
   }
 
   return (
-    <NavigationContainer ref={navigationRef}>
+    <View style={{ flex: 1, userSelect: 'none' } as any}>
+      <NavigationContainer ref={navigationRef}>
       {lastSyncError && (
         <View style={styles.syncErrorBanner}>
           <Text style={styles.syncErrorText} numberOfLines={1}>
@@ -166,17 +174,8 @@ export default function App() {
           </Text>
         </TouchableOpacity>
       )}
-      {deadLetterCount > 0 && (
-        <TouchableOpacity
-          onPress={() => setDeadLetterModalVisible(true)}
-          style={styles.deadLetterBanner}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.deadLetterBannerText} numberOfLines={1}>
-            Требуется внимание: {deadLetterCount} зависших операций склада. Открыть.
-          </Text>
-        </TouchableOpacity>
-      )}
+      {/* Dead-letter banner intentionally hidden from waiters.
+         * These are admin concerns — visible in admin panel, not POS. */}
       <DeadLetterModal
         visible={deadLetterModalVisible}
         onClose={() => setDeadLetterModalVisible(false)}
@@ -195,9 +194,12 @@ export default function App() {
         <Stack.Screen name="Payment" component={PaymentScreen} />
         <Stack.Screen name="PaidCheck" component={PaidCheckScreen} />
         <Stack.Screen name="TablePicker" component={TablePickerScreen} />
+        <Stack.Screen name="Cash" component={CashScreen} />
+        <Stack.Screen name="CloseShift" component={CloseShiftScreen} />
         <Stack.Screen name="Showcase" component={OrderCardShowcase} />
       </Stack.Navigator>
     </NavigationContainer>
+    </View>
   );
 }
 
@@ -209,7 +211,7 @@ const styles = StyleSheet.create({
     right: 8,
     zIndex: 9999,
     height: 40,
-    backgroundColor: '#5A1010',
+    backgroundColor: theme.colors.chipError,
     borderRadius: 8,
     paddingHorizontal: 10,
     flexDirection: 'row',
@@ -218,7 +220,7 @@ const styles = StyleSheet.create({
   },
   syncErrorText: {
     flex: 1,
-    color: '#fff',
+    color: theme.colors.white,
     fontSize: 13,
     fontFamily: theme.fonts.medium,
   },
@@ -239,7 +241,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   syncErrorCloseText: {
-    color: '#fff',
+    color: theme.colors.white,
     fontSize: 12,
     fontFamily: theme.fonts.medium,
   },
@@ -249,14 +251,14 @@ const styles = StyleSheet.create({
     right: 8,
     zIndex: 9998,
     height: 32,
-    backgroundColor: '#254A62',
+    backgroundColor: theme.colors.bannerSyncing,
     borderRadius: 8,
     paddingHorizontal: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },
   syncingText: {
-    color: '#fff',
+    color: theme.colors.white,
     fontSize: 12,
     fontFamily: theme.fonts.medium,
   },
@@ -267,16 +269,16 @@ const styles = StyleSheet.create({
     right: 8,
     zIndex: 9997,
     height: 36,
-    backgroundColor: '#7A5A00',
+    backgroundColor: theme.colors.bannerOutbox,
     borderRadius: 8,
     paddingHorizontal: 12,
     justifyContent: 'center',
   },
   outboxBannerStale: {
-    backgroundColor: '#7A1010',
+    backgroundColor: theme.colors.bannerOutboxStale,
   },
   outboxBannerText: {
-    color: '#fff',
+    color: theme.colors.white,
     fontSize: 13,
     fontFamily: theme.fonts.medium,
   },
@@ -287,14 +289,14 @@ const styles = StyleSheet.create({
     right: 8,
     zIndex: 9996,
     height: 36,
-    backgroundColor: '#B71C1C',
+    backgroundColor: theme.colors.bannerDeadLetter,
     borderRadius: 8,
     paddingHorizontal: 12,
     justifyContent: 'center',
   },
   deadLetterBannerText: {
-    color: '#fff',
+    color: theme.colors.white,
     fontSize: 13,
-    fontFamily: theme.fonts.bold,
+    fontFamily: theme.fonts.medium,
   },
 });
