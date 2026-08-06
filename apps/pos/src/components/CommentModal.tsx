@@ -1,0 +1,117 @@
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, TextInput, StyleSheet, Modal } from 'react-native';
+import { CrossIcon } from './Icons';
+import { theme } from '../theme/colors';
+
+interface Props {
+  visible: boolean;
+  onClose: () => void;
+  /** Initial comment value from the order */
+  comment?: string;
+  onSaveComment?: (comment: string) => void;
+}
+
+export const CommentModal: React.FC<Props> = ({ visible, onClose, comment: initialComment, onSaveComment }) => {
+  const [comment, setComment] = useState('');
+
+  useEffect(() => {
+    if (visible) {
+      setComment(initialComment || '');
+    }
+  }, [visible, initialComment]);
+
+  const handleSave = () => {
+    onSaveComment?.(comment);
+    onClose();
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="fade">
+      <View style={styles.overlay}>
+        <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={onClose} />
+        <View style={styles.modal}>
+          <View style={styles.header}>
+            <Text style={styles.title}>Комментарий</Text>
+            <TouchableOpacity onPress={onClose}>
+              <CrossIcon size={22} color={theme.colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.body}>
+            <TextInput
+              style={styles.input}
+              value={comment}
+              onChangeText={setComment}
+              placeholder="Введите комментарий..."
+              placeholderTextColor={theme.colors.textSecondary}
+              multiline
+              autoFocus
+            />
+
+            <TouchableOpacity style={styles.saveBtn} onPress={handleSave} activeOpacity={0.8}>
+              <Text style={styles.saveText}>Сохранить</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+const styles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: theme.colors.overlay,
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    paddingTop: '10%',
+  },
+  modal: {
+    width: '40%',
+    maxWidth: 440,
+    minWidth: 320,
+    backgroundColor: theme.colors.surface,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  title: {
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
+    color: theme.colors.textPrimary,
+  },
+  body: {
+    padding: 20,
+    paddingTop: 0,
+  },
+  input: {
+    height: 100,
+    backgroundColor: theme.colors.surfaceLight,
+    borderRadius: theme.borderRadius,
+    padding: 16,
+    color: theme.colors.textPrimary,
+    fontSize: 16,
+      fontFamily: theme.fonts.regular,
+    textAlignVertical: 'top',
+    marginBottom: 16,
+    outlineStyle: 'none',
+  } as any,
+  saveBtn: {
+    height: 48,
+    backgroundColor: theme.colors.accent,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  saveText: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
+  },
+});
