@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, Alert } from 'react-native';
 import { theme } from '../theme/colors';
-import type { VenueTable } from '../store/venueStore';
+import type { VenueTable } from '../types';
 import { FloorPlanCanvas } from '../components/FloorPlanCanvas';
-import { getInstantClient, getDeviceId, getVenueId } from '../data/instant';
-import { createOrder as createOrderCommand } from '@lumo/data';
+import { createPosOrder, updatePosOrder } from '../data/posCommands';
 import { useInstantOrders } from '../store/useInstantOrders';
 import { useInstantVenue } from '../store/useInstantVenue';
 import { useInstantShift } from '../store/useInstantShift';
@@ -35,23 +34,17 @@ export const TablePickerScreen: React.FC<{ navigation?: any; route?: any }> = ({
       try {
         if (!currentUser) { Alert.alert('Ошибка', 'Пользователь не выбран'); return; }
         if (!shiftId) { Alert.alert('Ошибка', 'Смена не открыта'); return; }
-        const db = getInstantClient();
         const operationId = `create-order-${Date.now()}`;
-        const result = await createOrderCommand(db, {
+        const result = await createPosOrder({
           operationId,
-          venueId: getVenueId(),
-          deviceId: getDeviceId(),
           actorEmployeeId: currentUser.id,
           shiftId,
           tableId: table.id,
-          tableNumber: table.number,
-          zoneName: table.zone,
           guestCount: 1,
-          clientTimestamp: new Date().toISOString(),
           orderType: 'dine-in',
           isQuickCheck: false,
           orderNumber: table.number,
-        }).execute();
+        });
         setCurrentOrderId(result.orderId);
         navigation?.replace('Pos', { orderId: result.orderId });
       } catch (e: unknown) {
@@ -67,14 +60,13 @@ export const TablePickerScreen: React.FC<{ navigation?: any; route?: any }> = ({
       return;
     }
     try {
-      const db = getInstantClient();
-      await db.transact([
-        db.tx.orders[currentOrderId].update({
-          tableNumber: table.number,
-          zoneName: table.zone,
-          isQuickCheck: false,
-        }).link({ table: table.id }),
-      ]);
+      if (!currentUser) throw new Error('Пользователь не выбран');
+      await updatePosOrder({
+        operationId: `move-order-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        orderId: currentOrderId,
+        actorEmployeeId: currentUser.id,
+        updates: { tableId: table.id },
+      });
       navigation?.goBack();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Не удалось перенести заказ';

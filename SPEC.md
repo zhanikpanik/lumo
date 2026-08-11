@@ -1,4 +1,4 @@
-# r_keeper Clone — Design Spec
+# Lumo Clone — Design Spec
 
 ## Test Environment
 - **Target**: Landscape tablet (POS kiosk)

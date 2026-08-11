@@ -1,16 +1,17 @@
-# Smoke Test — Restaurant Delta
+# Smoke Test — Restaurant (бар с официантами и столами)
 
-Дельта-чек-лист поверх [smoke-test-takeaway.md](./smoke-test-takeaway.md).
-Проверяем только то, чего **нет** в режиме takeaway: столы, floor plan, привязка заказа к столу, гостей, и сортировка по столам.
+Чек-лист для venue в режиме `restaurant`. Только то, что отличает ресторан от общих операций POS: столы, floor plan, привязка заказа к столу, переназначение, сортировка, роли.
 
-Все общие фичи (логин, смены, продукты, модификаторы, оплата, возвраты, инкассация, outbox, dead-letter, перезапуск, идемпотентность) уже покрыты в takeaway-смок-тесте — их повторно прогонять не надо.
+Базовые операции (логин, смены, продукты, модификаторы, оплата, возвраты, касса, outbox) → [smoke-test-basic.md](./smoke-test-basic.md).
+
+Гости не считаются (`track_guests = false`). Glovo/Yandex не тестируем.
 
 ## 0. Подготовка
 
 - [ ] У venue выставлен `venue_type = 'restaurant'`:
   ```sql
   update venues set venue_type = 'restaurant' where id = '00000000-0000-0000-0000-000000000010';
-  select id, name, venue_type, track_guests from venues where id = '00000000-0000-0000-0000-000000000010';
+  select id, name, venue_type from venues where id = '00000000-0000-0000-0000-000000000010';
   ```
 - [ ] Очищен кэш `venue-store` в Local Storage → жёсткий refresh приложения.
 - [ ] В Supabase есть как минимум 1 zone (`zones`) и в ней 4+ столов (`tables`) с заданными `col`/`row`/`col_span`/`row_span`.
@@ -18,7 +19,7 @@
 
 ---
 
-## 1. Floor plan (новое относительно takeaway)
+## 1. Floor plan
 
 - [ ] В нижнем таб-баре **появилась** вкладка "Столы".
 - [ ] Переключиться на "Столы" → видна сетка с расставленными столами по зонам.
@@ -28,7 +29,7 @@
 
 ---
 
-## 2. Заказ на столе (главный отличающий флоу)
+## 2. Заказ на столе
 
 ### Создание заказа на стол
 
@@ -40,7 +41,7 @@
 
 DB-проверки:
 ```sql
-select id, number, table_id, table_number, zone_name, status, is_quick_check, guest_count
+select id, number, table_id, table_number, zone_name, status, is_quick_check
 from orders
 where id = '<order_id>';
 ```
@@ -79,13 +80,11 @@ where id = '<order_id>';
 
 ---
 
-## 4. Быстрый чек (quick check) рядом со столами
-
-В отличие от takeaway, в ресторанном режиме quick check — это альтернативный путь:
+## 4. Быстрый чек (quick check)
 
 - [ ] Создать quick check (если есть кнопка "+" или другой запуск) → попадаем в POS без стола.
 - [ ] В шапке кнопка "Назначить стол" (т.к. стола нет).
-- [ ] На карточке заказа в `Orders` видна метка "**Быстрый чек**" (в takeaway она была скрыта).
+- [ ] На карточке заказа в `Orders` видна метка "**Быстрый чек**".
 - [ ] Quick check можно оплатить как обычный заказ — стол при этом не задействуется.
 
 ---
@@ -100,26 +99,6 @@ where id = '<order_id>';
 
 ---
 
-## 6. Счётчик гостей (только при `track_guests = true`)
-
-Если у venue `track_guests = true`, в шапке POS должен появиться счётчик гостей:
-
-```sql
-update venues set track_guests = true where id = '00000000-0000-0000-0000-000000000010';
-```
-(после изменения — очистить кэш `venue-store` и обновить страницу)
-
-- [ ] В шапке POS виден счётчик гостей: текущее значение + кнопки `+` / `−`.
-- [ ] `−` дизейблится при значении `1` (минимум).
-- [ ] Изменения значения сохраняются в `orders.guest_count`.
-- [ ] При `track_guests = false` (откатить):
-  ```sql
-  update venues set track_guests = false where id = '00000000-0000-0000-0000-000000000010';
-  ```
-  → счётчик скрыт.
-
----
-
 ## 7. Роль waiter на столах
 
 - [ ] Залогиниться под `waiter`.
@@ -130,19 +109,21 @@ update venues set track_guests = true where id = '00000000-0000-0000-0000-000000
 
 ---
 
-## 8. Откат / повторный прогон takeaway
+## 8. Итог
 
-Когда закончили — можно либо оставить venue в `restaurant`, либо вернуть в `takeaway` для production-точки на вынос. **Не забывайте чистить кэш `venue-store` после смены `venue_type`** — иначе UI 30 секунд будет показывать старый режим.
+Venue закреплён в режиме `restaurant`. Откатывать в `takeaway` не нужно — это постоянный режим работы.
 
 ---
 
 ## Сводка покрытия
 
-| Из основного `SMOKE_TEST_CHECKLIST.md` | Где проверяется |
-|---|---|
-| A–B, D–O разделы | в [smoke-test-takeaway.md](./smoke-test-takeaway.md) |
-| **C) Order + Table Behavior** | этот файл, секции 1–4 |
-| Track guests UI | этот файл, секция 6 |
-| Сортировка по столам | этот файл, секция 5 |
-| P) Glovo / Yandex / Marketplace UX | основной `SMOKE_TEST_CHECKLIST.md` (для venue с маркетплейсом) |
-| Printer integration (будущее) | отдельный `smoke-test-printer.md` (когда добавим) |
+| Секция | Что проверяется |
+|--------|-----------------|
+| 0. Подготовка | venue_type=restaurant, zones, tables, смена |
+| 1. Floor plan | Вкладка «Столы», сетка, размеры столов |
+| 2. Заказ на столе | Создание, открытие, оплата, отмена |
+| 3. TablePicker | Назначение/переназначение стола |
+| 4. Быстрый чек | Quick check без стола |
+| 5. Сортировка | По столам / по времени |
+| 7. Роль waiter | Доступ к столам, ограничения по возвратам/отмене |
+| — | Printer integration (будущее) — отдельный smoke-test-printer.md |

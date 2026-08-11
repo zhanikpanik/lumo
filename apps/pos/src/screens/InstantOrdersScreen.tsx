@@ -10,14 +10,14 @@ import { BottomTabBar } from '../components/BottomTabBar';
 import { SegmentedSwitcher } from '../components/SegmentedSwitcher';
 import { FunctionsModal } from '../components/FunctionsModal';
 import { SalesReportModal } from '../components/SalesReportModal';
-import { useShiftStore } from '../store/shiftStore';
+import { useUserStore } from '../store/userStore';
+import { useInstantShift } from '../store/useInstantShift';
 import { usePosUiStore } from '../store/posUiStore';
 import { useNotificationStore } from '../store/notificationStore';
 import { useOrdersUiStore } from '../store/ordersUiStore';
 import { useInstantOrders } from '../store/useInstantOrders';
 import { useInstantVenue } from '../store/useInstantVenue';
-import { getInstantClient, getDeviceId, getVenueId } from '../data/instant';
-import { createOrder as createOrderCommand } from '@lumo/data';
+import { createPosOrder } from '../data/posCommands';
 import type { Order } from '../types';
 
 const getCols = (width: number): number => {
@@ -58,15 +58,12 @@ function InstantOrdersScreenImpl({ navigation }: { navigation: any }) {
   const [activeTab, setActiveTab] = useState<'orders' | 'tables'>('orders');
   const [page, setPage] = useState(0);
 
-  // InstantDB reactive queries — replaces imperative Supabase fetches
-  const currentShiftId = useShiftStore((s) => s.currentShift?.id);
-  const { orders, isLoading } = useInstantOrders(currentShiftId);
+  const currentUser = useUserStore((s) => s.currentUser);
+  const logout = useUserStore((s) => s.logout);
+  const { openShift } = useInstantShift(currentUser?.id);
+  const { orders, isLoading } = useInstantOrders(openShift?.id);
   const { venueType, zones: venueZones } = useInstantVenue();
 
-  // InstantDB commands for writes
-  const db = getInstantClient();
-  const currentUser = useShiftStore((s) => s.currentUser);
-  const currentShift = useShiftStore((s) => s.currentShift);
 
   const [menuVisible, setMenuVisible] = useState(false);
   const [zoneIdx, setZoneIdx] = useState(0);
@@ -76,7 +73,6 @@ function InstantOrdersScreenImpl({ navigation }: { navigation: any }) {
   const [searchActive, setSearchActive] = useState(false);
   const sortMode = useOrdersUiStore((s) => s.sortMode);
   const setSortMode = useOrdersUiStore((s) => s.setSortMode);
-  const logout = useShiftStore((s) => s.logout);
   const [orderCounter, setOrderCounter] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const isTakeaway = venueType === 'takeaway';
@@ -158,24 +154,19 @@ function InstantOrdersScreenImpl({ navigation }: { navigation: any }) {
   };
 
   const handleQuickCheck = async () => {
-    if (!currentShift) return;
+    if (!openShift) return;
     if (!currentUser) { console.warn('handleQuickCheck: no currentUser'); return; }
-    const deviceId = getDeviceId();
-    const venueId = getVenueId();
     const operationId = `order-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     try {
-      const { orderId } = await createOrderCommand(db, {
+      const { orderId } = await createPosOrder({
         operationId,
-        venueId,
-        deviceId,
         actorEmployeeId: currentUser.id,
-        clientTimestamp: new Date().toISOString(),
-        shiftId: currentShift.id,
+        shiftId: openShift.id,
         guestCount: 1,
         orderType: 'Общий',
         isQuickCheck: true,
         orderNumber: nextOrderNumber,
-      }).execute();
+      });
       usePosUiStore.getState().setCurrentOrderId(orderId);
       usePosUiStore.getState().selectItem(null);
       usePosUiStore.getState().setActiveAction(null);
@@ -203,27 +194,20 @@ function InstantOrdersScreenImpl({ navigation }: { navigation: any }) {
       openInstantOrder(existingOrder);
       navigation.navigate(existingOrder.status === 'paid' ? 'PaidCheck' : 'Pos');
     } else {
-      if (!currentShift) return;
+      if (!openShift) return;
       if (!currentUser) { console.warn('handleTablePress: no currentUser'); return; }
-      const deviceId = getDeviceId();
-      const venueId = getVenueId();
       const operationId = `order-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       try {
-        const { orderId } = await createOrderCommand(db, {
+        const { orderId } = await createPosOrder({
           operationId,
-          venueId,
-          deviceId,
           actorEmployeeId: currentUser.id,
-          clientTimestamp: new Date().toISOString(),
-          shiftId: currentShift.id,
+          shiftId: openShift.id,
           tableId: table.id,
-          tableNumber: table.number,
-          zoneName: table.zone,
           guestCount: 1,
           orderType: 'Общий',
           isQuickCheck: false,
           orderNumber: nextOrderNumber,
-        }).execute();
+        });
         usePosUiStore.getState().setCurrentOrderId(orderId);
         usePosUiStore.getState().selectItem(null);
         usePosUiStore.getState().setActiveAction(null);

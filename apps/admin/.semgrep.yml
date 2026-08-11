@@ -1,0 +1,48 @@
+# Semgrep rules for r_keeper-admin
+# Run: semgrep --config .semgrep.yml src/
+# CI:  semgrep --config .semgrep.yml src/ --error
+
+rules:
+  # ── Architecture: Pages should use hooks, not supabase directly ──
+  - id: no-direct-supabase-in-pages
+    message: >
+      Direct supabase call in a page component.
+      Move data logic into a custom hook (src/hooks/).
+    severity: WARNING
+    languages: [ts, typescript]
+    patterns:
+      - pattern: supabase.from(...)
+    paths:
+      include:
+        - "src/pages/"
+
+  # ── Data Integrity: Missing await on supabase calls ──
+  - id: supabase-await-missing
+    message: >
+      Supabase call missing `await`. Add `await` before the supabase call.
+    severity: ERROR
+    languages: [ts, typescript]
+    patterns:
+      - pattern: |
+          const {$DATA, $ERR} = supabase.from(...).$METHOD(...)
+      - pattern-not: |
+          const {$DATA, $ERR} = await supabase.from(...).$METHOD(...)
+
+  # ── React Query: staleTime missing on queries ──
+  - id: query-missing-staletime
+    message: >
+      useQuery without staleTime. The query will refetch on every mount.
+      Consider adding staleTime to reduce unnecessary refetches.
+    severity: INFO
+    languages: [ts, typescript]
+    patterns:
+      - pattern: useQuery({...})
+      - pattern-not: |
+          useQuery({
+            ...,
+            staleTime: $T,
+            ...
+          })
+    paths:
+      include:
+        - "src/hooks/"

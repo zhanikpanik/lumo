@@ -1,0 +1,35 @@
+{
+  "name": "@lumo/activation-worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --import tsx/esm src/server.mjs",
+    "test": "node --import tsx/esm --test src/*.test.mjs",
+    "verify:revoke": "node --env-file=../../.env.local --import tsx/esm src/integration/verify-revoke.mjs",
+    "verify:command-runner": "node --env-file=../../.env.local --import tsx/esm src/integration/verify-command-runner.mjs",
+    "verify:pos-http": "node --env-file=../../.env.local --import tsx/esm src/integration/verify-pos-http.mjs",
+    "verify:warehouse-http": "node --env-file=../../.env.local --import tsx/esm src/integration/verify-warehouse-http.mjs",
+    "verify:staff-http": "node --env-file=../../.env.local --import tsx/esm src/integration/verify-staff-http.mjs",
+    "verify:query-performance": "node --env-file=../../.env.local --import tsx/esm src/integration/verify-query-performance.mjs",
+    "audit:tenant-keys": "node --env-file=../../.env.local src/audit-tenant-keys.mjs",
+    "audit:stock-quantities": "node --env-file=../../.env.local --import tsx/esm src/audit-stock-quantities.mjs",
+    "reconcile:stock-balances": "node --env-file=../../.env.local --import tsx/esm src/reconcile-stock-balances.mjs",
+    "snapshot:operational": "node --env-file=../../.env.local --import tsx/esm src/snapshot-operational.mjs",
+    "reconcile:admin-identities": "node --env-file=../../.env.local src/reconcile-admin-identities.mjs",
+    "backfill:tenant-keys": "node --env-file=../../.env.local src/backfill-tenant-keys.mjs",
+    "backfill:command-versions": "node --env-file=../../.env.local src/backfill-command-versions.mjs",
+    "backfill:analytics-projection-fields": "node --env-file=../../.env.local src/backfill-analytics-projection-fields.mjs",
+    "backfill:inventory-snapshot-versions": "node --env-file=../../.env.local --import tsx/esm src/backfill-inventory-snapshot-versions.mjs",
+    "migrate:pin-credentials": "node --env-file=../../.env.local --import tsx/esm src/migrate-pin-credentials.mjs",
+    "bootstrap:admin": "node --env-file=.env src/bootstrap-admin.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@instantdb/admin": "^1.0.52",
+    "@lumo/data": "workspace:*",
+    "tsx": "^4.23.1"
+  }
+}

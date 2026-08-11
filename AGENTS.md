@@ -1,15 +1,15 @@
-# r_keeper — Expo POS for Alto Coffee Bishkek
+# Lumo — Expo POS for Alto Coffee Bishkek
 
-Mobile point-of-sale app for waiters. Runs on tablets (iPad). Shares Supabase with `r_keeper-admin`.
+Mobile point-of-sale app for waiters. Runs on tablets (iPad). Shares InstantDB with `Lumo-admin`.
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|------------|
 | Framework | Expo 52 + React Native 0.76 |
-| State | Zustand 5 |
+| State | Zustand 5 (UI/auth only) + InstantDB (data) |
 | Navigation | React Navigation 7 (Stack) |
-| Backend | Supabase (shared with admin) |
+| Backend | InstantDB (reactive queries + optimistic writes) |
 | Font | Onest (400/500/700) via @expo-google-fonts |
 | Testing | Jest + jest-expo |
 | Icons | Custom SVGs in `src/assets/icons/` |
@@ -20,45 +20,49 @@ Mobile point-of-sale app for waiters. Runs on tablets (iPad). Shares Supabase wi
 src/
 ├── screens/              # 9 screens (Stack navigator in App.tsx)
 │   ├── PosScreen.tsx          # Main POS: FloorPlan + OrderPanel
-│   ├── OrdersScreen.tsx       # Order list (table view)
+│   ├── InstantOrdersScreen.tsx # Order list (table view)
 │   ├── PaymentScreen.tsx      # Payment flow
 │   ├── PaidCheckScreen.tsx    # Paid check view
 │   ├── TablePickerScreen.tsx  # Table selection
-│   ├── LockScreen.tsx         # Lock/unlock
-│   ├── OpenShiftScreen.tsx    # Shift open
+│   ├── LockScreen.tsx         # Lock/unlock (re-exports InstantLockScreen)
+│   ├── OpenShiftScreen.tsx    # Shift open (re-exports InstantOpenShiftScreen)
 │   ├── CashScreen.tsx         # Cash operations
 │   ├── CloseShiftScreen.tsx   # Shift close
 │   └── OrderCardShowcase.tsx  # Dev showcase
 ├── components/           # 25+ components
 │   ├── FloorPlan.tsx          # Table map (Canvas)
+│   ├── FloorPlanCanvas.tsx    # Canvas renderer
 │   ├── OrderPanel.tsx         # Active order editing
 │   ├── ProductGrid.tsx        # Menu product grid
 │   ├── CategoryMenu.tsx       # Category tabs
 │   ├── ModifierGrid.tsx       # Dish modifiers
 │   ├── Numpad.tsx             # Quantity numpad
 │   ├── OrderCard.tsx          # Order card (OrdersScreen)
-│   ├── BottomTabBar.tsx       # Tab navigation
 │   ├── PosHeader.tsx          # Top bar
-│   └── ... modals (BaseModal, CashModal, CommentModal, etc.)
-├── store/                # 8 Zustand stores
-│   ├── orderStore.ts          # Orders CRUD + Supabase sync (899 lines)
-│   ├── menuStore.ts           # Categories + products
-│   ├── shiftStore.ts          # Current shift + user
-│   ├── venueStore.ts          # Venue/zones config
+│   ├── NotificationBell.tsx   # Unread badge
+│   ├── NotificationModal.tsx  # Notifications list
+│   └── ... modals (CashModal, CloseShiftModal, CommentModal, etc.)
+├── store/                # 3 Zustand stores (UI/auth only)
+│   ├── posUiStore.ts          # UI state: selection, draft, active category
 │   ├── ordersUiStore.ts       # UI state (selected order, view mode)
-│   ├── notificationStore.ts   # Order notifications
-│   ├── syncOutboxStore.ts     # Offline queue
-│   └── deadLetterStore.ts     # Failed sync items
-├── api/                  # Supabase operations
-│   ├── inventory.ts           # Stock finalization
-│   └── payments.ts            # Payment processing
-├── hooks/
-│   └── useOrderRealtime.ts    # Supabase realtime subscription
+│   ├── userStore.ts           # currentUser + AsyncStorage persist
+│   └── notificationStore.ts   # Local notifications + marketplace unseen
+├── data/
+│   ├── instant.ts             # InstantDB client (React Native)
+│   ├── instant.web.ts         # InstantDB client (web)
+│   ├── employeePin.ts         # Offline PIN verification
+│   └── employeePin.web.ts     # Web variant
 ├── utils/
-│   ├── supabase.ts            # Supabase client (EXPO_PUBLIC_*)
 │   ├── permissions.ts         # Permission checks
 │   ├── logger.ts              # Structured logger
+│   ├── orderMapping.ts        # InstantDB row → Order mapping
+│   ├── notificationSound.ts   # Marketplace arrival chirp
+│   ├── money.ts               # Tiyin formatting
 │   └── squircle.ts            # Squircle shape helper
+├── print/
+│   ├── printService.ts        # Print adapter interface
+│   ├── HttpPrintAdapter.ts    # HTTP bridge adapter
+│   └── escpos.ts              # ESC/POS commands
 ├── theme/
 │   ├── colors.ts              # Dark theme token system (~100 tokens)
 │   └── fonts.ts               # Font config
@@ -74,25 +78,32 @@ LockScreen → OpenShiftScreen → PosScreen (главный экран)
                                   ├── TablePickerScreen
                                   ├── PaymentScreen → PaidCheckScreen
                                   ├── CashScreen → CloseShiftScreen
-                                  └── OrdersScreen (таб)
+                                  └── InstantOrdersScreen (таб)
 ```
 
 ## Key Architecture Patterns
 
-### Offline-first with syncOutbox
-- Orders created locally, synced to Supabase fire-and-forget
-- Failed syncs go to `syncOutboxStore` → retry queue
-- Permanent failures → `deadLetterStore` → DeadLetterModal
+### InstantDB reactive data
+- All persistent data lives in InstantDB (`@lumo/data` schema)
+- Components use `db.useQuery()` for reactive reads
+- Writes via `db.transact()` or `@lumo/data` command functions
+- Optimistic updates — UI reflects changes before server confirms
 
-### Order Events
-- `orderStore.syncOrderItems` writes `item_added`/`item_removed` to `order_events`
-- `PaymentScreen` writes `cancelled` on close without payment
-- Admin reads `order_events` for dashboard detectors
+### Zustand for UI/auth only
+- `posUiStore` — selected item, draft item, active category, modifier actions
+- `userStore` — `currentUser` + AsyncStorage persist (offline login)
+- `ordersUiStore` — selected order, view mode
+- `notificationStore` — local notifications, marketplace unseen (Glovo/Yandex)
 
-### Stock Consumption
-- On payment: POS calls `finalize_order_consumption` RPC
-- RPC writes `inventory_movements` (списание по техкарте)
-- Admin reads `inventory_movements` for stock analysis
+### Order lifecycle
+- `@lumo/data` commands: `createOrder`, `addOrderLine`, `removeOrderLine`, `payOrder`, `cancelOrder`, `refundOrder`
+- All commands are atomic InstantDB transactions
+- Stock consumption via `inventoryMovements` entity
+
+### Shift management
+- `useInstantShift` hook reads shifts from InstantDB
+- `openShift` / `closeShift` commands in `@lumo/data`
+- Cash movements via `cashMovements` entity
 
 ## Design Conventions
 
@@ -116,9 +127,11 @@ LockScreen → OpenShiftScreen → PosScreen (главный экран)
 ## Environment Variables
 
 ```
-EXPO_PUBLIC_SUPABASE_URL=        # Must match VITE_SUPABASE_URL in admin
-EXPO_PUBLIC_SUPABASE_ANON_KEY=   # Must match VITE_SUPABASE_ANON_KEY in admin
-EXPO_PUBLIC_VENUE_ID=            # Must match VITE_VENUE_ID in admin
+EXPO_PUBLIC_VENUE_ID=              # Must match admin VENUE_ID
+EXPO_PUBLIC_INSTANT_ENV=           # development | production
+EXPO_PUBLIC_INSTANT_APP_ID=        # InstantDB app ID
+EXPO_PUBLIC_ACTIVATION_WORKER_URL= # Device activation worker
+EXPO_PUBLIC_PRINT_BRIDGE_URL=      # Receipt printer bridge
 ```
 
 ## Common Commands
@@ -130,24 +143,23 @@ npx expo start --android # Android
 npm test                 # Jest
 ```
 
-## Shared with Admin (r_keeper-admin)
+## Shared with Admin (Lumo-admin)
 
-| Table/RPC | POS writes | Admin reads |
-|-----------|-----------|-------------|
-| `orders` | Create/update orders | Dashboard metrics |
-| `order_events` | item_added/removed/cancelled | Detectors |
-| `inventory_movements` | Consumption via RPC | Stock analysis |
+Both apps share the same InstantDB project and schema (`@lumo/data`).
+
+| Entity | POS writes | Admin reads |
+|--------|-----------|-------------|
+| `orders` | Create/update | Dashboard metrics |
+| `orderEvents` | item_added/removed/cancelled | Detectors |
+| `inventoryMovements` | Consumption on payment | Stock analysis |
 | `shifts` | Open/close | Cash analytics |
-| `stock_items` | Read availability | Warehouse management |
-
-### Sync Checklist
-- Both repos must use **same Supabase project** (same URL + anon key)
-- Both must use **same VENUE_ID**
-- POS `FLOOR_PLAN_ZONE_ID` must match admin `VITE_FLOOR_PLAN_ZONE_ID`
+| `stockItems` | Read availability | Warehouse management |
+| `cashMovements` | Cash operations | Cash analytics |
 
 ## Pitfalls
 
 - Never use raw hex colors — always `theme.colors.*`
-- `orderStore.ts` is the core file (899 lines) — changes there affect everything
-- Offline sync is fire-and-forget — test with network disabled
+- InstantDB queries are reactive — no manual refresh needed
+- `@lumo/data` commands must use `getInstantClient()` for the db reference
 - `.env` is gitignored, `.env.example` is committed — keep in sync
+- Pre-existing TS errors: `@lumo/data` module resolution (workspace build), React JSX types

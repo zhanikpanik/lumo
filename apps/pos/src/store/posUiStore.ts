@@ -132,26 +132,36 @@ export const usePosUiStore = create<PosUiState>((set, get) => ({
       return;
     }
     const existing = draftItem.modifiers.filter((m) => m.id === modifierId);
-    const count = existing.length;
-    if (qty === count) return;
-    if (qty > count) {
-      const toAdd = qty - count;
+    const allRelated = draftItem.modifiers.filter(
+      (m) => m.id === modifierId || m.id.startsWith(modifierId + '_'),
+    );
+    const totalCount = allRelated.length;
+    if (qty === totalCount) return;
+    if (qty > totalCount) {
+      const toAdd = qty - totalCount;
       const newModifiers = [...draftItem.modifiers];
+      const template = existing[0] ?? allRelated[0];
       for (let i = 0; i < toAdd; i++) {
         newModifiers.push({
-          ...existing[0],
-          id: existing[0].id + '_' + (count + i + 1),
+          ...template,
+          id: modifierId + '_' + (totalCount + i + 1),
         });
       }
       set({ draftItem: { ...draftItem, modifiers: newModifiers } });
     } else {
-      const toRemove = count - qty;
+      const toRemove = totalCount - qty;
       let removed = 0;
       set({
         draftItem: {
           ...draftItem,
           modifiers: draftItem.modifiers.filter((m) => {
-            if (m.id.startsWith(modifierId) && removed < toRemove) {
+            if (removed >= toRemove) return true;
+            // Remove copies first (mod-milk_2, mod-milk_3), then base
+            if (m.id !== modifierId && m.id.startsWith(modifierId + '_')) {
+              removed++;
+              return false;
+            }
+            if (m.id === modifierId) {
               removed++;
               return false;
             }

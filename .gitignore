@@ -8,3 +8,7 @@ report/
 clojure-noob/
 .DS_Store
 **/.DS_Store
+.hermes/
+coverage/
+ios/
+android/

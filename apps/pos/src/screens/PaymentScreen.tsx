@@ -3,11 +3,11 @@ import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, Aler
 import { theme } from '../theme/colors';
 import { Numpad } from '../components/Numpad';
 import { usePosUiStore } from '../store/posUiStore';
-import { useShiftStore } from '../store/shiftStore';
+import { useUserStore } from '../store/userStore';
+import { useInstantShift } from '../store/useInstantShift';
 import { can } from '../utils/permissions';
 import { formatTiyin as formatAmount } from '../utils/money';
-import { getInstantClient, getDeviceId, getVenueId } from '../data/instant';
-import { payOrder as payOrderCommand, cancelOrder, DomainError, type PayableOrder } from '@lumo/data';
+import { cancelPosOrder, payPosOrder, PosCommandError } from '../data/posCommands';
 import { useInstantOrder } from '../store/useInstantOrders';
 
 type PaymentMethod = 'cash' | 'card' | 'none';
@@ -23,7 +23,8 @@ const CLOSE_REASONS = [
 export const PaymentScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
   const currentOrderId = usePosUiStore((s) => s.currentOrderId);
   const setCurrentOrderId = usePosUiStore((s) => s.setCurrentOrderId);
-  const currentUser = useShiftStore((s) => s.currentUser);
+  const currentUser = useUserStore((s) => s.currentUser);
+  const { openShift } = useInstantShift(currentUser?.id);
   const [method, setMethod] = useState<PaymentMethod>('cash');
   const [cashInput, setCashInput] = useState('');
   const [printReceipt, setPrintReceipt] = useState(true);
@@ -51,86 +52,28 @@ export const PaymentScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
     orderId: string,
     shiftId: string,
     payMethod: PaymentMethod,
-    payTotal: number,
     payCashAmount: number,
     payCloseReason: string | null,
   ) => {
-    const db = getInstantClient();
-    const currentUser = useShiftStore.getState().currentUser;
-
-    // Query order from InstantDB to get consumptionSnapshotJson
-    const { data: orderData } = await db.queryOnce({ orders: { $: { where: { id: orderId } }, items: {} } });
-    const instantOrder = orderData?.orders?.[0];
-    if (!instantOrder) throw new Error('Order not found in InstantDB');
-
-    const payableOrder: PayableOrder = {
-      id: instantOrder.id,
-      status: instantOrder.status ?? 'active',
-      totalAmountTiyin: instantOrder.totalAmountTiyin ?? payTotal,
-      items: (instantOrder.items ?? []).map((item: Record<string, unknown>) => ({
-        id: item.id as string,
-        consumptionSnapshotJson: (item.consumptionSnapshotJson as string) ?? '{"consumption":[]}',
-      })),
-    };
-    const deviceId = getDeviceId();
-    const venueId = getVenueId();
     const operationId = `payment-${orderId}-${Date.now()}`;
-    const now = new Date().toISOString();
-
+    const actorEmployeeId = currentUser?.id ?? 'unknown';
     if (payMethod === 'none') {
-      await cancelOrder(db, {
+      await cancelPosOrder({
         operationId,
-        venueId,
-        deviceId,
-        actorEmployeeId: currentUser?.id ?? 'unknown',
         orderId,
+        actorEmployeeId,
         closeReason: payCloseReason ?? 'Без оплаты',
-        clientTimestamp: now,
-      }, { id: orderId, status: instantOrder.status ?? 'active' }).execute();
-    } else {
-      await payOrderCommand(db, {
-        operationId,
-        venueId,
-        shiftId,
-        orderId,
-        deviceId,
-        actorEmployeeId: currentUser?.id ?? 'unknown',
-        method: payMethod,
-        tenderedCashTiyin: payMethod === 'cash' ? payCashAmount : undefined,
-        clientTimestamp: now,
-      }, payableOrder).execute();
+      });
+      return;
     }
-
-    // Fire-and-forget: update daily stats
-    if (payMethod !== 'none') {
-      const venueDay = now.slice(0, 10);
-      const statsId = `venue-daily-stats-${venueId}-${venueDay}`;
-      let currentRevenue = 0;
-      let currentOrderCount = 0;
-      let currentFoodCost = 0;
-      try {
-        const { data: existingStats } = await db.queryOnce({
-          venueDailyStats: { $: { where: { id: statsId } } },
-        });
-        const stats = existingStats?.venueDailyStats?.[0];
-        if (stats) {
-          currentRevenue = stats.revenueTiyin ?? 0;
-          currentOrderCount = stats.orderCount ?? 0;
-          currentFoodCost = stats.foodCostTiyin ?? 0;
-        }
-      } catch { /* best-effort */ }
-      db.transact(
-        db.tx.venueDailyStats[statsId]
-          .update({
-            day: venueDay,
-            revenueTiyin: currentRevenue + payTotal,
-            orderCount: currentOrderCount + 1,
-            foodCostTiyin: currentFoodCost,
-            updatedAt: now,
-          })
-          .link({ venue: venueId }),
-      ).catch(() => undefined);
-    }
+    await payPosOrder({
+      operationId,
+      orderId,
+      shiftId,
+      actorEmployeeId,
+      method: payMethod,
+      tenderedCashTiyin: payMethod === 'cash' ? payCashAmount : undefined,
+    });
   };
 
   const handlePay = async () => {
@@ -138,7 +81,7 @@ export const PaymentScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
     if (!canPay || !currentOrderId) return;
     if (method === 'none' && !canCloseWithoutPayment) return;
 
-    const shiftId = useShiftStore.getState().currentShift?.id ?? null;
+    const shiftId = openShift?.id ?? null;
     if (!shiftId) {
       Alert.alert('Смена не открыта', 'Сначала откройте смену.');
       navigation?.replace('OpenShift');
@@ -146,7 +89,7 @@ export const PaymentScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
     }
     setIsProcessing(true);
     try {
-      await handlePayInstant(currentOrderId, shiftId, method, total, cashAmount * 100, closeReason);
+      await handlePayInstant(currentOrderId, shiftId, method, cashAmount * 100, closeReason);
       setCurrentOrderId(null);
       if (method !== 'none') {
         navigation?.replace('Orders');
@@ -154,8 +97,8 @@ export const PaymentScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
         navigation?.navigate('Orders');
       }
     } catch (e: unknown) {
-      // DomainError from @lumo/data — machine-readable error codes
-      if (e instanceof DomainError) {
+      // Worker command errors expose stable machine-readable codes.
+      if (e instanceof PosCommandError) {
         const messages: Record<string, string> = {
           order_already_paid: 'Заказ уже оплачен другим терминалом.',
           order_already_cancelled: 'Заказ уже отменён.',
@@ -166,7 +109,7 @@ export const PaymentScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
           duplicate_operation: 'Операция уже выполнена.',
           permission_denied: 'Недостаточно прав для оплаты.',
         };
-        Alert.alert('Ошибка', messages[e.code] ?? e.message);
+        Alert.alert('Ошибка', (e.code ? messages[e.code] : undefined) ?? e.message);
         if (e.code === 'order_already_paid' || e.code === 'order_not_found' || e.code === 'order_already_cancelled') {
           navigation?.replace('Orders');
         }

@@ -7,7 +7,7 @@ import { Order } from '../types';
 import YandexIcon from '../assets/icons/yandex.svg';
 import { useNotificationStore } from '../store/notificationStore';
 import { useInstantVenue } from '../store/useInstantVenue';
-import { useShiftStore } from '../store/shiftStore';
+import { useUserStore } from '../store/userStore';
 
 const formatAmount = (amount: number): string => {
   return (amount / 100).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
@@ -29,7 +29,7 @@ interface Props {
 
 export const OrderCard: React.FC<Props> = ({ order, onPress, scale = 1 }) => {
   const isTakeaway = useInstantVenue().venueType === 'takeaway';
-  const currentUser = useShiftStore((s) => s.currentUser);
+  const currentUser = useUserStore((s) => s.currentUser);
   const [, setTick] = useState(0);
 
   useEffect(() => {

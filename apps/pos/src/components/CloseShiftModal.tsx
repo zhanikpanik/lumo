@@ -1,0 +1,352 @@
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Modal,
+  ScrollView,
+  TextInput,
+  Alert,
+} from 'react-native';
+import { CrossIcon, SomIcon } from './Icons';
+import { theme } from '../theme/colors';
+import { useUserStore } from '../store/userStore';
+import { useInstantShift } from '../store/useInstantShift';
+
+const formatAmount = (n: number): string =>
+  (n / 100).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+
+const formatTime = (date: Date): string =>
+  `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+
+const formatDate = (date: Date): string => {
+  const months = [
+    'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+    'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря',
+  ];
+  return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
+};
+
+const formatDuration = (start: Date, end: Date): string => {
+  const diff = end.getTime() - start.getTime();
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+  if (hours === 0) return `${minutes} мин`;
+  return `${hours} ч ${minutes} мин`;
+};
+
+interface Props {
+  visible: boolean;
+  onClose: () => void;
+  onConfirmClose: (countedCash: number) => void;
+  canConfirmClose?: boolean;
+}
+
+export const CloseShiftModal: React.FC<Props> = ({
+  visible,
+  onClose,
+  onConfirmClose,
+  canConfirmClose = true,
+}) => {
+  const currentUser = useUserStore((s) => s.currentUser);
+  const { openShift: currentShift, totalOrders, totalRevenueTiyin, cashTotalTiyin, cardTotalTiyin, otherTotalTiyin, cashFloatInTiyin, cashFloatOutTiyin, cashCollectionsTiyin, payments } = useInstantShift(currentUser?.id);
+
+  // Compute payment counts from ledger (not stored as denormalized counters)
+  const cashPayments = payments.filter((p) => p.method === 'cash').length;
+  const cardPayments = payments.filter((p) => p.method === 'card').length;
+  const otherPayments = payments.filter((p) => p.method !== 'cash' && p.method !== 'card').length;
+  const [countedInput, setCountedInput] = useState('');
+
+  useEffect(() => {
+    if (visible) setCountedInput('');
+  }, [visible]);
+
+  if (!currentShift) return null;
+
+  const now = new Date();
+
+  const handleConfirmClose = () => {
+    const raw = countedInput.replace(/\s/g, '').replace(',', '.').trim();
+    if (raw === '') {
+      Alert.alert('Введите сумму', 'Укажите фактически пересчитанную сумму в кассе.');
+      return;
+    }
+    const n = Number(raw);
+    if (Number.isNaN(n) || n < 0) {
+      Alert.alert('Ошибка', 'Некорректная сумма.');
+      return;
+    }
+    onConfirmClose(n);
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="fade">
+      <View style={styles.overlay}>
+        <View style={styles.modal}>
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.title}>Закрытие смены</Text>
+            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+              <CrossIcon size={20} color={theme.colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView
+            style={styles.body}
+            contentContainerStyle={styles.bodyContent}
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Report header */}
+            <Text style={styles.reportTitle}>Z-отчет</Text>
+            <Text style={styles.reportDate}>{formatDate(now)}</Text>
+
+            <View style={styles.divider} />
+
+            {/* Shift meta */}
+            <Row label="Кассир" value={currentUser?.name ?? 'Кассир'} />
+            <Row label="Смена открыта" value={formatTime(currentShift.openedAt)} />
+            <Row label="Длительность" value={formatDuration(currentShift.openedAt, now)} />
+
+            <View style={styles.divider} />
+
+            {/* Totals */}
+            <Row label="Заказов" value={String(totalOrders ?? 0)} bold />
+            <Row label="Выручка" amount={totalRevenueTiyin ?? 0} bold />
+
+            <View style={styles.divider} />
+            <Text style={styles.sectionTitle}>По способам оплаты</Text>
+
+            <Row label="Наличные" value={`${cashPayments} зак. · ${formatAmount(cashTotalTiyin ?? 0)} c`} />
+            <Row label="Карта" value={`${cardPayments} зак. · ${formatAmount(cardTotalTiyin ?? 0)} c`} />
+            <Row label="Без оплаты" value={`${otherPayments} зак. · ${formatAmount(otherTotalTiyin ?? 0)} c`} />
+
+            <View style={styles.divider} />
+            <Text style={styles.sectionTitle}>Движения наличных</Text>
+
+            <Row label="Внесения" amount={cashFloatInTiyin ?? 0} accent />
+            <Row label="Изъятия" amount={cashFloatOutTiyin ?? 0} />
+            <Row label="Инкассация" amount={cashCollectionsTiyin ?? 0} />
+
+            {/* Cash count */}
+            <View style={styles.divider} />
+            <Text style={styles.sectionTitle}>На конец смены</Text>
+            <Text style={styles.inputHint}>Пересчитайте наличные и введите сумму</Text>
+            <TextInput
+              style={styles.cashInput}
+              value={countedInput}
+              onChangeText={setCountedInput}
+              placeholder="0"
+              placeholderTextColor={theme.colors.textSecondary}
+              keyboardType="decimal-pad"
+            />
+          </ScrollView>
+
+          {/* Actions */}
+          <View style={styles.footer}>
+            <TouchableOpacity style={styles.cancelBtn} onPress={onClose} activeOpacity={0.7}>
+              <Text style={styles.cancelText}>Отмена</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.confirmBtn, !canConfirmClose && styles.confirmBtnDisabled]}
+              onPress={handleConfirmClose}
+              disabled={!canConfirmClose}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.confirmText}>Закрыть смену</Text>
+            </TouchableOpacity>
+          </View>
+          {!canConfirmClose && (
+            <Text style={styles.warningText}>Только кассир может закрывать смену</Text>
+          )}
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+// ── Tiny row helper ──
+const Row: React.FC<{
+  label: string;
+  value?: string;
+  amount?: number;
+  bold?: boolean;
+  accent?: boolean;
+}> = ({ label, value, amount, bold, accent }) => (
+  <View style={styles.infoRow}>
+    <Text style={[styles.infoLabel, bold && styles.bold]}>{label}</Text>
+    {amount != null ? (
+      <View style={styles.amountRow}>
+        <Text style={[styles.infoValue, bold && styles.bold, accent && styles.accent]}>
+          {formatAmount(amount)}
+        </Text>
+        <SomIcon size={9} color={accent ? theme.colors.online : '#fff'} />
+      </View>
+    ) : (
+      <Text style={[styles.infoValue, bold && styles.bold, accent && styles.accent]}>
+        {value}
+      </Text>
+    )}
+  </View>
+);
+
+const styles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: theme.colors.overlay,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modal: {
+    width: '40%',
+    maxWidth: 440,
+    minWidth: 340,
+    maxHeight: '90%',
+    backgroundColor: theme.colors.surface,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 12,
+  },
+  title: {
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
+    color: theme.colors.textPrimary,
+  },
+  closeBtn: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  body: {
+    paddingHorizontal: 20,
+  },
+  bodyContent: {
+    paddingBottom: 8,
+  },
+
+  reportTitle: {
+    fontSize: 20,
+    fontFamily: theme.fonts.medium,
+    color: theme.colors.textPrimary,
+    marginBottom: 2,
+  },
+  reportDate: {
+    fontSize: 16,
+      fontFamily: theme.fonts.regular,
+    color: theme.colors.textSecondary,
+  },
+
+  divider: {
+    height: 1,
+    backgroundColor: theme.colors.subtleBorder,
+    marginVertical: 10,
+  },
+
+  sectionTitle: {
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
+    color: theme.colors.textSecondary,
+    marginBottom: 6,
+  },
+
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 3,
+  },
+  infoLabel: {
+    fontSize: 16,
+      fontFamily: theme.fonts.regular,
+    color: theme.colors.textSecondary,
+  },
+  infoValue: {
+    fontSize: 16,
+      fontFamily: theme.fonts.regular,
+    color: theme.colors.textPrimary,
+  },
+  bold: {
+    fontFamily: theme.fonts.medium,
+    color: theme.colors.textPrimary,
+  },
+  accent: {
+    color: theme.colors.online,
+  },
+  amountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+
+  inputHint: {
+    fontSize: 16,
+      fontFamily: theme.fonts.regular,
+    color: theme.colors.textSecondary,
+    marginBottom: 8,
+  },
+  cashInput: {
+    backgroundColor: theme.colors.surfaceLight,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 20,
+    fontFamily: theme.fonts.medium,
+    color: theme.colors.textPrimary,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+
+  footer: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.subtleBorder,
+    gap: 10,
+  },
+  cancelBtn: {
+    flex: 1,
+    height: 46,
+    backgroundColor: theme.colors.surfaceLight,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cancelText: {
+    color: theme.colors.textPrimary,
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
+  },
+  confirmBtn: {
+    flex: 2,
+    height: 46,
+    backgroundColor: theme.colors.destructive,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  confirmBtnDisabled: {
+    opacity: 0.4,
+  },
+  confirmText: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
+  },
+  warningText: {
+    color: theme.colors.warningSubtle,
+    fontSize: 16,
+      fontFamily: theme.fonts.regular,
+    textAlign: 'center',
+    paddingBottom: 12,
+  },
+});

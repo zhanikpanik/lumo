@@ -1,0 +1,9 @@
+packages:
+  - apps/*
+  - packages/*
+overrides:
+  react-server-dom-webpack: 19.0.2
+allowBuilds:
+  '@parcel/watcher': false
+  esbuild: true
+  msgpackr-extract: false

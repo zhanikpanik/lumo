@@ -2,8 +2,7 @@ import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Feather } from '../components/Feather';
 import { theme } from '../theme/colors';
-import { VenueTable, VenueZone } from '../store/venueStore';
-import { Order } from '../types';
+import { VenueTable, VenueZone, Order } from '../types';
 import { FloorPlanCanvas } from './FloorPlanCanvas';
 
 const PADDING = 16;

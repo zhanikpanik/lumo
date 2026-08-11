@@ -2,7 +2,11 @@ import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import { Feather } from '../components/Feather';
 import { theme } from '../theme/colors';
-import { useInstantVenue } from '../store/useInstantVenue';
+import { verifyOfflineEmployeePin, type OfflineEmployee } from '../data/employeePin';
+import { loadOfflineEmployees, registerUnlockAttempt, unlockLockedUntil } from '../data/offlinePinState';
+import { flushPendingUnlockAttempts } from '../data/unlockAttempts';
+import { getVenueId } from '../data/instant';
+import { EMPLOYEE_PIN_LENGTH } from '@lumo/data';
 
 interface Props {
   onTakeover: (waiterName: string) => void;
@@ -11,11 +15,17 @@ interface Props {
 const DIGITS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'];
 
 export const TakeoverLock: React.FC<Props> = ({ onTakeover }) => {
-  const { employees } = useInstantVenue();
-  const waiters = employees.map(e => ({ name: e.name, pin: e.pinCredential?.pinVerifier ?? '' }));
+  const venueId = getVenueId();
+  const [employees, setEmployees] = useState<OfflineEmployee[]>([]);
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const verifyingRef = useRef(false);
   const shakeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    void loadOfflineEmployees(venueId).then(setEmployees);
+  }, [venueId]);
 
   useEffect(() => {
     if (error) {
@@ -28,25 +38,47 @@ export const TakeoverLock: React.FC<Props> = ({ onTakeover }) => {
     }
   }, [error, shakeAnim]);
 
-  const handleDigit = (d: string) => {
-    if (d === '' || pin.length >= 4) return;
+  const handleDigit = async (d: string) => {
+    if (verifyingRef.current || d === '' || pin.length >= EMPLOYEE_PIN_LENGTH) return;
     const newPin = pin + d;
     setPin(newPin);
 
-    if (newPin.length === 4) {
-      const match = waiters.find(w => w.pin === newPin);
-      if (match) {
-        setPin('');
-        onTakeover(match.name);
-      } else {
-        setError(true);
-        setPin('');
+    if (newPin.length === EMPLOYEE_PIN_LENGTH) {
+      verifyingRef.current = true;
+      setVerifying(true);
+      try {
+        if (await unlockLockedUntil(venueId)) {
+          setError(true);
+          setPin('');
+          return;
+        }
+        let match: OfflineEmployee | undefined;
+        for (const employee of employees) {
+          if (await verifyOfflineEmployeePin(employee, newPin)) {
+            match = employee;
+            break;
+          }
+        }
+        if (match) {
+          await registerUnlockAttempt(venueId, 'success', match.employeeId);
+          void flushPendingUnlockAttempts(venueId);
+          setPin('');
+          onTakeover(match.displayName);
+        } else {
+          await registerUnlockAttempt(venueId, 'failure');
+          void flushPendingUnlockAttempts(venueId);
+          setError(true);
+          setPin('');
+        }
+      } finally {
+        verifyingRef.current = false;
+        setVerifying(false);
       }
     }
   };
 
   const handleDelete = () => {
-    setPin(pin.slice(0, -1));
+    if (!verifyingRef.current) setPin(pin.slice(0, -1));
   };
 
   const masked = pin.replace(/./g, '●');
@@ -65,7 +97,7 @@ export const TakeoverLock: React.FC<Props> = ({ onTakeover }) => {
 
       <Animated.View style={[styles.displayRow, { transform: [{ translateX: shakeAnim }] }]}>
         <Text style={[styles.displayText, error && styles.displayTextError]}>
-          {masked || '····'}
+          {masked || '······'}
         </Text>
       </Animated.View>
 
@@ -83,7 +115,7 @@ export const TakeoverLock: React.FC<Props> = ({ onTakeover }) => {
                       style={styles.key}
                       onPress={handleDelete}
                       activeOpacity={0.6}
-                      disabled={pin.length === 0}
+                      disabled={verifying || pin.length === 0}
                     >
                       <Feather name="delete" size={24} color={pin.length === 0 ? theme.colors.textDisabled : theme.colors.textPrimary} />
                     </TouchableOpacity>
@@ -96,6 +128,7 @@ export const TakeoverLock: React.FC<Props> = ({ onTakeover }) => {
                     style={styles.key}
                     onPress={() => handleDigit(d)}
                     activeOpacity={0.6}
+                    disabled={verifying}
                   >
                     <Text style={styles.keyText}>{d}</Text>
                   </TouchableOpacity>

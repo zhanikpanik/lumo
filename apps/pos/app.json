@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "Lumo",
+    "slug": "Lumo",
+    "version": "1.0.0",
+    "orientation": "landscape",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.Lumo"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#1A1A1A"
+      }
+    },
+    "plugins": [
+      "expo-asset",
+      "expo-font",
+      "expo-sqlite",
+      "expo-secure-store"
+    ]
+  }
+}

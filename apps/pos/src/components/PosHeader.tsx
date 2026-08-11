@@ -4,7 +4,7 @@ import { theme } from '../theme/colors';
 import { SearchIcon, CrossIcon } from './Icons';
 import { NotificationBell } from './NotificationBell';
 import { useInstantVenue } from '../store/useInstantVenue';
-import { useShiftStore } from '../store/shiftStore';
+import { useUserStore } from '../store/userStore';
 
 const LEFT = 0.35;
 const MID = 0.25;
@@ -59,7 +59,7 @@ export const PosHeader: React.FC<Props> = ({
   currentOrder: currentOrderProp,
 }) => {
   const S = useSizes();
-  const currentUser = useShiftStore((s) => s.currentUser);
+  const currentUser = useUserStore((s) => s.currentUser);
   const currentOrder = currentOrderProp ?? null;
   const { venueType, zones } = useInstantVenue();
   const hasTables = venueType !== 'takeaway' && zones.length > 0;

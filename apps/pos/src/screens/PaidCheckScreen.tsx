@@ -4,15 +4,15 @@ import { PrinterIcon, RefreshIcon } from '../components/Icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { theme } from '../theme/colors';
 import { usePosUiStore } from '../store/posUiStore';
-import { useShiftStore } from '../store/shiftStore';
+import { useUserStore } from '../store/userStore';
+import { useInstantShift } from '../store/useInstantShift';
 import { Order, OrderItem } from '../types';
 import { can } from '../utils/permissions';
-import { cancelRefund, refundOrder } from '../api/inventory';
-import { fetchActiveRefunds } from '../api/payments';
-import { VENUE_ID } from '../config';
+import { refundedOrdersForShiftQuery } from '@lumo/data';
 import { logger } from '../utils/logger';
 import { getPrintAdapter } from '../print/printService';
-import { getInstantClient } from '../data/instant';
+import { getInstantClient, getVenueId } from '../data/instant';
+import { cancelPosRefund, refundPosOrder } from '../data/posCommands';
 import { useInstantOrder, useInstantOrders } from '../store/useInstantOrders';
 
 const GAP = 8;
@@ -62,34 +62,30 @@ const orderListPreview = (o: Order) =>
     .join(', ');
 
 export const PaidCheckScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
+  const db = getInstantClient();
+  const venueId = getVenueId();
   const currentOrderId = usePosUiStore((s) => s.currentOrderId);
   const setCurrentOrderId = usePosUiStore((s) => s.setCurrentOrderId);
-  const currentShift = useShiftStore((s) => s.currentShift);
+  const currentUser = useUserStore((s) => s.currentUser);
+  const { openShift } = useInstantShift(currentUser?.id);
 
-  const shiftId = currentShift?.id;
+  const shiftId = openShift?.id;
   const { orders } = useInstantOrders(shiftId);
   const instantSelected = useInstantOrder(currentOrderId ?? undefined);
 
-  const currentUser = useShiftStore((s) => s.currentUser);
-  const fetchOpenShift = useShiftStore((s) => s.fetchOpenShift);
-  const refreshShiftCashSummary = useShiftStore((s) => s.refreshShiftCashSummary);
   const canRefund = can(currentUser?.role, 'refund');
 
-  // Active refunds for the current shift (not yet cancelled) — order_id -> refund_shift_id.
-  // Used to surface refunded checks in the list and offer "Отменить возврат".
-  const [refundedOrderIds, setRefundedOrderIds] = useState<Set<string>>(new Set());
-
-  const reloadActiveRefunds = async (shiftId: string) => {
-    setRefundedOrderIds(await fetchActiveRefunds(shiftId));
-  };
-
-  useEffect(() => {
-    if (!currentShift) {
-      setRefundedOrderIds(new Set());
-      return;
-    }
-    void reloadActiveRefunds(currentShift.id);
-  }, [currentShift?.id]);
+  // Active refunds for the current shift — reactive InstantDB query.
+  const refundQuery = openShift ? refundedOrdersForShiftQuery(venueId, openShift.id) : null;
+  const { data: refundData } = db.useQuery(refundQuery);
+  const refundedOrderIds = React.useMemo(() => {
+    if (!refundData) return new Set<string>();
+    const payments = refundData.payments as Array<Record<string, unknown>> ?? [];
+    const fromPayments = payments
+      .map((p) => ((p.order as Record<string, unknown>)?.id as string) ?? '')
+      .filter((id) => id.length > 0);
+    return new Set(fromPayments);
+  }, [refundData]);
 
   // Closed orders for the current shift, including those that are currently
   // "active" only because the user refunded them (so cancel is reachable).
@@ -124,7 +120,6 @@ export const PaidCheckScreen: React.FC<{ navigation?: any }> = ({ navigation }) 
     setLoadingPayment(true);
     setPayment(null);
 
-    const db = getInstantClient();
     db.queryOnce({
       payments: {
         $: { where: { order: selectedOrder.id } },
@@ -205,7 +200,7 @@ export const PaidCheckScreen: React.FC<{ navigation?: any }> = ({ navigation }) 
     if (!selectedOrder) return;
     if (isRefunding) return;
     if (!canRefund) return;
-    if (!currentShift) {
+    if (!openShift) {
       Alert.alert('Смена не открыта', 'Сначала откройте смену.');
       navigation?.replace('OpenShift');
       return;
@@ -213,34 +208,18 @@ export const PaidCheckScreen: React.FC<{ navigation?: any }> = ({ navigation }) 
 
     try {
       setIsRefunding(true);
-
-      const occurredAt = new Date().toISOString();
-      const res = await refundOrder({
-        venueId: VENUE_ID,
+      const operationId = `refund-${selectedOrder.id}-${Date.now()}`;
+      await refundPosOrder({
+        operationId,
+        shiftId: openShift.id,
         orderId: selectedOrder.id,
-        shiftId: currentShift.id,
-        actorUserId: currentUser?.id ?? null,
+        actorEmployeeId: currentUser?.id ?? '',
         reason: 'Возврат через экран закрытых заказов',
-        occurredAt,
       });
 
-      if (!res.ok) {
-        logger.error('paidCheck.refund', res.error, { orderId: selectedOrder.id, detail: res.detail });
-        if (res.error === 'shift_not_open' || res.error === 'shift_required') {
-          Alert.alert('Смена не открыта', 'Сначала откройте смену.');
-          navigation?.replace('OpenShift');
-          return;
-        }
-        Alert.alert('Ошибка возврата', refundErrorMessage(res.error));
-        return;
-      }
-
-      await fetchOpenShift();
-      await refreshShiftCashSummary();
-      await reloadActiveRefunds(currentShift.id);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'unknown_error';
-      logger.error('paidCheck.refund', e);
+      logger.error('paidCheck.refund', e instanceof Error ? e : String(e));
       Alert.alert('Ошибка возврата', `Не удалось выполнить возврат: ${msg}`);
     } finally {
       setIsRefunding(false);
@@ -251,7 +230,7 @@ export const PaidCheckScreen: React.FC<{ navigation?: any }> = ({ navigation }) 
     if (!selectedOrder) return;
     if (isCancelling) return;
     if (!canRefund) return;
-    if (!currentShift) {
+    if (!openShift) {
       Alert.alert('Смена не открыта', 'Сначала откройте смену.');
       navigation?.replace('OpenShift');
       return;
@@ -259,26 +238,17 @@ export const PaidCheckScreen: React.FC<{ navigation?: any }> = ({ navigation }) 
 
     try {
       setIsCancelling(true);
-      const res = await cancelRefund({
-        venueId: VENUE_ID,
+      const operationId = `cancel-refund-${selectedOrder.id}-${Date.now()}`;
+      await cancelPosRefund({
+        operationId,
+        shiftId: openShift.id,
         orderId: selectedOrder.id,
-        actorUserId: currentUser?.id ?? null,
-        occurredAt: new Date().toISOString(),
+        actorEmployeeId: currentUser?.id ?? '',
       });
-
-      if (!res.ok) {
-        logger.error('paidCheck.cancelRefund', res.error, { orderId: selectedOrder.id, detail: res.detail });
-        Alert.alert('Не удалось отменить возврат', cancelErrorMessage(res.error));
-        return;
-      }
-
-      await fetchOpenShift();
-      await refreshShiftCashSummary();
-      await reloadActiveRefunds(currentShift.id);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'unknown_error';
-      logger.error('paidCheck.cancelRefund', e);
-      Alert.alert('Не удалось отменить возврат', msg);
+      logger.error('paidCheck.cancelRefund', e instanceof Error ? e : String(e));
+      Alert.alert('Не удалось отменить возврат', `Не удалось отменить возврат: ${msg}`);
     } finally {
       setIsCancelling(false);
     }
@@ -291,7 +261,7 @@ export const PaidCheckScreen: React.FC<{ navigation?: any }> = ({ navigation }) 
     onAccept: () => void,
   ) => {
     if (Platform.OS === 'web') {
-      const accepted = typeof globalThis.confirm === 'function' ? globalThis.confirm(message) : true;
+      const accepted = typeof window !== 'undefined' && window.confirm(`${title}\n\n${message}`);
       if (accepted) onAccept();
       return;
     }

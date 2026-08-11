@@ -1,0 +1,79 @@
+name: Instant cutover quality
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: instant-cutover-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.12.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Data contracts
+        run: pnpm --filter @lumo/data typecheck && pnpm --filter @lumo/data test
+      - name: Worker contracts
+        run: pnpm --filter @lumo/activation-worker test
+      - name: POS contracts
+        run: pnpm --filter @lumo/pos typecheck && pnpm --filter @lumo/pos exec jest --runInBand
+      - name: Admin production build
+        run: pnpm --filter @lumo/admin build
+      - name: Secret and forbidden-pattern scan
+        run: pnpm secrets:scan
+
+  instant-integration:
+    if: github.event_name != 'pull_request'
+    needs: checks
+    runs-on: ubuntu-latest
+    env:
+      INSTANT_APP_ID: ${{ secrets.INSTANT_CI_APP_ID }}
+      INSTANT_APP_ADMIN_TOKEN: ${{ secrets.INSTANT_CI_ADMIN_TOKEN }}
+      INSTANT_ADMIN_TOKEN: ${{ secrets.INSTANT_CI_ADMIN_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.12.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Require dedicated Instant CI credentials
+        run: test -n "$INSTANT_APP_ID" && test -n "$INSTANT_ADMIN_TOKEN"
+      - name: Push schema and permissions to dedicated CI app
+        run: pnpm --filter @lumo/data exec instant-cli push all --yes
+      - name: Prepare integration environment
+        run: printf 'INSTANT_APP_ID=%s\nINSTANT_ADMIN_TOKEN=%s\n' "$INSTANT_APP_ID" "$INSTANT_ADMIN_TOKEN" > .env.local
+      - name: Seed representative dataset
+        run: pnpm --filter @lumo/data seed
+      - name: Real-token permission matrix
+        run: pnpm --filter @lumo/data verify:permissions
+      - name: Atomic command and fault-injection proof
+        run: pnpm --filter @lumo/activation-worker verify:command-runner
+      - name: POS HTTP and analytics rebuild proof
+        run: pnpm --filter @lumo/activation-worker verify:pos-http
+      - name: Warehouse concurrency proof
+        run: pnpm --filter @lumo/activation-worker verify:warehouse-http
+      - name: Staff credential and admin mutation proof
+        run: pnpm --filter @lumo/activation-worker verify:staff-http
+      - name: Query performance proof
+        run: pnpm --filter @lumo/activation-worker verify:query-performance
+      - name: Tenant and stock audits
+        run: pnpm --filter @lumo/activation-worker audit:tenant-keys && pnpm --filter @lumo/activation-worker audit:stock-quantities

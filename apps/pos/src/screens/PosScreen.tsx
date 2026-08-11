@@ -25,7 +25,6 @@ import { NotificationModal } from '../components/NotificationModal';
 import type { OrderActionType, OrderItem, Product } from '../types';
 import type { InstantModifierGroup } from '../store/useInstantMenu';
 import { getPrintAdapter } from '../print/printService';
-import { useNotificationStore } from '../store/notificationStore';
 
 const COL_GAP = 10;
 
@@ -96,10 +95,6 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
   const [notificationVisible, setNotificationVisible] = useState(false);
 
   // ── Effects ───────────────────────────────────────────
-  useEffect(() => {
-    const unsub = useNotificationStore.getState().subscribe();
-    return unsub;
-  }, []);
 
   const isLocked = useMemo(() => {
     if (!currentUser || !currentOrder) return false;
