@@ -333,12 +333,16 @@ POS имеет только ограниченную device identity без envi
    - Legacy `pnpm verify:pos-flow` ожидаемо отклонён на первом direct device `openShift`: этот путь теперь запрещён rules.
    - Локальный worker поднялся и ответил `GET /healthz` с `{"ok":true}`; запрос с device token дошёл до operation boundary и корректно вернул `503` без `DATABASE_URL`.
 
-### Текущие блокеры и следующий порядок
+### Исторические блокеры закрыты новым cutover
 
-1. Привязать существующий Railway PostgreSQL к worker как `DATABASE_URL=${{ Postgres.DATABASE_URL }}`. PostgreSQL хранит только operation ledger и locks; InstantDB остаётся source of truth operational data.
-2. Развернуть activation worker с этим reference variable.
-3. Заменить legacy direct `verify:pos-flow` на worker-backed HTTP integration scenario: device token → open shift → order → line → payment → ledger/idempotency assertions.
-4. После успешного worker smoke test проверить production rollout отдельно. Production schema/rules в рамках этой работы не пушились.
+Этот вариант с PostgreSQL operation ledger не был выпущен: crash-window между PostgreSQL и InstantDB не позволял доказать exactly-once operational commit. Реализация заменена pure InstantDB архитектурой из `docs/plans/2026-08-11-instantdb-pure-operational-cutover.md`.
+
+Итоговый production cutover:
+
+1. `commandOperations`, version claims, target state и immutable accounting effects коммитятся одной InstantDB transaction.
+2. `DATABASE_URL`, `worker_operations`, PostgreSQL advisory locks и `pg` удалены из command path.
+3. Worker-backed HTTP scenarios проверяют device token → shift → order → line → payment/refund, replay, lost response и competing transitions.
+4. Production schema, permissions, worker и admin развёрнуты; canary cleanup не показал изменений operational snapshot.
 
 ---
 

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import NetInfo from '@react-native-community/netinfo';
 import { EMPLOYEE_PIN_LENGTH } from '@lumo/data';
 import { verifyOfflineEmployeePin, type OfflineEmployee } from '../data/employeePin';
 import {
@@ -78,12 +77,13 @@ export function InstantLockScreen({ navigation, route }: Props) {
   useEffect(() => {
     if (isEmployeesLoading || queryError) return;
     let cancelled = false;
-    void NetInfo.fetch().then(async (network) => {
-      if (!network.isConnected) return;
-      await cacheOfflineEmployees(venueId, freshEmployees);
-      if (!cancelled) setEmployees(await loadOfflineEmployees(venueId));
-      await flushPendingUnlockAttempts(venueId);
-    }).catch((cause) => logger.error('instant-pin.cache', cause));
+    void cacheOfflineEmployees(venueId, freshEmployees)
+      .then(() => loadOfflineEmployees(venueId))
+      .then((cached) => {
+        if (!cancelled) setEmployees(cached);
+        return flushPendingUnlockAttempts(venueId);
+      })
+      .catch((cause) => logger.error('instant-pin.cache', cause));
     return () => { cancelled = true; };
   }, [freshEmployees, isEmployeesLoading, queryError, venueId]);
 

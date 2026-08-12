@@ -3,7 +3,7 @@ import { randomUUID } from 'expo-crypto';
 import { EMPLOYEE_PIN_OFFLINE_TTL_MS } from '@lumo/data'
 import type { OfflineEmployee } from './employeePin';
 
-const STATE_KEY = '@lumo/offline-pin-state/v1';
+const STATE_KEY = 'lumo.offline-pin-state.v1';
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_MS = 15 * 60 * 1000;
 

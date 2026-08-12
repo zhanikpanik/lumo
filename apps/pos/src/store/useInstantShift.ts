@@ -53,12 +53,12 @@ export interface InstantShiftData {
  * in shiftStore with reactive queries — totals are computed from the ledger,
  * not maintained as mutable denormalized counters.
  */
-export function useInstantShift(employeeId?: string): InstantShiftData {
+export function useInstantShift(employeeId?: string, isAuthenticated = true): InstantShiftData {
   const db = getInstantClient();
-  const venueId = getVenueId();
+  const venueId = isAuthenticated ? getVenueId() : undefined;
 
   const { data, isLoading, error } = db.useQuery(
-    employeeId
+    employeeId && venueId
       ? {
           shifts: {
             $: {

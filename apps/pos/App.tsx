@@ -73,7 +73,10 @@ export default function App() {
 
   // ── Shift guard ────────────────────────────────────────────────
   const currentUser = useUserStore((s) => s.currentUser);
-  const { openShift } = useInstantShift(currentUser?.id);
+  const { openShift } = useInstantShift(
+    currentUser?.id,
+    bootstrap?.status === 'authenticated',
+  );
   const hasShift = openShift !== null;
 
   useEffect(() => {

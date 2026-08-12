@@ -629,6 +629,56 @@ Rollback до production write cutover — previous app/client version. Посл
 - Неиспользуемый Railway PostgreSQL service не удалён: Railway API и CLI вернули `Unauthorized` даже после повторной авторизации. Он не связан с worker и не является operational dependency.
 - Production worker CORS ограничен доменом admin; сторонний Origin не получает `Access-Control-Allow-Origin`.
 
+### Что было реализовано до native iPad acceptance
+
+#### Operational transaction boundary
+
+- PostgreSQL ledger/locks подход отклонён после разбора crash windows: запись `processing`, Instant commit и PostgreSQL result нельзя было сделать одним atomic commit.
+- В `@lumo/data` добавлен единый Instant command runner с deterministic canonical request hash, venue-scoped operation keys, immutable `commandOperations`, unique `commandClaims` и monotonic resource versions.
+- Один `db.transact()` сохраняет command result, version claim, target update и все payments, cash/inventory movements, order events, kitchen/fiscal jobs и financial contributions.
+- Повтор идентичного `operationId` возвращает сохранённый result; reuse с другим payload отклоняется; competing state transitions конфликтуют на unique version claim.
+- Critical POS и warehouse writes переведены на trusted worker. `venueId`, device identity и server timestamps выводятся из authenticated context, а actor/resource tenancy проверяется worker.
+- Реализованы trusted flows для shift, order/line/meta, payment/cancel, refund/cancel-refund, cash movements, stock receive, write-off и transfer.
+
+#### Identity, tenancy и PIN
+
+- Admin переведён с Supabase auth на Instant magic code; active venue выводится из active membership, а owner/manager role назначается server-side.
+- POS activation создаёт отдельную active device identity и custom token; device authorization можно revoke, после чего старый token перестаёт давать доступ.
+- Plaintext `employees.pin` удалён. Worker создаёт versioned PBKDF2 verifier с salt и expiry; поддержаны create/reset/deactivate и offline verification без отправки PIN в InstantDB.
+- Offline unlock получил TTL, failed-attempt lockout и replayable audit attempts.
+- Tenant keys стали required/indexed для operational entities; bootstrap, backfill и audit scripts закрывают missing, ambiguous и cross-venue links.
+
+#### Schema, permissions и query contracts
+
+- Development, disposable CI, isolated staging и production получили одну schema и deny-by-default permissions.
+- Direct client mutations critical POS entities запрещены; admin catalog/warehouse writes разрешены только через membership-scoped правила или trusted commands.
+- Real-token permission matrix доказал allowed reads и отклонение unsigned, revoked, cross-venue и direct critical writes.
+- Worker authorization и operational queries ограничены indexed/bounded contracts; добавлены performance proofs и guards против infinite operational reads.
+- Репозиторный audit запрещает `$inc`, `employees.pin`, privileged client credentials и PostgreSQL operational-ledger imports.
+
+#### Rebuildable analytics
+
+- Payment/refund и связанные financial changes создают immutable `financialContributions`.
+- Projector поддерживает deterministic replay, persisted idempotent checkpoints, daily-stat versions и полный rebuild.
+- Projection outage только логируется: POS commit не блокируется и может быть восстановлен из operational contributions.
+- Supabase оставлен read-only источником старого dashboard analytics; Supabase auth и operational writes удалены.
+
+#### Rollout, reconciliation и delivery
+
+- Development snapshot и tenant audit подготовлены до isolated staging rollout; representative dataset был скопирован и очищен после E2E.
+- Production canary проверил shift → order → line → payment, identical replay после потерянного ответа, payload mismatch, concurrent payment, refund replay и PIN credential lifecycle.
+- Production snapshot после cleanup совпал с pre-canary snapshot по operational entities; temporary users, memberships, claims и credentials удалены.
+- Production worker CORS ограничен `https://lumo-admin-production.up.railway.app`; посторонний Origin получает ответ без `Access-Control-Allow-Origin`.
+- Instant admin credentials раздельно ротированы для development, CI/staging и production; production worker после rotation прошёл health и canary.
+- Railway PostgreSQL проверен напрямую: пользовательских таблиц и `worker_operations` нет; compute остановлен. Пустой service/volume остался только из-за `Unauthorized` ответа Railway delete API/CLI.
+- Cutover опубликован в `master`. Workflow `Instant cutover quality` проходит data/worker/POS checks, real-token permission matrix, command fault injection, POS/analytics HTTP E2E, warehouse concurrency, staff credential proof, query performance, tenant/stock audits и secret scan.
+
+#### Дополнительные native-исправления — 2026-08-12
+
+- `App.tsx` и `useInstantShift.ts` изменены так, чтобы venue-scoped shift query был disabled до завершения device authentication.
+- Загрузка offline PIN cache в `InstantLockScreen.tsx` перенесена после завершения employee query; промежуточный loading state больше не сохраняет пустой список сотрудников.
+
+
 ## 24. Официальные источники
 
 - Instant transactions: https://www.instantdb.com/docs/instaml
