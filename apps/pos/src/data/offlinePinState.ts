@@ -4,8 +4,6 @@ import { EMPLOYEE_PIN_OFFLINE_TTL_MS } from '@lumo/data'
 import type { OfflineEmployee } from './employeePin';
 
 const STATE_KEY = 'lumo.offline-pin-state.v1';
-const MAX_FAILED_ATTEMPTS = 5;
-const LOCKOUT_MS = 15 * 60 * 1000;
 
 export interface UnlockAttemptEvent {
   id: string;
@@ -18,13 +16,11 @@ interface OfflinePinState {
   venueId: string;
   cachedAt: string | null;
   employees: OfflineEmployee[];
-  failedAttempts: number;
-  lockedUntil: string | null;
   pendingAttempts: UnlockAttemptEvent[];
 }
 
 function emptyState(venueId: string): OfflinePinState {
-  return { venueId, cachedAt: null, employees: [], failedAttempts: 0, lockedUntil: null, pendingAttempts: [] };
+  return { venueId, cachedAt: null, employees: [], pendingAttempts: [] };
 }
 
 async function loadState(venueId: string): Promise<OfflinePinState> {
@@ -56,18 +52,13 @@ export async function loadOfflineEmployees(venueId: string, now = Date.now()): P
   return state.employees.filter((employee) => Date.parse(employee.expiresAt) > now && employee.status === 'active');
 }
 
-export async function unlockLockedUntil(venueId: string, now = Date.now()): Promise<string | null> {
-  const state = await loadState(venueId);
-  if (!state.lockedUntil || Date.parse(state.lockedUntil) <= now) return null;
-  return state.lockedUntil;
-}
 
 export async function registerUnlockAttempt(
   venueId: string,
   outcome: UnlockAttemptEvent['outcome'],
   employeeId?: string,
   now = Date.now(),
-): Promise<string | null> {
+): Promise<void> {
   const state = await loadState(venueId);
   const event: UnlockAttemptEvent = {
     id: randomUUID(),
@@ -75,19 +66,8 @@ export async function registerUnlockAttempt(
     outcome,
     ...(employeeId ? { employeeId } : {}),
   };
-  if (outcome === 'success') {
-    state.failedAttempts = 0;
-    state.lockedUntil = null;
-  } else {
-    const priorLockExpired = state.lockedUntil && Date.parse(state.lockedUntil) <= now;
-    state.failedAttempts = priorLockExpired ? 1 : state.failedAttempts + 1;
-    state.lockedUntil = state.failedAttempts >= MAX_FAILED_ATTEMPTS
-      ? new Date(now + LOCKOUT_MS).toISOString()
-      : null;
-  }
   state.pendingAttempts = [...state.pendingAttempts, event].slice(-100);
   await saveState(state);
-  return state.lockedUntil;
 }
 
 export async function pendingUnlockAttempts(venueId: string): Promise<UnlockAttemptEvent[]> {

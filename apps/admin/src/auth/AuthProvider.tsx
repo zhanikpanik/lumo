@@ -5,12 +5,17 @@ import { flushPendingAdminCommands } from '@/data/adminCommands';
 import { AuthContext, type AuthValue } from './auth-context';
 
 const ADMIN_ROLES: Record<string, true> = { owner: true, manager: true };
+const PREFERRED_VENUE_ID = import.meta.env.VITE_VENUE_ID;
 
-function linkedId(value: unknown): string | null {
+function linkedVenue(value: unknown): { id: string; name: string } | null {
   const linked = Array.isArray(value) ? value[0] : value;
-  return linked && typeof linked === 'object' && 'id' in linked && typeof linked.id === 'string'
-    ? linked.id
-    : null;
+  if (!linked || typeof linked !== 'object' || !('id' in linked) || typeof linked.id !== 'string') {
+    return null;
+  }
+  return {
+    id: linked.id,
+    name: 'name' in linked && typeof linked.name === 'string' ? linked.name : 'Заведение',
+  };
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -23,7 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  const venueId = useMemo(() => {
+  const selectedVenue = useMemo(() => {
     const memberships = (membershipResult.data?.$users?.[0]?.memberships ?? []) as Array<{
       status?: string;
       role?: string;
@@ -31,12 +36,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       venue?: unknown;
     }>;
 
-    return memberships
+    const venues = memberships
       .filter((membership) => membership.status === 'active' && ADMIN_ROLES[membership.role ?? ''] === true)
       .sort((left, right) => (left.createdAt ?? '').localeCompare(right.createdAt ?? ''))
-      .map((membership) => linkedId(membership.venue))
-      .find((id): id is string => id !== null) ?? null;
+      .map((membership) => linkedVenue(membership.venue))
+      .filter((venue): venue is { id: string; name: string } => venue !== null);
+    return venues.find((venue) => venue.id === PREFERRED_VENUE_ID) ?? venues[0] ?? null;
   }, [membershipResult.data]);
+  const venueId = selectedVenue?.id ?? null;
+  const venueName = selectedVenue?.name ?? null;
 
   useEffect(() => {
     if (user) {
@@ -63,6 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading: isLoading,
       membershipLoading: Boolean(user) && membershipResult.isLoading,
       venueId,
+      venueName,
       authError: error instanceof Error ? error : null,
       requestMagicCode,
       verifyMagicCode,
@@ -76,6 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signOut,
       user,
       venueId,
+      venueName,
       verifyMagicCode,
     ],
   );

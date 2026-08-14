@@ -1,6 +1,7 @@
 import { getInstantClient } from '@/data/instant';
 import { adminAllOrdersQuery, adminOrderDetailQuery } from '@lumo/data';
 import { useVenueId } from './useVenueId';
+import { instantOne } from '@/lib/instantLink';
 
 export interface CheckItem {
   name: string;
@@ -61,7 +62,7 @@ function profitFromItems(items: CheckItem[]): { profit: number; incomplete: bool
 
 function mapStatus(status: string): 'open' | 'closed' | 'cancelled' {
   if (status === 'cancelled') return 'cancelled';
-  if (status === 'closed') return 'closed';
+  if (status === 'paid' || status === 'closed') return 'closed';
   return 'open';
 }
 
@@ -117,10 +118,12 @@ export function useInstantChecks({ from, page = 0 }: ChecksPageOptions = {}) {
     const source: OrderSource =
       o.source === 'glovo' || o.source === 'yandex_eda' ? o.source : 'pos';
 
+    const table = instantOne(o.table);
+    const ownerEmployee = instantOne(o.ownerEmployee);
     return {
       id: o.id,
-      tableNumber: o.table?.number || o.tableNumber || '—',
-      waiter: o.ownerEmployee?.displayName || '—',
+      tableNumber: table?.number || o.tableNumber || '—',
+      waiter: ownerEmployee?.displayName || '—',
       paymentMethod,
       status: mapStatus(o.status),
       openedAt: new Date(o.openedAt).toISOString(),
@@ -152,13 +155,16 @@ export function useInstantCheckDetail(orderId: string) {
   const venueId = useVenueId();
   const result = db.useQuery(adminOrderDetailQuery(venueId, orderId));
   const order = result.data?.orders?.[0];
-  const items: CheckItem[] = (order?.items ?? []).map(item => ({
-    name: item.productName,
-    qty: item.quantity,
-    price: tyinToSom(item.productPriceTiyin),
-    productId: item.product?.id ?? null,
-    unitCost: item.product?.costTiyin != null ? tyinToSom(item.product.costTiyin) : null,
-  }));
+  const items: CheckItem[] = (order?.items ?? []).map(item => {
+    const product = instantOne(item.product);
+    return {
+      name: item.productName,
+      qty: item.quantity,
+      price: tyinToSom(item.productPriceTiyin),
+      productId: product?.id ?? null,
+      unitCost: product?.costTiyin != null ? tyinToSom(product.costTiyin) : null,
+    };
+  });
   const events: OrderEvent[] = (order?.orderEvents ?? []).map(event => {
     const meta = event.metadata as Record<string, unknown> | undefined;
     return {

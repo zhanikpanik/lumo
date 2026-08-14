@@ -1,6 +1,7 @@
 import { getInstantClient } from '@/data/instant';
 import { adminDeliveriesQuery } from '@lumo/data';
 import { useVenueId } from '@/hooks/useVenueId';
+import { instantRecord } from '@/lib/instantLink';
 
 /** Legacy DeliveryRow for AllOperations mergeOps compatibility. */
 export interface DeliveryRow {
@@ -24,7 +25,7 @@ export function useInstantDeliveriesList() {
 
   const data: DeliveryRow[] = (result.data?.deliveryDocuments ?? []).map((d) => {
     const rec = d as Record<string, unknown>;
-    const wh = (rec.warehouse ?? {}) as Record<string, unknown>;
+    const wh = instantRecord(rec.warehouse) ?? {};
     const lines = (Array.isArray(rec.lines) ? rec.lines : []) as Record<string, unknown>[];
     return {
       id: d.id,
@@ -39,7 +40,7 @@ export function useInstantDeliveriesList() {
       workshop_id: null,
       items: lines.map((l) => ({
         id: String(l.id),
-        product_id: String(((l.product ?? {}) as Record<string, unknown>).id ?? null),
+        product_id: String(instantRecord(l.product)?.id ?? ''),
         name: String(l.name),
         quantity: Number(l.quantityMilli) / 1000,
         unit: String(l.unit),

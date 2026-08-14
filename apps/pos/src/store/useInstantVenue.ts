@@ -2,6 +2,9 @@ import { useMemo } from 'react';
 import { getInstantClient, getVenueId } from '../data/instant';
 import type { VenueZone, VenueTable, VenueType } from '../types';
 
+const FLOOR_GRID_COLS = 24;
+const FLOOR_GRID_ROWS = 14;
+
 interface VenueEmployee {
   id: string;
   name: string;
@@ -46,8 +49,8 @@ export function useInstantVenue(): InstantVenueData {
       .map((z: any) => ({
         id: z.id,
         name: z.name,
-        cols: z.gridCols,
-        rows: z.gridRows,
+        cols: Math.max(z.gridCols ?? 0, FLOOR_GRID_COLS),
+        rows: Math.max(z.gridRows ?? 0, FLOOR_GRID_ROWS),
         tables: (z.tables ?? [])
           .filter((t: any) => t.status !== 'archived')
           .map((t: any): VenueTable => ({

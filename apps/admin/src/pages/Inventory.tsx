@@ -7,6 +7,7 @@ import { ArrowLeft, Check, Search } from 'lucide-react';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { DeleteButton } from '@/components/ui/DeleteButton';
 import { somRounded } from '@/lib/formatSom';
+import { operationalStatusLabel } from '@/lib/operationalLabels';
 import { useInstantWarehouses } from '@/hooks/useInstantWarehouses';
 import { useInstantWarehouseIngredients } from '@/hooks/useInstantWarehouseIngredients';
 import { useVenueId } from '@/hooks/useVenueId';
@@ -59,8 +60,8 @@ function getStatusColor(status: InventoryUiStatus) {
 
 function SetupField({ label, children }: { label: string; children: React.ReactNode }) {
  return (
-  <div className="flex items-start gap-4">
-   <label className="w-32 text-sm shrink-0 pt-2 sm:w-36">{label}</label>
+  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-4">
+   <label className="text-sm sm:w-36 sm:shrink-0 sm:pt-2">{label}</label>
    <div className="min-w-0 flex-1">{children}</div>
   </div>
  );
@@ -133,6 +134,11 @@ export function Inventory() {
 
  // Quick-start from dashboard: skip setup, auto-create partial session
  useEffect(() => {
+   if (searchParams.get('create') === 'true') {
+    setStep('setup');
+    setSearchParams({}, { replace: true });
+    return;
+   }
    const quick = searchParams.get('quick');
    const products = searchParams.get('products');
    const warehouse = searchParams.get('warehouse');
@@ -370,7 +376,7 @@ export function Inventory() {
    id: 'status',
    header: 'Статус',
    meta: { align: 'text-left', className: 'text-left' },
-   cell: ({ row }) => <span className={`text-sm ${getStatusColor(row.original.status)}`}>{row.original.status}</span>,
+   cell: ({ row }) => <span className={`text-sm ${getStatusColor(row.original.status)}`}>{operationalStatusLabel(row.original.status)}</span>,
   },
   {
    id: 'type',
@@ -513,8 +519,7 @@ export function Inventory() {
   );
 
   return (
-   <div className="p-8 [&_button]:cursor-pointer">
-   <div className="flex items-center justify-between mb-6">
+   <div className="page-shell [&_button]:cursor-pointer"><div className="flex items-center justify-between mb-6">
      <h2 className="text-2xl font-bold">Инвентаризация</h2>
      <button
       onClick={() => {
@@ -527,13 +532,13 @@ export function Inventory() {
       + Начать инвентаризацию
      </button>
     </div>
-
+   
     <div className="flex items-center gap-2 mb-4">
-     <SearchInput value={search} onChange={setSearch} placeholder="Поиск по складу или дате..." className="w-64" />
+     <SearchInput value={search} onChange={setSearch} placeholder="Поиск по складу или дате..." className="w-full sm:w-64" />
     </div>
-
+   
     {invLoading && <p className="text-sm text-muted-foreground py-4">Загрузка…</p>}
-
+   
     {!invLoading && (
      <DataTable
       data={filtered}
@@ -542,172 +547,169 @@ export function Inventory() {
       emptyMessage="Нет записей"
       className="max-w-4xl"
      />
-    )}
-   </div>
+    )}</div>
   );
  }
 
  // --- Setup ---
  if (step === 'setup') {
   return (
-   <div className="p-8 pb-24 max-w-3xl [&_button]:cursor-pointer">
-    <button
-     type="button"
-     onClick={() => {
-      setPartialSelectedIds([]);
-      setPartialSearch('');
-      setStep('history');
-     }}
-     className="flex items-center gap-1.5 text-sm hover:text-foreground transition-colors mb-8"
-    >
-     <ArrowLeft className="w-4 h-4" />
-     Инвентаризации
-    </button>
-
-    <h2 className="text-2xl font-bold mb-8">Новая инвентаризация</h2>
-
-    <div className="space-y-4 mb-10">
-     <SetupField label="Дата">
-      <input
-       type="date"
-       className="w-40 px-3 py-2 border rounded-lg text-sm bg-background"
-       value={conductDate}
-       onChange={(e) => setConductDate(e.target.value)}
-      />
-     </SetupField>
-
-     <SetupField label="Время">
-      <input
-       type="time"
-       className="w-32 px-3 py-2 border rounded-lg text-sm bg-background"
-       value={conductTime}
-       onChange={(e) => setConductTime(e.target.value)}
-      />
-     </SetupField>
-
-     <SetupField label="Склад">
-      <div
-       className="inline-flex flex-wrap gap-0.5 rounded-lg bg-[#F2F2F7] p-0.5 shadow-[inset_0_1px_2px_rgba(0,0,0,0.04)]"
-
-      >
-       {warehouses.map((w) => (
-        <button
-         key={w.id}
-         type="button"
-         onClick={() => {
-          setSelectedWorkshopId(w.id);
-          setPartialSelectedIds([]);
-         }}
-         className={`px-4 py-1.5 rounded-lg text-sm transition-all ${
-          selectedWorkshopId === w.id
-           ? 'bg-white text-foreground shadow-sm'
-           : 'text-muted-foreground hover:text-foreground'
-         }`}
-         
-        >
-         {w.name}
-        </button>
-       ))}
-      </div>
-     </SetupField>
-
-     <SetupField label="Тип">
-      <div
-       className="inline-flex flex-wrap gap-0.5 rounded-lg bg-[#F2F2F7] p-0.5 shadow-[inset_0_1px_2px_rgba(0,0,0,0.04)]"
-
-      >
+   <div className="page-shell page-shell--narrow pb-24 [&_button]:cursor-pointer"><button
+    type="button"
+    onClick={() => {
+     setPartialSelectedIds([]);
+     setPartialSearch('');
+     setStep('history');
+    }}
+    className="flex items-center gap-1.5 text-sm hover:text-foreground transition-colors mb-8"
+   >
+    <ArrowLeft className="w-4 h-4" />
+    Инвентаризации
+   </button>
+   
+   <h2 className="text-2xl font-bold mb-8">Новая инвентаризация</h2>
+   
+   <div className="space-y-4 mb-10">
+    <SetupField label="Дата">
+     <input
+      type="date"
+      className="min-h-11 w-full px-3 py-2 border rounded-lg text-base bg-background sm:w-40 sm:text-sm"
+      value={conductDate}
+      onChange={(e) => setConductDate(e.target.value)}
+     />
+    </SetupField>
+   
+    <SetupField label="Время">
+     <input
+      type="time"
+      className="min-h-11 w-full px-3 py-2 border rounded-lg text-base bg-background sm:w-32 sm:text-sm"
+      value={conductTime}
+      onChange={(e) => setConductTime(e.target.value)}
+     />
+    </SetupField>
+   
+    <SetupField label="Склад">
+     <div
+      className="inline-flex flex-wrap gap-0.5 rounded-lg bg-muted p-0.5 shadow-[inset_0_1px_2px_rgba(0,0,0,0.04)]"
+   
+     >
+      {warehouses.map((w) => (
        <button
+        key={w.id}
         type="button"
         onClick={() => {
-         setInventoryType('full');
+         setSelectedWorkshopId(w.id);
          setPartialSelectedIds([]);
         }}
         className={`px-4 py-1.5 rounded-lg text-sm transition-all ${
-         inventoryType === 'full'
+         selectedWorkshopId === w.id
           ? 'bg-white text-foreground shadow-sm'
           : 'text-muted-foreground hover:text-foreground'
         }`}
         
        >
-        Полная
+        {w.name}
        </button>
-       <button
-        type="button"
-        onClick={() => setInventoryType('partial')}
-        className={`px-4 py-1.5 rounded-lg text-sm transition-all ${
-         inventoryType === 'partial'
-          ? 'bg-white text-foreground shadow-sm'
-          : 'text-muted-foreground hover:text-foreground'
-        }`}
-       >
-        Частичная
-       </button>
+      ))}
+     </div>
+    </SetupField>
+   
+    <SetupField label="Тип">
+     <div
+      className="inline-flex flex-wrap gap-0.5 rounded-lg bg-muted p-0.5 shadow-[inset_0_1px_2px_rgba(0,0,0,0.04)]"
+   
+     >
+      <button
+       type="button"
+       onClick={() => {
+        setInventoryType('full');
+        setPartialSelectedIds([]);
+       }}
+       className={`px-4 py-1.5 rounded-lg text-sm transition-all ${
+        inventoryType === 'full'
+         ? 'bg-white text-foreground shadow-sm'
+         : 'text-muted-foreground hover:text-foreground'
+       }`}
+       
+      >
+       Полная
+      </button>
+      <button
+       type="button"
+       onClick={() => setInventoryType('partial')}
+       className={`px-4 py-1.5 rounded-lg text-sm transition-all ${
+        inventoryType === 'partial'
+         ? 'bg-white text-foreground shadow-sm'
+         : 'text-muted-foreground hover:text-foreground'
+       }`}
+      >
+       Частичная
+      </button>
+     </div>
+    </SetupField>
+   
+    {inventoryType === 'partial' && selectedWorkshopId && (
+     <SetupField label="Позиции">
+      <div className="space-y-2 max-w-md">
+       <p className="text-sm text-muted-foreground">
+        Удерживайте Cmd (Mac) или Ctrl (Windows) для нескольких позиций.
+       </p>
+       <div className="flex items-center gap-2 border rounded-lg px-3 py-1.5">
+        <Search className="w-3.5 h-3.5 text-muted-foreground opacity-40 shrink-0" />
+        <input
+         className="bg-transparent text-base outline-none flex-1 min-w-0 sm:text-sm"
+         placeholder="Поиск по названию…"
+         value={partialSearch}
+         onChange={(e) => setPartialSearch(e.target.value)}
+        />
+       </div>
+       {partialListPending ? (
+        <p className="text-sm text-muted-foreground py-2">Загрузка…</p>
+       ) : (
+        <select
+         multiple
+         size={12}
+         className="w-full min-h-[12rem] px-2 py-1 border rounded-lg text-sm bg-background"
+         value={partialSelectedIds}
+         onChange={(e) =>
+          setPartialSelectedIds(
+           Array.from(e.target.selectedOptions, (o) => o.value)
+          )
+         }
+        >
+         {ingredientsForPartialSelect.map((i) => (
+          <option key={i.id} value={i.id}>
+           {i.name} · {i.unit}
+          </option>
+         ))}
+        </select>
+       )}
       </div>
      </SetupField>
-
-     {inventoryType === 'partial' && selectedWorkshopId && (
-      <SetupField label="Позиции">
-       <div className="space-y-2 max-w-md">
-        <p className="text-sm text-muted-foreground">
-         Удерживайте Cmd (Mac) или Ctrl (Windows) для нескольких позиций.
-        </p>
-        <div className="flex items-center gap-2 border rounded-lg px-3 py-1.5">
-         <Search className="w-3.5 h-3.5 text-muted-foreground opacity-40 shrink-0" />
-         <input
-          className="bg-transparent text-sm outline-none flex-1 min-w-0"
-          placeholder="Поиск по названию…"
-          value={partialSearch}
-          onChange={(e) => setPartialSearch(e.target.value)}
-         />
-        </div>
-        {partialListPending ? (
-         <p className="text-sm text-muted-foreground py-2">Загрузка…</p>
-        ) : (
-         <select
-          multiple
-          size={12}
-          className="w-full min-h-[12rem] px-2 py-1 border rounded-lg text-sm bg-background"
-          value={partialSelectedIds}
-          onChange={(e) =>
-           setPartialSelectedIds(
-            Array.from(e.target.selectedOptions, (o) => o.value)
-           )
-          }
-         >
-          {ingredientsForPartialSelect.map((i) => (
-           <option key={i.id} value={i.id}>
-            {i.name} · {i.unit}
-           </option>
-          ))}
-         </select>
-        )}
-       </div>
-      </SetupField>
-     )}
-    </div>
-
-    <div className="flex gap-3">
-     <button
-      type="button"
-      disabled={
-       !selectedWorkshopId ||
-      createSession.loading ||
-       (inventoryType === 'partial' && partialSelectedIds.length === 0)
-      }
-      onClick={handleStartFromSetup}
-      className="px-6 py-2.5 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-     >
-      Начать инвентаризацию
-     </button>
-     <button
-      type="button"
-      onClick={() => setStep('history')}
-      className="px-6 py-2.5 border rounded-lg text-sm hover:bg-secondary transition-colors"
-     >
-      Отмена
-     </button>
-    </div>
+    )}
    </div>
+   
+   <div className="flex gap-3">
+    <button
+     type="button"
+     disabled={
+      !selectedWorkshopId ||
+     createSession.loading ||
+      (inventoryType === 'partial' && partialSelectedIds.length === 0)
+     }
+     onClick={handleStartFromSetup}
+     className="px-6 py-2.5 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+    >
+     Начать инвентаризацию
+    </button>
+    <button
+     type="button"
+     onClick={() => setStep('history')}
+     className="px-6 py-2.5 border rounded-lg text-sm hover:bg-secondary transition-colors"
+    >
+     Отмена
+    </button>
+   </div></div>
   );
  }
 
@@ -716,53 +718,51 @@ export function Inventory() {
   warehouses.find((w) => w.id === selectedWorkshopId)?.name || 'Склад';
 
  return (
-  <div className="p-8 [&_button]:cursor-pointer">
-   <div className="flex items-center justify-between mb-6">
-    <div>
-     <button
-      type="button"
-      onClick={() => {
-       setMovementPeriodHint(null);
-       setStep('history');
-      }}
-      className="flex items-center gap-1.5 text-sm hover:text-foreground transition-colors mb-2"
-     >
-      <ArrowLeft className="w-4 h-4" />
-      Инвентаризации
-     </button>
-     <h2 className="text-2xl font-bold">Инвентаризация: {selectedSkladName}</h2>
-     {movementPeriodHint && (
-      <p className="text-sm text-muted-foreground mt-2 max-w-2xl">{movementPeriodHint}</p>
-     )}
-    </div>
-    <div className="flex gap-2">
-     <button
-      type="button"
-      disabled={saveLines.loading || postSession.loading}
-      onClick={handlePostCounting}
-      className="inline-flex cursor-pointer items-center justify-center gap-1.5 px-4 py-1.5 text-sm rounded-lg bg-primary text-primary-foreground hover:bg-primary/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-     >
-      <Check className="w-4 h-4 shrink-0" aria-hidden />
-      Провести
-     </button>
-    </div>
+  <div className="page-shell [&_button]:cursor-pointer"><div className="flex items-center justify-between mb-6">
+   <div>
+    <button
+     type="button"
+     onClick={() => {
+      setMovementPeriodHint(null);
+      setStep('history');
+     }}
+     className="flex items-center gap-1.5 text-sm hover:text-foreground transition-colors mb-2"
+    >
+     <ArrowLeft className="w-4 h-4" />
+     Инвентаризации
+    </button>
+    <h2 className="text-2xl font-bold">Инвентаризация: {selectedSkladName}</h2>
+    {movementPeriodHint && (
+     <p className="text-sm text-muted-foreground mt-2 max-w-2xl">{movementPeriodHint}</p>
+    )}
    </div>
-
-   {countingError && (
-    <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-     {countingError}
-    </div>
-   )}
-
-   <DataTable
-    data={countingItems}
-    columns={countingColumns}
-    dense
-    isLoading={countingRowsLoading}
-    error={countingError ? new Error(countingError) : null}
-    emptyMessage="Нет позиций для сверки"
-    className="max-w-4xl"
-   />
+   <div className="flex gap-2">
+    <button
+     type="button"
+     disabled={saveLines.loading || postSession.loading}
+     onClick={handlePostCounting}
+     className="inline-flex cursor-pointer items-center justify-center gap-1.5 px-4 py-1.5 text-sm rounded-lg bg-primary text-primary-foreground hover:bg-primary/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+     <Check className="w-4 h-4 shrink-0" aria-hidden />
+     Провести
+    </button>
+   </div>
   </div>
+  
+  {countingError && (
+   <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+    {countingError}
+   </div>
+  )}
+  
+  <DataTable
+   data={countingItems}
+   columns={countingColumns}
+   dense
+   isLoading={countingRowsLoading}
+   error={countingError ? new Error(countingError) : null}
+   emptyMessage="Нет позиций для сверки"
+   className="max-w-4xl"
+  /></div>
  );
 }

@@ -30,7 +30,7 @@ describe('mapOrderRow', () => {
       number: 'A-42',
       status: 'active',
       source: 'pos',
-      ownerEmployee: { displayName: 'Айжан' },
+      ownerEmployee: [{ id: 'employee-1', displayName: 'Айжан' }],
       zoneName: 'Зал',
       orderType: 'Общий',
       totalAmountTiyin: 35000,
@@ -41,6 +41,7 @@ describe('mapOrderRow', () => {
     expect(order.number).toBe('A-42');
     expect(order.status).toBe('active');
     expect(order.waiter).toBe('Айжан');
+    expect(order.ownerEmployeeId).toBe('employee-1');
     expect(order.zone).toBe('Зал');
     expect(order.totalAmount).toBe(35000);
     expect(order.tableNumber).toBe('5');
@@ -174,10 +175,24 @@ describe('mapAndSortOrders', () => {
     const rows: InstantOrderRow[] = [
       makeRow({ id: 'paid-1', status: 'paid', openedAt: '2025-01-15T10:00:00Z' }),
       makeRow({ id: 'active-1', status: 'active', openedAt: '2025-01-15T11:00:00Z' }),
-      makeRow({ id: 'cancelled-1', status: 'cancelled', openedAt: '2025-01-15T09:00:00Z' }),
+      makeRow({
+        id: 'cancelled-1',
+        status: 'cancelled',
+        openedAt: '2025-01-15T09:00:00Z',
+        items: [{ id: 'i1', productName: 'Латте', productPriceTiyin: 15000, quantity: 1 }],
+      }),
     ];
 
     const result = mapAndSortOrders(rows);
     expect(result.map((o) => o.id)).toEqual(['active-1', 'paid-1', 'cancelled-1']);
+  });
+
+  it('omits an empty cancelled draft from the waiter grid', () => {
+    const result = mapAndSortOrders([
+      makeRow({ id: 'cancelled-empty', status: 'cancelled', items: [] }),
+      makeRow({ id: 'active-1', status: 'active', items: [] }),
+    ]);
+
+    expect(result.map((order) => order.id)).toEqual(['active-1']);
   });
 });

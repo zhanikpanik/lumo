@@ -27,8 +27,14 @@ export { default as instantSchema, type AppSchema } from './instant.schema.js';
 export { DomainError, domainErrorFrom, guardActiveOrder, guardShiftState, type ErrorCode } from './errors.js';
 export type { CommandDatabase } from './commands/database.js';
 export type {
+  CompleteDeviceActivationRequest,
+  DeviceActivationMagicCodeRequest,
+  DeviceActivationMagicCodeResult,
+  DeviceActivationResponse,
   DeviceActivationRequest,
   DeviceActivationResult,
+  DeviceActivationVenue,
+  DeviceActivationVenueSelection,
   DeviceStatus,
   EmployeePinCredential,
   EmployeeStatus,

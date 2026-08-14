@@ -190,9 +190,9 @@ function WriteOffFormInner({
     </div>
    )}
    <div className="space-y-4">
-    <div className="flex items-center gap-4">
-          <label className="w-32 text-sm text-foreground shrink-0 sm:w-36">Дата и время</label>
-          <div className="flex items-center gap-2">
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+          <label className="text-sm text-foreground sm:w-36 sm:shrink-0">Дата и время</label>
+          <div className="flex flex-wrap items-center gap-2">
             <DatePicker value={date} onChange={setDate} />
             <TimePicker value={time} onChange={setTime} />
           </div>
@@ -214,7 +214,7 @@ function WriteOffFormInner({
 
     <Field label="Комментарий" topLabel>
      <textarea
-      className="w-full max-w-sm px-3 py-2 border border-border rounded-lg text-sm resize-none"
+      className="w-full px-3 py-2 border border-border rounded-lg text-base resize-none sm:max-w-sm sm:text-sm"
       rows={2}
       placeholder="Необязательно"
       value={comment}
@@ -224,7 +224,7 @@ function WriteOffFormInner({
    </div>
 
    <div className="mb-8">
-    <div className="flex items-center gap-2 pb-2 mb-1 text-xs font-normal text-foreground">
+    <div className="hidden sm:flex items-center gap-2 pb-2 mb-1 text-xs font-normal text-foreground">
      <div className="flex-[3] min-w-0">Ингредиент</div>
      <div className="w-24 shrink-0 text-right">Кол-во</div>
      <div className="w-40">Причина</div>
@@ -233,8 +233,8 @@ function WriteOffFormInner({
 
     <div className="space-y-2">
      {lines.map((line) => (
-      <div key={line.key} className="flex items-center gap-2">
-       <div className="flex-[3] min-w-0">
+      <div key={line.key} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)_2.75rem] items-center gap-2 sm:flex">
+       <div className="col-span-3 min-w-0 sm:col-span-1 sm:flex-[3]">
         <SearchableSelect
          ingredients={ingredients}
          valueId={line.product_id || null}
@@ -242,14 +242,14 @@ function WriteOffFormInner({
          excludeIds={usedIds}
         />
        </div>
-       <div className="w-24 shrink-0">
+       <div className="min-w-0 sm:w-24 sm:shrink-0">
         <DecimalSuffixInput
          value={line.quantity}
          onChange={(v) => patchLine(line.key, 'quantity', v)}
          suffix={quantitySuffix(line.unit)}
         />
        </div>
-       <div className="w-40">
+       <div className="min-w-0 sm:w-40">
         <select
          className="w-full px-2 py-1.5 border border-border rounded-lg text-sm "
          value={line.reason}
@@ -262,7 +262,7 @@ function WriteOffFormInner({
          ))}
         </select>
        </div>
-       <div className="w-9 flex justify-center">
+       <div className="flex size-11 items-center justify-center sm:w-9">
         <DeleteButton variant="line" onClick={() => removeLine(line.key)} />
        </div>
       </div>
@@ -272,7 +272,7 @@ function WriteOffFormInner({
     <button
      type="button"
      onClick={addRow}
-     className="flex items-center gap-1.5 mt-6 px-3 py-1.5 text-sm font-medium border rounded-md hover:bg-secondary transition-colors"
+     className="flex min-h-11 items-center gap-1.5 mt-6 px-3 py-1.5 text-sm font-medium border rounded-md hover:bg-secondary transition-colors"
     >
      <Plus className="w-4 h-4" />
      Добавить строку

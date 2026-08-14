@@ -744,87 +744,85 @@ export function CashShifts() {
  ], []);
 
  return (
-  <div className="p-8">
-   {showModal && (
-    <AddTransactionModal
-     shifts={shifts}
-     defaultDatetime={modalDefaultDt}
-     onClose={() => setShowModal(false)}
-    />
-   )}
-
-   {!!error && (
-    <div className="mb-6 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-1.5 text-sm text-destructive">
-     {error instanceof Error ? error.message : 'Не удалось загрузить смены'}
-    </div>
-   )}
-
-   <div className="flex items-center justify-between mb-6">
-    <h2 className="text-2xl font-bold">Кассовые смены</h2>
-    <div className="flex gap-3">
-     <button className="flex items-center gap-2 px-4 py-2 border rounded-lg text-sm text-[#5D4FF1] font-medium hover:bg-secondary/50 transition-colors">
-      <Printer className="w-4 h-4" />
-      Распечатать
-     </button>
-     <button className="flex items-center gap-2 px-4 py-2 border rounded-lg text-sm text-[#5D4FF1] font-medium hover:bg-secondary/50 transition-colors">
-      12 марта — 12 апреля
-      <ChevronDown className="w-4 h-4" />
-     </button>
-    </div>
-   </div>
-  <SegmentTabs
-     options={[
-       { value: 'today' as const, label: 'Сегодня' },
-       { value: 'week' as const, label: 'Неделя' },
-       { value: 'month' as const, label: 'Месяц' },
-       { value: 'all' as const, label: 'Всё' },
-     ]}
-     value={period}
-     onChange={(value) => { setPeriod(value); setPage(0); setExpandedId(null); }}
-     className="mb-4"
+  <div className="page-shell">{showModal && (
+   <AddTransactionModal
+    shifts={shifts}
+    defaultDatetime={modalDefaultDt}
+    onClose={() => setShowModal(false)}
    />
-
-   <div className="max-w-4xl">
-    <DataTable
-      data={shifts}
-      columns={shiftColumns}
-      dense
-      isLoading={isLoading}
-      error={error ? new Error(error.message) : null}
-      emptyMessage="Нет кассовых смен"
-      expandedRows={expandedRows}
-      onExpandedChange={toggleExpand}
-      renderExpandedRow={(row) => (
-        <ShiftDetail shift={row.original} onAddTransaction={openModal} />
-      )}
-      getRowClassName={(row) => {
-        const s = row.original;
-        if (expandedId === s.id) return 'bg-black/[0.03]';
-        if (!s.closeTime) return 'bg-[#FDF6E3] hover:bg-[#F9EED4]';
-        if (s.difference != null && s.difference !== 0) return 'bg-[#FCE8E8] hover:bg-[#FAD5D5]';
-        return row.index % 2 === 1 ? 'bg-muted/10' : '';
-      }}
-    />
-    <div className="mt-4 flex items-center justify-end gap-2">
-     <button
-      type="button"
-      className="rounded-lg border px-3 py-1.5 text-sm disabled:opacity-40"
-      disabled={page === 0 || isLoading}
-      onClick={() => { setExpandedId(null); setPage((current) => Math.max(0, current - 1)); }}
-     >
-      Назад
-     </button>
-     <span className="text-sm text-muted-foreground">Страница {page + 1}</span>
-     <button
-      type="button"
-      className="rounded-lg border px-3 py-1.5 text-sm disabled:opacity-40"
-      disabled={!hasNextPage || isLoading}
-      onClick={() => { setExpandedId(null); setPage((current) => current + 1); }}
-     >
-      Далее
-     </button>
-    </div>
+  )}
+  
+  {!!error && (
+   <div className="mb-6 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-1.5 text-sm text-destructive">
+    {error instanceof Error ? error.message : 'Не удалось загрузить смены'}
+   </div>
+  )}
+  
+  <div className="flex items-center justify-between mb-6">
+   <h2 className="text-2xl font-bold">Кассовые смены</h2>
+   <div className="flex gap-3">
+    <button className="flex items-center gap-2 px-4 py-2 border rounded-lg text-sm text-[#5D4FF1] font-medium hover:bg-secondary/50 transition-colors">
+     <Printer className="w-4 h-4" />
+     Распечатать
+    </button>
+    <button className="flex items-center gap-2 px-4 py-2 border rounded-lg text-sm text-[#5D4FF1] font-medium hover:bg-secondary/50 transition-colors">
+     12 марта — 12 апреля
+     <ChevronDown className="w-4 h-4" />
+    </button>
+   </div>
   </div>
-  </div>
+    <SegmentTabs
+    options={[
+      { value: 'today' as const, label: 'Сегодня' },
+      { value: 'week' as const, label: 'Неделя' },
+      { value: 'month' as const, label: 'Месяц' },
+      { value: 'all' as const, label: 'Всё' },
+    ]}
+    value={period}
+    onChange={(value) => { setPeriod(value); setPage(0); setExpandedId(null); }}
+    className="mb-4"
+  />
+  
+  <div className="max-w-4xl">
+   <DataTable
+     data={shifts}
+     columns={shiftColumns}
+     dense
+     isLoading={isLoading}
+     error={error ? new Error(error.message) : null}
+     emptyMessage="Нет кассовых смен"
+     expandedRows={expandedRows}
+     onExpandedChange={toggleExpand}
+     renderExpandedRow={(row) => (
+       <ShiftDetail shift={row.original} onAddTransaction={openModal} />
+     )}
+     getRowClassName={(row) => {
+       const s = row.original;
+       if (expandedId === s.id) return 'bg-black/[0.03]';
+       if (!s.closeTime) return 'bg-[#FDF6E3] hover:bg-[#F9EED4]';
+       if (s.difference != null && s.difference !== 0) return 'bg-[#FCE8E8] hover:bg-[#FAD5D5]';
+       return row.index % 2 === 1 ? 'bg-muted/10' : '';
+     }}
+   />
+   <div className="mt-4 flex items-center justify-end gap-2">
+    <button
+     type="button"
+     className="rounded-lg border px-3 py-1.5 text-sm disabled:opacity-40"
+     disabled={page === 0 || isLoading}
+     onClick={() => { setExpandedId(null); setPage((current) => Math.max(0, current - 1)); }}
+    >
+     Назад
+    </button>
+    <span className="text-sm text-muted-foreground">Страница {page + 1}</span>
+    <button
+     type="button"
+     className="rounded-lg border px-3 py-1.5 text-sm disabled:opacity-40"
+     disabled={!hasNextPage || isLoading}
+     onClick={() => { setExpandedId(null); setPage((current) => current + 1); }}
+    >
+     Далее
+    </button>
+   </div>
+    </div></div>
  );
 }

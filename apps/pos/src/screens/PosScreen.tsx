@@ -1,5 +1,5 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar } from 'react-native';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { ActivityIndicator, Alert, View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar } from 'react-native';
 import { theme } from '../theme/colors';
 import { PosHeader } from '../components/PosHeader';
 import { OrderPanel } from '../components/OrderPanel';
@@ -20,13 +20,18 @@ import { useInstantMenu } from '../store/useInstantMenu';
 import { useInstantOrderEditor } from '../store/useInstantOrderEditor';
 import { useInstantVenue } from '../store/useInstantVenue';
 import { useInstantShift } from '../store/useInstantShift';
+import { useUserStore } from '../store/userStore';
+import { requiresOrderTakeover } from '../utils/permissions';
 import { CommentModal } from '../components/CommentModal';
 import { NotificationModal } from '../components/NotificationModal';
 import type { OrderActionType, OrderItem, Product } from '../types';
 import type { InstantModifierGroup } from '../store/useInstantMenu';
 import { getPrintAdapter } from '../print/printService';
 
+const GAP = 10;
 const COL_GAP = 10;
+const PADDING = 10;
+const EMPTY_ITEMS: OrderItem[] = [];
 
 /**
  * Compute total from order items (replaces orderStore.getTotal).
@@ -41,6 +46,8 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
   // ── UI state (from posUiStore) ────────────────────────
   const {
     currentOrderId,
+    isCreatingOrder,
+    setCreatingOrder,
     selectedItemId, selectedModifierId, modifierAction,
     activeAction, draftItem,
     selectItem, selectModifier, cancelDraft,
@@ -48,8 +55,8 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
   } = usePosUiStore();
 
   // ── InstantDB data ────────────────────────────────────
-  const { employees, venueType } = useInstantVenue();
-  const currentUser = employees[0]; // TODO: proper current user from auth
+  const { venueType } = useInstantVenue();
+  const currentUser = useUserStore((state) => state.currentUser);
   const { openShift: currentShift } = useInstantShift(currentUser?.id);
   const shiftId = currentShift?.id;
 
@@ -61,7 +68,13 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
     return instantOrders.find((o) => o.id === currentOrderId) ?? null;
   }, [instantOrders, currentOrderId]);
 
-  const items = currentOrder?.items ?? [];
+  const items = currentOrder?.items ?? EMPTY_ITEMS;
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+  const [pendingItems, setPendingItems] = useState<Array<OrderItem & { committedItemId?: string }>>([]);
+  const pendingItemIds = useMemo(() => new Set(pendingItems.map((item) => item.id)), [pendingItems]);
+  const displayItems = useMemo(() => [...items, ...pendingItems], [items, pendingItems]);
+  const hasPendingItems = pendingItems.length > 0;
 
   // ── InstantDB write commands ──────────────────────────
   const { addItem, removeItem, deleteCurrentOrder, updateMeta } =
@@ -76,10 +89,11 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
 
   // ── Derived state ─────────────────────────────────────
   const isModifierSelected = !!selectedModifierId;
-  const selectedItem = items.find((i) => i.id === selectedItemId);
-  const isItemSelected = !!selectedItem || !!draftItem;
-  const isEmpty = items.length === 0;
-  const total = calcTotal(items);
+  const selectedItem = draftItem ?? displayItems.find((item) => item.id === selectedItemId);
+  const isItemSelected = !!selectedItem;
+  const editorItems = draftItem ? [draftItem, ...displayItems] : displayItems;
+  const isEmpty = displayItems.length === 0;
+  const total = calcTotal(displayItems);
 
   const modifierGroups: InstantModifierGroup[] | undefined =
     selectedItem && products[selectedItem.product.id]?.modifierGroups;
@@ -92,18 +106,52 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
   const [commentVisible, setCommentVisible] = useState(false);
   const [orderActionsMode, setOrderActionsMode] = useState(false);
   const [selectedOrderAction, setSelectedOrderAction] = useState<OrderActionType>(null);
+  const backPendingRef = useRef(false);
   const [notificationVisible, setNotificationVisible] = useState(false);
 
   // ── Effects ───────────────────────────────────────────
 
-  const isLocked = useMemo(() => {
-    if (!currentUser || !currentOrder) return false;
-    if (currentUser.role !== 'waiter') return false;
-    if (isTakeaway) return false;
-    return currentOrder.waiter !== currentUser.name;
-  }, [currentUser, currentOrder, isTakeaway]);
+  const isLocked = useMemo(
+    () => requiresOrderTakeover(currentUser, currentOrder, isTakeaway),
+    [currentUser, currentOrder, isTakeaway],
+  );
+  useEffect(() => {
+    if (isCreatingOrder && currentOrder) setCreatingOrder(false);
+  }, [currentOrder, isCreatingOrder, setCreatingOrder]);
+
+
+  useEffect(() => {
+    setPendingItems((current) => {
+      const next = current.filter(
+        (pending) => !pending.committedItemId || !items.some((item) => item.id === pending.committedItemId),
+      );
+      return next.length === current.length ? current : next;
+    });
+  }, [items]);
+
+  useEffect(() => {
+    setPendingItems([]);
+  }, [currentOrderId]);
 
   // ── Handlers ──────────────────────────────────────────
+
+  const submitItem = useCallback((item: OrderItem) => {
+    const pendingId = `pending-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    setPendingItems((current) => [...current, { ...item, id: pendingId }]);
+    void addItem(item)
+      .then((result) => {
+        if (!result) throw new Error('Заказ ещё не готов');
+        setPendingItems((current) => itemsRef.current.some((item) => item.id === result.orderItemId)
+          ? current.filter((pending) => pending.id !== pendingId)
+          : current.map((pending) =>
+            pending.id === pendingId ? { ...pending, committedItemId: result.orderItemId } : pending
+          ));
+      })
+      .catch((error: unknown) => {
+        setPendingItems((current) => current.filter((pending) => pending.id !== pendingId));
+        Alert.alert('Не удалось добавить блюдо', error instanceof Error ? error.message : 'Повторите попытку');
+      });
+  }, [addItem]);
 
   const handleAddProduct = useCallback((product: Product) => {
     if (product.hasModifiers) {
@@ -116,38 +164,49 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
       };
       startDraft(draftItem);
     } else {
-      // Simple product — add directly to InstantDB
-      addItem({
+      // Show the line immediately; the authoritative command reconciles it.
+      submitItem({
         id: `item-${Date.now()}`,
         product,
         quantity: 1,
         modifiers: [],
       });
     }
-  }, [addItem, startDraft]);
+  }, [startDraft, submitItem]);
 
   const handleCommitDraft = useCallback(() => {
     const committed = usePosUiStore.getState().commitDraft();
     if (committed && currentOrderId) {
-      // Persist to InstantDB
-      addItem(committed);
+      submitItem(committed);
     }
-  }, [addItem, currentOrderId]);
+  }, [currentOrderId, submitItem]);
 
-  const handleBack = useCallback(() => {
-    const comment = currentOrder?.comment || '';
-    const empty = items.length === 0 && !comment;
-    if (empty && currentOrderId && deleteCurrentOrder) {
-      deleteCurrentOrder();
-    }
+  const handleBack = useCallback(async () => {
+    if (backPendingRef.current) return;
+    backPendingRef.current = true;
+
+    const comment = currentOrder?.comment?.trim() || '';
+    const empty = displayItems.length === 0 && !comment;
     cancelDraft();
-    navigation?.navigate('Orders');
-  }, [currentOrder, items, currentOrderId, deleteCurrentOrder, cancelDraft, navigation]);
+
+    try {
+      if (empty && currentOrderId) {
+        await deleteCurrentOrder(currentOrderId);
+        usePosUiStore.getState().setCurrentOrderId(null);
+      }
+      navigation?.navigate('Orders');
+    } catch (error) {
+      console.error('cancel empty order failed:', error);
+    } finally {
+      backPendingRef.current = false;
+    }
+  }, [currentOrder, displayItems, currentOrderId, deleteCurrentOrder, cancelDraft, navigation]);
 
   const handleSearchOpen = () => { setSearchMode(true); setSearchQuery(''); };
   const handleSearchClose = () => { setSearchMode(false); setSearchQuery(''); };
 
   const handleOrderActionsToggle = useCallback(() => {
+    if (hasPendingItems) return;
     if (orderActionsMode) {
       setOrderActionsMode(false);
       setSelectedOrderAction(null);
@@ -156,7 +215,7 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
       setOrderActionsMode(true);
       setSelectedOrderAction(null);
     }
-  }, [orderActionsMode, cancelDraft]);
+  }, [hasPendingItems, orderActionsMode, cancelDraft]);
 
   const handleOrderActionSelect = useCallback((action: OrderActionType) => {
     if (action === 'transfer') {
@@ -174,7 +233,7 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
   };
 
   const handlePrecheck = async () => {
-    if (isEmpty || !currentOrderId) return;
+    if (isEmpty || hasPendingItems || !currentOrderId) return;
     const adapter = getPrintAdapter();
     const lines = items.map((item) => ({
       name: item.product.name,
@@ -191,6 +250,18 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
       createdAt: new Date().toISOString(),
     });
   };
+
+  if (isCreatingOrder) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar hidden />
+        <View style={styles.orderCreating}>
+          <ActivityIndicator size="large" color={theme.colors.accent} />
+          <Text style={styles.orderCreatingText}>Создаём заказ…</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   // ── Render ────────────────────────────────────────────
   return (
@@ -222,19 +293,20 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
             <View style={styles.leftCol}>
               <View style={styles.colContent}>
                 <OrderPanel
-                  items={items}
+                  items={displayItems}
+                  pendingItemIds={pendingItemIds}
                   currentOrder={currentOrder}
                   onCommentPress={() => setCommentVisible(true)}
                 />
               </View>
               <View style={styles.paymentRow}>
-                <TouchableOpacity style={styles.precheckBtn} onPress={() => void handlePrecheck()} disabled={isEmpty}>
+                <TouchableOpacity style={styles.precheckBtn} onPress={() => void handlePrecheck()} disabled={isEmpty || hasPendingItems}>
                   <Text style={styles.precheckText}>Пречек</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.paymentBtn, isEmpty && styles.btnDisabled]}
+                  style={[styles.paymentBtn, (isEmpty || hasPendingItems) && styles.btnDisabled]}
                   onPress={() => navigation?.navigate('Payment')}
-                  disabled={isEmpty}
+                  disabled={isEmpty || hasPendingItems}
                 >
                   <Text style={styles.paymentLabel}>Оплата</Text>
                   <Text style={styles.paymentAmount}>{formatAmount(total)} c</Text>
@@ -244,7 +316,7 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
             <View style={{ width: COL_GAP }} />
             <View style={styles.searchRightCol}>
               <ProductGrid
-                items={items}
+                items={displayItems}
                 products={products}
                 categories={categories}
                 onAddItem={handleAddProduct}
@@ -256,19 +328,20 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
             <View style={styles.leftCol}>
               <View style={styles.colContent}>
                 <OrderPanel
-                  items={items}
+                  items={displayItems}
+                  pendingItemIds={pendingItemIds}
                   currentOrder={currentOrder}
                   onCommentPress={() => setCommentVisible(true)}
                 />
               </View>
               <View style={styles.paymentRow}>
-                <TouchableOpacity style={styles.precheckBtn} onPress={() => void handlePrecheck()} disabled={isEmpty}>
+                <TouchableOpacity style={styles.precheckBtn} onPress={() => void handlePrecheck()} disabled={isEmpty || hasPendingItems}>
                   <Text style={styles.precheckText}>Пречек</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.paymentBtn, isItemSelected && styles.paymentBtnSecondary, isEmpty && styles.btnDisabled]}
+                  style={[styles.paymentBtn, isItemSelected && styles.paymentBtnSecondary, (isEmpty || hasPendingItems) && styles.btnDisabled]}
                   onPress={() => navigation?.navigate('Payment')}
-                  disabled={isEmpty}
+                  disabled={isEmpty || hasPendingItems}
                 >
                   <Text style={styles.paymentLabel}>Оплата</Text>
                   <Text style={styles.paymentAmount}>{formatAmount(total)} c</Text>
@@ -286,7 +359,7 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
                 ) : isModifierSelected ? (
                   <ModifierActionsMenu />
                 ) : isItemSelected ? (
-                  <ItemActionsMenu items={items} />
+                  <ItemActionsMenu items={editorItems} />
                 ) : (
                   <CategoryMenu categories={categories} />
                 )}
@@ -313,7 +386,7 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
                   selectedOrderAction === 'waiter' ? <WaiterPickerPanel onChangeWaiter={(id) => updateMeta({ employeeId: id })} /> :
                   selectedOrderAction === 'guests' ? <GuestCounterPanel guestCount={currentOrder?.guestCount ?? 1} onChangeGuestCount={(count) => updateMeta({ guestCount: count })} /> :
                   selectedOrderAction === 'delete' ? <DeleteOptions items={items} mode="order" orderNumber={currentOrder?.number} onDone={closeOrderActions} onDeleteOrder={deleteCurrentOrder} /> :
-                  <ProductGrid items={items} products={products} categories={categories} onAddItem={handleAddProduct} />
+                  <ProductGrid items={displayItems} products={products} categories={categories} onAddItem={handleAddProduct} />
                 ) : isModifierSelected && modifierAction === 'delete' ? (
                   <DeleteOptions items={items} onDone={() => selectModifier(null)} />
                 ) : isModifierSelected ? (
@@ -333,12 +406,12 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
                   })()
                 ) : isItemSelected ? (
                   <ModifierGrid
-                    items={items}
+                    items={editorItems}
                     modifierGroups={modifierGroups}
                     onRemoveItem={removeItem}
                   />
                 ) : (
-                  <ProductGrid items={items} products={products} categories={categories} onAddItem={handleAddProduct} />
+                  <ProductGrid items={displayItems} products={products} categories={categories} onAddItem={handleAddProduct} />
                 )}
               </View>
               <TouchableOpacity
@@ -370,28 +443,30 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
 const formatAmount = (n: number) => (n / 100).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: theme.colors.background },
-  root: { flex: 1, padding: 10 },
-  mainRow: { flex: 1, flexDirection: 'row', marginTop: 10 },
-  leftCol: { flex: 0.35, justifyContent: 'space-between' },
-  colContent: { flex: 1 },
-  midCol: { flex: 0.25, justifyContent: 'space-between' },
-  rightCol: { flex: 0.4, justifyContent: 'space-between' },
-  searchRightCol: { flex: 0.65 },
-  takeoverCol: { flex: 1 },
-  paymentRow: { flexDirection: 'row', gap: 10, paddingTop: 10 },
-  precheckBtn: { flex: 0.3, height: 56, borderRadius: 10, backgroundColor: theme.colors.surface, justifyContent: 'center', alignItems: 'center' },
-  precheckText: { color: theme.colors.textSecondary, fontSize: 14, fontFamily: theme.fonts.medium },
-  paymentBtn: { flex: 0.7, height: 56, borderRadius: 10, backgroundColor: theme.colors.accent, justifyContent: 'center', alignItems: 'center', flexDirection: 'row', gap: 8 },
-  paymentBtnSecondary: { backgroundColor: theme.colors.surface },
-  btnDisabled: { opacity: 0.4 },
-  paymentLabel: { color: '#fff', fontSize: 14, fontFamily: theme.fonts.medium },
-  paymentAmount: { color: '#fff', fontSize: 16, fontFamily: theme.fonts.bold },
-  colFooterBtn: { height: 56, borderRadius: 10, backgroundColor: theme.colors.surface, justifyContent: 'center', alignItems: 'center' },
-  colFooterBtnDanger: { backgroundColor: theme.colors.destructive },
+  safeArea: { flex: 1, minHeight: 0, minWidth: 0, overflow: 'hidden', backgroundColor: theme.colors.background },
+  root: { flex: 1, minHeight: 0, minWidth: 0, overflow: 'hidden', backgroundColor: theme.colors.background },
+  orderCreating: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: GAP, backgroundColor: theme.colors.background },
+  orderCreatingText: { color: theme.colors.textSecondary, fontSize: 16, fontFamily: theme.fonts.medium },
+  mainRow: { flex: 1, minHeight: 0, minWidth: 0, flexDirection: 'row', paddingHorizontal: PADDING, paddingBottom: COL_GAP },
+  leftCol: { flex: 0.35, minHeight: 0, flexDirection: 'column' },
+  midCol: { flex: 0.25, flexDirection: 'column' },
+  rightCol: { flex: 0.40, flexDirection: 'column' },
+  colContent: { flex: 1, overflow: 'hidden', borderRadius: theme.borderRadius },
+  colFooterBtn: { height: 56, marginTop: GAP, backgroundColor: theme.colors.surfaceLight, borderRadius: theme.borderRadius, justifyContent: 'center', alignItems: 'center' },
   colFooterBtnActive: { backgroundColor: theme.colors.accent },
-  colFooterBtnText: { color: theme.colors.textSecondary, fontSize: 14, fontFamily: theme.fonts.medium },
-  colFooterBtnTextAccent: { color: theme.colors.accent, fontSize: 14, fontFamily: theme.fonts.medium },
-  colFooterBtnTextActive: { color: '#fff', fontSize: 14, fontFamily: theme.fonts.medium },
-  colFooterBtnTextDanger: { color: '#fff', fontSize: 14, fontFamily: theme.fonts.medium },
+  colFooterBtnText: { color: theme.colors.textPrimary, fontSize: 16, fontFamily: theme.fonts.medium },
+  colFooterBtnTextAccent: { color: theme.colors.accentLight, fontSize: 16, fontFamily: theme.fonts.medium },
+  colFooterBtnTextActive: { color: theme.colors.white, fontSize: 16, fontFamily: theme.fonts.medium },
+  colFooterBtnDanger: { backgroundColor: theme.colors.destructive },
+  colFooterBtnTextDanger: { color: theme.colors.white, fontFamily: theme.fonts.medium },
+  paymentRow: { height: 56, flexDirection: 'row', gap: GAP, marginTop: GAP },
+  searchRightCol: { flex: 0.65 },
+  takeoverCol: { flex: 0.65, overflow: 'hidden', borderRadius: theme.borderRadius },
+  paymentBtn: { flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: theme.colors.accent, borderRadius: theme.borderRadius, paddingHorizontal: 12 },
+  paymentBtnSecondary: { backgroundColor: theme.colors.surfaceLight },
+  btnDisabled: { opacity: 0.4 },
+  paymentLabel: { color: theme.colors.white, fontSize: 22, fontFamily: theme.fonts.medium },
+  paymentAmount: { color: theme.colors.white, fontSize: 22, fontFamily: theme.fonts.medium },
+  precheckBtn: { flex: 0.5, justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.surfaceLight, borderRadius: theme.borderRadius },
+  precheckText: { color: theme.colors.textPrimary, fontSize: 16, fontFamily: theme.fonts.medium },
 });

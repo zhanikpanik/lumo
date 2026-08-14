@@ -3,8 +3,7 @@ import { getInstantClient, getVenueId } from '../data/instant';
 import type { Order } from '../types';
 import {
   mapAndSortOrders,
-  type InstantModifierRow,
-  type InstantOrderItemRow,
+  mapOrderRow,
   type InstantOrderRow,
 } from '../utils/orderMapping';
 
@@ -74,39 +73,5 @@ export function useInstantOrder(orderId?: string): Order | undefined {
   const order = data?.orders?.[0];
   if (!order) return undefined;
 
-  return {
-    id: order.id,
-    number: order.number ?? '',
-    status: (order.status as Order['status']) ?? 'active',
-    source: (order.source as Order['source']) ?? 'pos',
-    waiter: (order.ownerEmployee?.displayName as string) ?? 'Кассир',
-    openedAt: order.openedAt as string,
-    closedAt: order.closedAt as string | undefined ?? undefined,
-    zone: (order.zoneName as string) ?? '',
-    type: (order.orderType as string) ?? 'Общий',
-    totalAmount: (order.totalAmountTiyin as number) ?? 0,
-    tableNumber: (order.tableNumber as string) ?? '',
-    guestCount: (order.guestCount as number) ?? 1,
-    tableId: (order as any).table?.[0]?.id ?? '',
-    isQuickCheck: (order.isQuickCheck as boolean) ?? false,
-    comment: order.comment as string | undefined ?? undefined,
-    closeReason: order.closeReason as string | undefined ?? undefined,
-    sentToKitchen: false, // Not in InstantDB schema yet, default to false
-    items: (order.items ?? []).map((i: InstantOrderItemRow) => ({
-      id: i.id,
-      product: {
-        id: i.product?.id ?? '',
-        categoryId: '',
-        name: i.productName ?? i.product?.name ?? '',
-        price: i.productPriceTiyin ?? i.product?.priceTiyin ?? 0,
-      },
-      quantity: i.quantity ?? 1,
-      comment: i.comment ?? undefined,
-      modifiers: (i.modifiers ?? []).map((m: InstantModifierRow) => ({
-        id: m.id,
-        name: m.name ?? '',
-        price: m.priceTiyin ?? 0,
-      })),
-    })),
-  };
+  return mapOrderRow(order as unknown as InstantOrderRow);
 }

@@ -5,12 +5,15 @@ import { SomIcon } from '../components/Icons';
 import { useUserStore } from '../store/userStore';
 import { useInstantShift } from '../store/useInstantShift';
 import { closePosShift } from '../data/posCommands';
+import { somToTiyin } from '../utils/money';
 
 const GAP = 10;
 const PAD = 10;
 
 const formatAmount = (n: number): string =>
   (n / 100).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+const formatSomInput = (n: number): string =>
+  n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 
 const formatTime = (date: Date): string =>
   `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
@@ -39,12 +42,14 @@ export const CloseShiftScreen: React.FC<{ navigation: any }> = ({ navigation }) 
   const hours = Math.floor(diff / (1000 * 60 * 60));
   const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
   const duration = hours === 0 ? `${minutes} мин` : `${hours} ч ${minutes} мин`;
-
-  const handleNumPress = (n: string) => {
-    if (countedInput.length > 7) return;
-    setCountedInput(prev => prev + n);
+  const handleNumPress = (digit: string) => {
+    setCountedInput((current) => {
+      const next = current + digit;
+      return next.length <= 8 ? next : current;
+    });
   };
-  const handleBackspace = () => setCountedInput(prev => prev.slice(0, -1));
+  const handleBackspace = () => setCountedInput((current) => current.slice(0, -1));
+
 
   const handleConfirmClose = async () => {
     if (closing) return;
@@ -64,7 +69,7 @@ export const CloseShiftScreen: React.FC<{ navigation: any }> = ({ navigation }) 
       await closePosShift({
         operationId,
         shiftId: currentShift.id,
-        countedCashTiyin: n,
+        countedCashTiyin: somToTiyin(n),
       });
       // useInstantShift will detect the closed shift reactively — no manual state update needed
       navigation.replace('OpenShift');
@@ -134,14 +139,14 @@ export const CloseShiftScreen: React.FC<{ navigation: any }> = ({ navigation }) 
 
               <View style={styles.displayWrap}>
                 <Text style={styles.displayText}>
-                  {countedInput ? formatAmount(Number(countedInput)) : '0'}
+                  {countedInput ? formatSomInput(Number(countedInput)) : '0'}
                 </Text>
                 <SomIcon size={20} color={theme.colors.textSecondary} />
               </View>
 
               <View style={styles.numpadGrid}>
-                {[['7','8','9'],['4','5','6'],['1','2','3'],['0','00','←']].map((row, ri) => (
-                  <View key={ri} style={styles.numRow}>
+                {[['7', '8', '9'], ['4', '5', '6'], ['1', '2', '3'], ['0', '00', '←']].map((row, rowIndex) => (
+                  <View key={rowIndex} style={styles.numRow}>
                     {row.map((key) => (
                       <TouchableOpacity
                         key={key}
@@ -155,6 +160,7 @@ export const CloseShiftScreen: React.FC<{ navigation: any }> = ({ navigation }) 
                   </View>
                 ))}
               </View>
+
 
               <View style={styles.expectedNote}>
                 <Text style={styles.expectedNoteText}>Ожидаемая касса: {formatAmount(expectedCash)}</Text>
@@ -199,7 +205,7 @@ const AmountRow: React.FC<{ label: string; amount: number; sub?: string; bold?: 
         <Text style={[styles.statValue, bold && styles.bold, accent && styles.accent]}>
           {formatAmount(amount)}
         </Text>
-        <SomIcon size={9} color={accent ? theme.colors.online : bold ? '#fff' : theme.colors.textSecondary} />
+        <SomIcon size={9} color={accent ? theme.colors.online : bold ? theme.colors.white : theme.colors.textSecondary} />
       </View>
     </View>
   );
@@ -234,7 +240,7 @@ const styles = StyleSheet.create({
   rightCol: { flex: 0.55 },
   rightContent: { flex: 1 },
 
-  reportTitle: { color: '#fff', fontSize: 20, fontFamily: theme.fonts.medium, marginBottom: 4 },
+  reportTitle: { color: theme.colors.white, fontSize: 20, fontFamily: theme.fonts.medium, marginBottom: 4 },
 
   divider: { height: 1, backgroundColor: theme.colors.subtleBorder, marginVertical: 8 },
 
@@ -249,7 +255,7 @@ const styles = StyleSheet.create({
   statValue: { color: theme.colors.textPrimary, fontSize: 16, fontFamily: theme.fonts.medium },
   amountRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   valueText: { color: theme.colors.textPrimary, fontFamily: theme.fonts.medium },
-  bold: { color: '#fff', fontFamily: theme.fonts.medium },
+  bold: { color: theme.colors.white, fontFamily: theme.fonts.medium },
   accent: { color: theme.colors.online },
   sectionTitle: { color: theme.colors.textSecondary, fontSize: 16, fontFamily: theme.fonts.medium, marginTop: 8, marginBottom: 4 },
 
@@ -266,7 +272,11 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     gap: 4,
   },
-  displayText: { color: theme.colors.textPrimary, fontSize: 40, fontFamily: theme.fonts.medium },
+  displayText: {
+    color: theme.colors.textPrimary,
+    fontSize: 40,
+    fontFamily: theme.fonts.medium,
+  },
   numpadGrid: { flex: 1 },
   numRow: { flex: 1, flexDirection: 'row', gap: 2, marginBottom: 2 },
   numKey: {
@@ -276,7 +286,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  numKeyText: { color: theme.colors.textPrimary, fontSize: 24, fontFamily: theme.fonts.medium },
+  numKeyText: {
+    color: theme.colors.textPrimary,
+    fontSize: 24,
+    fontFamily: theme.fonts.medium,
+  },
 
   expectedNote: {
     flexDirection: 'row',
@@ -300,5 +314,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   closeBtnDisabled: { opacity: 0.5 },
-  closeBtnText: { color: '#fff', fontSize: 16, fontFamily: theme.fonts.medium },
+  closeBtnText: { color: theme.colors.white, fontSize: 16, fontFamily: theme.fonts.medium },
 });

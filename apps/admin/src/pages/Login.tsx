@@ -50,7 +50,13 @@ export function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-muted/30">
       <div className="w-full max-w-sm border bg-card rounded-xl p-8 shadow-sm">
-        <h1 className="text-xl font-bold mb-1">r_keeper</h1>
+        <div className="mb-6 flex items-center gap-3">
+          <span className="flex size-10 items-center justify-center rounded-xl bg-primary text-sm font-bold text-primary-foreground">L</span>
+          <div>
+            <h1 className="text-xl font-bold leading-tight">Lumo</h1>
+            <p className="text-sm text-muted-foreground">Alto Coffee Bishkek</p>
+          </div>
+        </div>
         <p className="text-sm text-muted-foreground mb-6">Вход в панель управления</p>
 
         {codeSent ? (

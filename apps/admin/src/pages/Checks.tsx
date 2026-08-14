@@ -6,6 +6,8 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { useInstantCheckDetail, useInstantChecks, type Check, type OrderSource, type OrderEvent } from '@/hooks/useInstantChecks';
 import { CHECK_ITEMS_TABLE_GRID, checkItemPositionTitle } from '@/lib/checkItemsTableGrid';
 import { DatePresetPicker } from '@/components/ui/DatePresetPicker';
+import { SegmentTabs } from '@/components/ui/SegmentTabs';
+import { TableToolbar } from '@/components/ui/TableToolbar';
 import {
  analyzeChecks,
  countBySeverity,
@@ -13,6 +15,8 @@ import {
  type Severity,
  type CheckAnalysis,
 } from '@/lib/checkAnalysis';
+import { formatSom } from '@/lib/formatSom';
+import { orderEventLabel } from '@/lib/operationalLabels';
 
 // ─── Format table column ────────────────────────────────
 
@@ -47,7 +51,7 @@ function formatCheckPeriod(openedAt: string, closedAt: string | undefined, statu
  return `${dayOpen}, ${timeOpen} — ${dayClose}, ${timeClose}`;
 }
 
-function formatMoney(n: number) { return n.toLocaleString('ru-RU') + ' с'; }
+function formatMoney(n: number) { return formatSom(n); }
 
 function formatCheckProfit(c: Check): string {
  if (c.items.length === 0) return '—';
@@ -63,22 +67,13 @@ type StatusFilter = 'all' | 'open' | 'closed' | 'cancelled';
 type SeverityFilter = 'all' | Severity;
 type ExpandTab = 'details' | 'history';
 
-/** Human-readable labels for order event actions */
-const EVENT_LABELS: Record<string, string> = {
- item_added: 'Добавлено блюдо',
- item_removed: 'Удалено блюдо',
- precheck_printed: 'Пречек',
- paid: 'Закрытие чека',
- cancelled: 'Отмена чека',
- refunded: 'Возврат',
-};
 
 function formatEventDetail(ev: OrderEvent): string {
  switch (ev.action) {
  case 'item_added':
  case 'item_removed':
  return ev.productName
- ? `${ev.productName}${ev.quantity != null ? ` × ${ev.quantity}` : ''}${ev.unitPrice != null ? ` — ${Number(ev.unitPrice).toLocaleString('ru-RU')} с` : ''}`
+ ? `${ev.productName}${ev.quantity != null ? ` × ${ev.quantity}` : ''}${ev.unitPrice != null ? ` — ${formatSom(Number(ev.unitPrice))}` : ''}`
  : '';
  case 'paid':
  return '';
@@ -158,7 +153,7 @@ function CheckExpandedContent({
  {c.events.map((event) => {
  const time = new Date(event.occurredAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
  const suspicious = isEventSuspicious(event);
- const label = EVENT_LABELS[event.action] || event.action;
+ const label = orderEventLabel(event.action);
  const eventDetail = formatEventDetail(event);
  return (
  <div key={event.id} className={`flex items-start gap-3 py-1.5 pl-3 text-sm ${suspicious ? 'bg-amber-50 rounded-lg -mx-1 px-4' : ''}`}>
@@ -358,8 +353,7 @@ export function Checks() {
  ], [paidOverrides, editingId, editValue, startEdit, commitEdit]);
 
  return (
- <div className="p-8">
- <div className="flex items-center justify-between mb-6">
+ <div className="page-shell"><div className="flex items-center justify-between mb-6">
  <div>
  <h2 className="text-2xl font-bold">Чеки</h2>
  <p className="text-sm text-muted-foreground mt-1">
@@ -379,54 +373,72 @@ export function Checks() {
  </p>
  </div>
  </div>
-
+ 
  {isError && (
  <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
  {checksError instanceof Error ? checksError.message : 'Не удалось загрузить чеки'}
  </div>
  )}
-
- {/* Period + Filters */}
- <div className="mb-4 space-y-2">
-  <DatePresetPicker value={fromDate} onChange={(value) => { setFromDate(value); setPage(0); }} />
-  <div className="flex items-center gap-2 flex-wrap">
-  <select className="px-3 py-1.5 border rounded-lg text-sm bg-background outline-none focus:border-primary transition-colors" value={waiterFilter} onChange={(e) => setWaiterFilter(e.target.value)}>
- <option value="all">Все официанты</option>
- {WAITERS.map((w) => <option key={w} value={w}>{w}</option>)}
- </select>
- <div className="inline-flex rounded-lg bg-[#F2F2F7] p-0.5 shadow-[inset_0_1px_2px_rgba(0,0,0,0.04)]">
- {(['all', 'cash', 'card'] as PaymentFilter[]).map((v) => (
- <button key={v} onClick={() => setPaymentFilter(v)} className={`px-3 py-1 rounded-md text-sm font-medium transition-all ${paymentFilter === v ? 'bg-white text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
- {v === 'all' ? 'Все' : v === 'cash' ? 'Наличные' : 'Безналичные'}
- </button>
- ))}
- </div>
- <div className="inline-flex rounded-lg bg-[#F2F2F7] p-0.5 shadow-[inset_0_1px_2px_rgba(0,0,0,0.04)]">
- {(['all', 'open', 'closed', 'cancelled'] as StatusFilter[]).map((v) => (
- <button key={v} onClick={() => setStatusFilter(v)} className={`px-3 py-1 rounded-md text-sm font-medium transition-all ${statusFilter === v ? 'bg-white text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
- {v === 'all' ? 'Все' : v === 'open' ? 'Открытые' : v === 'cancelled' ? 'Отменённые' : 'Закрытые'}
- </button>
- ))}
- </div>
- {/* Severity filter pills — only when there are problems */}
- {severityCounts.critical + severityCounts.warning > 0 && (
- <div className="inline-flex rounded-lg bg-[#F2F2F7] p-0.5 shadow-[inset_0_1px_2px_rgba(0,0,0,0.04)]">
- <button onClick={() => setSeverityFilter('all')} className={`px-3 py-1 rounded-md text-sm font-medium transition-all cursor-pointer ${severityFilter === 'all' ? 'bg-white text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>Все</button>
- {severityCounts.critical > 0 && (
- <button onClick={() => setSeverityFilter('critical')} className={`px-3 py-1 rounded-md text-sm font-medium transition-all cursor-pointer flex items-center gap-1.5 ${severityFilter === 'critical' ? 'bg-white text-destructive shadow-sm' : 'text-muted-foreground hover:text-destructive'}`}>
- <ShieldAlert className="w-3.5 h-3.5" />{severityCounts.critical}
- </button>
- )}
- {severityCounts.warning > 0 && (
- <button onClick={() => setSeverityFilter('warning')} className={`px-3 py-1 rounded-md text-sm font-medium transition-all cursor-pointer flex items-center gap-1.5 ${severityFilter === 'warning' ? 'bg-white text-warning shadow-sm' : 'text-muted-foreground hover:text-warning'}`}>
- <AlertTriangle className="w-3.5 h-3.5" />{severityCounts.warning}
- </button>
- )}
- </div>
- )}
- </div>
- </div>
-
+ 
+ <TableToolbar
+  resultCount={filtered.length}
+  onReset={waiterFilter !== 'all' || paymentFilter !== 'all' || statusFilter !== 'all' || severityFilter !== 'all'
+   ? () => {
+     setWaiterFilter('all');
+     setPaymentFilter('all');
+     setStatusFilter('all');
+     setSeverityFilter('all');
+   }
+   : undefined}
+  filters={(
+   <>
+    <DatePresetPicker value={fromDate} onChange={(value) => { setFromDate(value); setPage(0); }} />
+    <select
+     className="min-h-11 rounded-lg border bg-background px-3 text-base outline-none transition-colors focus:border-primary sm:text-sm"
+     value={waiterFilter}
+     onChange={(event) => setWaiterFilter(event.target.value)}
+    >
+     <option value="all">Все официанты</option>
+     {WAITERS.map((waiter) => <option key={waiter} value={waiter}>{waiter}</option>)}
+    </select>
+    <SegmentTabs
+     options={[
+      { value: 'all' as const, label: 'Все оплаты' },
+      { value: 'cash' as const, label: 'Наличные' },
+      { value: 'card' as const, label: 'Безналичные' },
+     ]}
+     value={paymentFilter}
+     onChange={setPaymentFilter}
+    />
+    <SegmentTabs
+     options={[
+      { value: 'all' as const, label: 'Все статусы' },
+      { value: 'open' as const, label: 'Открытые' },
+      { value: 'closed' as const, label: 'Закрытые' },
+      { value: 'cancelled' as const, label: 'Отменённые' },
+     ]}
+     value={statusFilter}
+     onChange={setStatusFilter}
+    />
+    {severityCounts.critical + severityCounts.warning > 0 && (
+     <div className="inline-flex max-w-full overflow-x-auto rounded-lg bg-muted p-0.5">
+      <button onClick={() => setSeverityFilter('all')} className={`min-h-11 shrink-0 rounded-md px-3 text-sm font-medium transition-all sm:min-h-0 ${severityFilter === 'all' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>Все риски</button>
+      {severityCounts.critical > 0 && (
+       <button onClick={() => setSeverityFilter('critical')} className={`flex min-h-11 shrink-0 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-all sm:min-h-0 ${severityFilter === 'critical' ? 'bg-background text-destructive shadow-sm' : 'text-muted-foreground hover:text-destructive'}`}>
+        <ShieldAlert className="w-3.5 h-3.5" />{severityCounts.critical}
+       </button>
+      )}
+      {severityCounts.warning > 0 && (
+       <button onClick={() => setSeverityFilter('warning')} className={`flex min-h-11 shrink-0 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-all sm:min-h-0 ${severityFilter === 'warning' ? 'bg-background text-warning shadow-sm' : 'text-muted-foreground hover:text-warning'}`}>
+        <AlertTriangle className="w-3.5 h-3.5" />{severityCounts.warning}
+       </button>
+      )}
+     </div>
+    )}
+   </>
+  )}
+ />
+ 
  {/* Table */}
  <div className="max-w-4xl">
  {!isLoading && !isError && filtered.length === 0 ? (
@@ -492,7 +504,6 @@ export function Checks() {
  </div>
  </>
  )}
- </div>
- </div>
+ </div></div>
  );
 }

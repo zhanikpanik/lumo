@@ -15,7 +15,7 @@ export function EditButton({ onClick, className = '' }: EditButtonProps) {
       type="button"
       aria-label="Редактировать"
       onClick={(e) => { e.stopPropagation(); onClick(); }}
-      className={`p-2 rounded-md text-muted-foreground group-hover:bg-secondary hover:bg-accent hover:text-foreground transition-colors cursor-pointer ${className}`}
+      className={`flex size-11 items-center justify-center rounded-md text-muted-foreground group-hover:bg-secondary hover:bg-accent hover:text-foreground transition-colors cursor-pointer md:size-8 ${className}`}
     >
       <Pencil className="w-3.5 h-3.5" />
     </button>

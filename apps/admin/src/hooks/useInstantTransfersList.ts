@@ -1,6 +1,7 @@
 import { getInstantClient } from '@/data/instant';
 import { adminTransfersQuery } from '@lumo/data';
 import { useVenueId } from '@/hooks/useVenueId';
+import { instantRecord } from '@/lib/instantLink';
 
 export interface TransferRow {
   id: string;
@@ -23,8 +24,8 @@ export function useInstantTransfersList() {
 
   const data: TransferRow[] = (result.data?.transferDocuments ?? []).map((t) => {
     const rec = t as Record<string, unknown>;
-    const fromWh = (rec.fromWarehouse ?? {}) as Record<string, unknown>;
-    const toWh = (rec.toWarehouse ?? {}) as Record<string, unknown>;
+    const fromWh = instantRecord(rec.fromWarehouse) ?? {};
+    const toWh = instantRecord(rec.toWarehouse) ?? {};
     const fromName = (fromWh.name as string) ?? '';
     const toName = (toWh.name as string) ?? '';
     const lines = (Array.isArray(rec.lines) ? rec.lines : []) as Record<string, unknown>[];
@@ -41,7 +42,7 @@ export function useInstantTransfersList() {
       to_warehouse_name: toName,
       items: lines.map((l) => ({
         id: String(l.id),
-        product_id: String(((l.product ?? {}) as Record<string, unknown>).id ?? null),
+        product_id: String(instantRecord(l.product)?.id ?? ''),
         name: String(l.name),
         quantity: Number(l.quantityMilli) / 1000,
         unit: String(l.unit),

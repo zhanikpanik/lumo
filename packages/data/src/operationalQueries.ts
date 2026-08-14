@@ -496,6 +496,7 @@ export function adminDashboardPeriodPaidOrdersQuery(
       },
       items: { product: {} },
       payments: {},
+      shift: { openedBy: {} },
     },
   } satisfies InstaQLParams<AppSchema>;
 }

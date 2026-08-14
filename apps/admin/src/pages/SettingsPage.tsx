@@ -31,66 +31,64 @@ export function SettingsPage() {
  }
 
  return (
-  <div className="p-8 max-w-xl">
-   <h2 className="text-2xl font-bold mb-2">Настройки</h2>
-   <p className="text-sm text-muted-foreground mb-6">
-    Название, адрес и телефон заведения.
-   </p>
-
-   {isLoading && <p className="text-sm text-muted-foreground">Загрузка…</p>}
-
-   {isError && (
-    <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 mb-6">
-     <p className="font-medium mb-1">Не удалось загрузить venues</p>
-     <p className="text-sm opacity-90">{(error as Error)?.message}</p>
+  <div className="page-shell page-shell--form"><h2 className="text-2xl font-bold mb-2">Настройки</h2>
+  <p className="text-sm text-muted-foreground mb-6">
+   Название, адрес и телефон заведения.
+  </p>
+  
+  {isLoading && <p className="text-sm text-muted-foreground">Загрузка…</p>}
+  
+  {isError && (
+   <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 mb-6">
+    <p className="font-medium mb-1">Не удалось загрузить venues</p>
+    <p className="text-sm opacity-90">{(error as Error)?.message}</p>
+   </div>
+  )}
+  
+  {!isLoading && !isError && venue && (
+   <form onSubmit={handleSave} className="space-y-4">
+    <div>
+     <label className="text-sm font-medium text-muted-foreground">Название</label>
+     <input
+      className="mt-1 w-full px-3 py-2 border border-border rounded-lg text-sm "
+      value={name}
+      onChange={(e) => setName(e.target.value)}
+     />
     </div>
-   )}
-
-   {!isLoading && !isError && venue && (
-    <form onSubmit={handleSave} className="space-y-4">
-     <div>
-      <label className="text-sm font-medium text-muted-foreground">Название</label>
-      <input
-       className="mt-1 w-full px-3 py-2 border border-border rounded-lg text-sm "
-       value={name}
-       onChange={(e) => setName(e.target.value)}
-      />
-     </div>
-     <div>
-      <label className="text-sm font-medium text-muted-foreground">Адрес</label>
-      <input
-       className="mt-1 w-full px-3 py-2 border border-border rounded-lg text-sm "
-       value={address}
-       onChange={(e) => setAddress(e.target.value)}
-      />
-     </div>
-     <div>
-      <label className="text-sm font-medium text-muted-foreground">Телефон</label>
-      <input
-       className="mt-1 w-full px-3 py-2 border border-border rounded-lg text-sm "
-       value={phone}
-       onChange={(e) => setPhone(e.target.value)}
-      />
-     </div>
-     {updateVenue.isSuccess && (
-      <p className="text-sm text-green-600">Сохранено</p>
-     )}
-     {updateVenue.isError && (
-      <p className="text-sm text-destructive">{(updateVenue.error as Error)?.message}</p>
-     )}
-     <button
-      type="submit"
-      disabled={updateVenue.isPending}
-      className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50"
-     >
-      {updateVenue.isPending ? 'Применение…' : 'Применить'}
-     </button>
-    </form>
-   )}
-
-   <hr className="my-8 border-muted/30" />
-   <TransactionCategoriesSection />
-  </div>
+    <div>
+     <label className="text-sm font-medium text-muted-foreground">Адрес</label>
+     <input
+      className="mt-1 w-full px-3 py-2 border border-border rounded-lg text-sm "
+      value={address}
+      onChange={(e) => setAddress(e.target.value)}
+     />
+    </div>
+    <div>
+     <label className="text-sm font-medium text-muted-foreground">Телефон</label>
+     <input
+      className="mt-1 w-full px-3 py-2 border border-border rounded-lg text-sm "
+      value={phone}
+      onChange={(e) => setPhone(e.target.value)}
+     />
+    </div>
+    {updateVenue.isSuccess && (
+     <p className="text-sm text-green-600">Сохранено</p>
+    )}
+    {updateVenue.isError && (
+     <p className="text-sm text-destructive">{(updateVenue.error as Error)?.message}</p>
+    )}
+    <button
+     type="submit"
+     disabled={updateVenue.isPending}
+     className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 disabled:opacity-50"
+    >
+     {updateVenue.isPending ? 'Применение…' : 'Применить'}
+    </button>
+   </form>
+  )}
+  
+  <hr className="my-8 border-muted/30" />
+  <TransactionCategoriesSection /></div>
  );
 }
 

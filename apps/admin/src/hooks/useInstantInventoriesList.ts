@@ -1,6 +1,7 @@
 import { getInstantClient } from '@/data/instant';
 import { adminInventorySessionsQuery } from '@lumo/data';
 import { useVenueId } from '@/hooks/useVenueId';
+import { instantRecord } from '@/lib/instantLink';
 
 export interface InventoryActRow {
   id: string;
@@ -21,7 +22,7 @@ export function useInstantInventoriesList() {
 
   const data: InventoryActRow[] = (result.data?.inventorySessions ?? []).map((s) => {
     const rec = s as Record<string, unknown>;
-    const wh = (rec.warehouse ?? {}) as Record<string, unknown>;
+    const wh = instantRecord(rec.warehouse) ?? {};
     const whName = (wh.name as string) ?? '';
     return {
       id: s.id,

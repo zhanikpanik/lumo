@@ -1,12 +1,11 @@
-import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState, useMemo } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { type ColumnDef } from '@tanstack/react-table';
 import { DeleteButton } from '@/components/ui/DeleteButton';
 import { EditButton } from '@/components/ui/EditButton';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Modal } from '@/components/ui/Modal';
-import { SearchInput } from '@/components/ui/SearchInput';
 import { SegmentTabs } from '@/components/ui/SegmentTabs';
 import { DataTable } from '@/components/ui/DataTable';
 import { toast } from 'sonner';
@@ -21,6 +20,8 @@ import {
 import { useInstantCashMovements } from '@/hooks/useInstantCashMovements';
 import { useInstantAddCashMovement, useInstantDeleteCashMovement } from '@/hooks/useInstantCashMovementMutations';
 import { matchShiftIdForTimestamp } from '@/lib/matchShiftForTimestamp';
+import { formatSom } from '@/lib/formatSom';
+import { TableToolbar } from '@/components/ui/TableToolbar';
 
 const TYPE_LABELS: Record<TransactionType, string> = {
  income: 'Приход',
@@ -54,9 +55,6 @@ function humanizeNote(note: string | null | undefined): string {
  return NOTE_LABELS[trimmed] || trimmed.replace(/_/g, ' ');
 }
 
-function formatCurrency(amount: number) {
- return amount.toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' с';
-}
 
 function nowLocalISO() {
  const d = new Date();
@@ -244,6 +242,13 @@ function AddTransactionModal({ shifts, onClose }: ModalProps) {
 
 export function Transactions() {
  const [showModal, setShowModal] = useState(false);
+ const [searchParams, setSearchParams] = useSearchParams();
+
+ useEffect(() => {
+  if (searchParams.get('create') !== 'expense') return;
+  setShowModal(true);
+  setSearchParams({}, { replace: true });
+ }, [searchParams, setSearchParams]);
  const [page, setPage] = useState(0);
  const { data: rawTxs = [], isLoading, error, hasNextPage } = useInstantCashMovements({ page });
  const [typeFilter, setTypeFilter] = useState<TransactionType | 'all'>('all');
@@ -318,7 +323,7 @@ export function Transactions() {
    header: 'Сумма',
    cell: ({ row }) => {
     const tx = row.original;
-    return <span className={`text-sm ${TYPE_COLOR[tx.type]}`}>{formatCurrency(tx.amount)}</span>;
+    return <span className={`text-sm ${TYPE_COLOR[tx.type]}`}>{formatSom(tx.amount, { maximumFractionDigits: 2 })}</span>;
    },
   },
   {
@@ -342,24 +347,27 @@ export function Transactions() {
  ], [deleteTx, shiftById]);
 
  return (
-  <div className="p-8">
-   {showModal && <AddTransactionModal shifts={shifts} onClose={() => setShowModal(false)} />}
-   {editTx && <EditTransactionModal tx={editTx} onClose={() => setEditTx(null)} />}
-
-   <div className="flex items-center justify-between mb-6">
-    <h2 className="text-2xl font-bold">Транзакции</h2>
-    <button
-     onClick={() => setShowModal(true)}
-     className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm cursor-pointer font-medium hover:bg-primary/80 transition-colors"
-    >
-     <Plus className="w-4 h-4" />
-     Добавить транзакцию
-    </button>
-   </div>
-
-   {/* Filters */}
-   <div className="flex items-center gap-2 mb-4 flex-wrap">
-    <SearchInput value={search} onChange={setSearch} placeholder="Поиск по комментарию…" className="w-56" />
+  <div className="page-shell">{showModal && <AddTransactionModal shifts={shifts} onClose={() => setShowModal(false)} />}
+  {editTx && <EditTransactionModal tx={editTx} onClose={() => setEditTx(null)} />}
+  
+  <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+   <h2 className="text-2xl font-bold">Транзакции</h2>
+   <button
+    onClick={() => setShowModal(true)}
+    className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/80"
+   >
+    <Plus className="w-4 h-4" />
+    Добавить транзакцию
+   </button>
+  </div>
+  
+  <TableToolbar
+   search={search}
+   onSearchChange={setSearch}
+   searchPlaceholder="Поиск по комментарию…"
+   resultCount={txs.length}
+   onReset={search || typeFilter !== 'all' ? () => { setSearch(''); setTypeFilter('all'); } : undefined}
+   filters={(
     <SegmentTabs
       options={[
         { value: 'all' as const, label: 'Все' },
@@ -370,46 +378,46 @@ export function Transactions() {
       value={typeFilter}
       onChange={setTypeFilter}
     />
-   </div>
-
-   {txs.length === 0 && !isLoading && !error ? (
-    <EmptyState
-     title="Транзакций пока нет"
-     hint="Добавьте первую транзакцию — приход, расход или инкассацию"
-     action={{ label: 'Добавить транзакцию', onClick: () => setShowModal(true) }}
-    />
-   ) : (
-    <>
-    <DataTable
-     data={txs}
-     columns={columns}
-     dense
-     isLoading={isLoading}
-     error={error ? (error instanceof Error ? error : new Error('Не удалось загрузить транзакции')) : null}
-     emptyMessage="Нет транзакций по выбранным фильтрам"
-     className="max-w-4xl"
-    />
-    <div className="mt-4 flex max-w-4xl items-center justify-end gap-2">
-     <button
-      type="button"
-      className="rounded-lg border px-3 py-1.5 text-sm disabled:opacity-40"
-      disabled={page === 0 || isLoading}
-      onClick={() => setPage((current) => Math.max(0, current - 1))}
-     >
-      Назад
-     </button>
-     <span className="text-sm text-muted-foreground">Страница {page + 1}</span>
-     <button
-      type="button"
-      className="rounded-lg border px-3 py-1.5 text-sm disabled:opacity-40"
-      disabled={!hasNextPage || isLoading}
-      onClick={() => setPage((current) => current + 1)}
-     >
-      Далее
-     </button>
-    </div>
-    </>
    )}
-  </div>
+  />
+  
+  {txs.length === 0 && !isLoading && !error ? (
+   <EmptyState
+    title="Транзакций пока нет"
+    hint="Добавьте первую транзакцию — приход, расход или инкассацию"
+    action={{ label: 'Добавить транзакцию', onClick: () => setShowModal(true) }}
+   />
+  ) : (
+   <>
+   <DataTable
+    data={txs}
+    columns={columns}
+    dense
+    isLoading={isLoading}
+    error={error ? (error instanceof Error ? error : new Error('Не удалось загрузить транзакции')) : null}
+    emptyMessage="Нет транзакций по выбранным фильтрам"
+    className="max-w-4xl"
+   />
+   <div className="mt-4 flex max-w-4xl items-center justify-end gap-2">
+    <button
+     type="button"
+     className="min-h-11 rounded-lg border px-3 py-1.5 text-sm disabled:opacity-40"
+     disabled={page === 0 || isLoading}
+     onClick={() => setPage((current) => Math.max(0, current - 1))}
+    >
+     Назад
+    </button>
+    <span className="text-sm text-muted-foreground">Страница {page + 1}</span>
+    <button
+     type="button"
+     className="min-h-11 rounded-lg border px-3 py-1.5 text-sm disabled:opacity-40"
+     disabled={!hasNextPage || isLoading}
+     onClick={() => setPage((current) => current + 1)}
+    >
+     Далее
+    </button>
+   </div>
+   </>
+  )}</div>
  );
 }

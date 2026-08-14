@@ -148,17 +148,17 @@ POS имеет только ограниченную device identity без envi
 6. При revoke worker инвалидирует auth session, снимает active-device link и создаёт audit event.
 7. Для PIN поддержать offline unlock с ограниченным риском:
    - worker выдаёт только venue-scoped PIN verifier, employee ID, `credentialsVersion` и `expiresAt`; plaintext PIN никогда не передаётся и не хранится;
-   - verifier, local attempt counter и lockout хранятся только в platform secure storage;
+   - verifier и очередь unlock attempts хранятся только в platform secure storage;
    - local verifier годен не более 24 часов после последней успешной credential sync;
-   - после 5 неудачных попыток POS блокирует local unlock на 15 минут; unlock attempts сохраняются в durable local queue и отправляются worker-у при reconnect;
+   - неверные unlock attempts сохраняются в durable local queue и отправляются worker-у при reconnect; локальный lockout не применяется, чтобы общий терминал не прекращал приём заказов из-за ошибок одного пользователя;
    - увольнение и PIN reset повышают `credentialsVersion`; device revoke инвалидирует device session и удаляет локальный credential cache; online POS блокирует credential сразу, offline POS — не позднее истечения cache TTL;
    - device identity по-прежнему обязательна для любой InstantDB mutation; offline unlock не расширяет venue access и не authorizes server writes.
 
 #### Threat model offline verifier
 
 - Offline verifier — ограниченный секрет, но не эквивалент server-side password hash: после компрометации устройства атакующий может извлечь encrypted-at-rest blob и пытаться перебрать шестизначный PIN вне UI.
-- PBKDF2-SHA256 замедляет перебор, но пространство из $10^6$ PIN остаётся конечным; local lockout защищает штатный UI, а не атакующего с полным доступом к устройству.
-- Риск ограничивается шестизначным PIN, platform secure storage, 24-часовым cache TTL, 15-минутным lockout после 5 ошибок, credential version/expiry, удалением cache при revoke и server-side device identity для каждой mutation.
+- PBKDF2-SHA256 замедляет перебор, но пространство из $10^6$ PIN остаётся конечным; PIN используется для attribution сотрудника, а не как самостоятельная security boundary.
+- Риск ограничивается шестизначным PIN, platform secure storage, 24-часовым cache TTL, credential version/expiry, удалением cache при revoke и server-side device identity для каждой mutation. Отказ от локального lockout — осознанный availability tradeoff для общего POS-терминала.
 - Offline unlock разрешает только локальный вход в UI. Verifier и employee identity не могут выпустить Instant token, выбрать другой venue или вызвать trusted worker command без действующего device token.
 - Потерянное или скомпрометированное устройство нужно revoke немедленно. До reconnect локальный read-only/offline UI может оставаться доступным в пределах cache TTL; это явно принятый residual risk.
 
@@ -168,7 +168,7 @@ POS имеет только ограниченную device identity без envi
 - device не может подменить venue ID через client configuration;
 - следующая mutation после revoke получает denial;
 - повторная activation той же installation ID не создаёт второй device.
-- local PIN verifier перестаёт разблокировать POS не позднее 24 часов после последней credential sync; 5 ошибочных PIN блокируют unlock на 15 минут.
+- local PIN verifier перестаёт разблокировать POS не позднее 24 часов после последней credential sync; повторные ошибки остаются auditable и не блокируют терминал.
 
 ---
 

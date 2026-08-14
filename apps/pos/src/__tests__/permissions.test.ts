@@ -2,7 +2,14 @@
  * Role-based permission checks.
  * Waiter = restricted. Cashier+ = privileged. Owner/Manager = admin.
  */
-import { can, isAdmin, type UserRole, type PermissionAction } from '../utils/permissions';
+import {
+  can,
+  isAdmin,
+  resolveShiftEntry,
+  requiresOrderTakeover,
+  type PermissionAction,
+  type UserRole,
+} from '../utils/permissions';
 
 describe('can', () => {
   const privilegedActions: PermissionAction[] = [
@@ -28,6 +35,52 @@ describe('can', () => {
   it('denies when role is null or undefined', () => {
     expect(can(null, 'openShift')).toBe(false);
     expect(can(undefined, 'openShift')).toBe(false);
+  });
+});
+
+describe('resolveShiftEntry', () => {
+  it('keeps a waiter on PIN entry when no shift is open', () => {
+    expect(resolveShiftEntry('waiter', false, false)).toBe('lock');
+  });
+
+  it('sends a cashier to open the missing shift', () => {
+    expect(resolveShiftEntry('cashier', false, false)).toBe('open-shift');
+  });
+
+  it('sends every employee to orders when a shift is already open', () => {
+    expect(resolveShiftEntry('waiter', true, false)).toBe('orders');
+  });
+
+  it('does not route until shift state is known', () => {
+    expect(resolveShiftEntry('cashier', false, true)).toBe('loading');
+  });
+});
+
+describe('requiresOrderTakeover', () => {
+  const currentWaiter = { id: 'employee-1', name: 'Айжан', role: 'waiter' };
+
+  it('lets a waiter enter an order they own', () => {
+    expect(requiresOrderTakeover(
+      currentWaiter,
+      { ownerEmployeeId: 'employee-1', waiter: 'Айжан' },
+      false,
+    )).toBe(false);
+  });
+
+  it('asks for takeover PIN on another waiter’s order', () => {
+    expect(requiresOrderTakeover(
+      currentWaiter,
+      { ownerEmployeeId: 'employee-2', waiter: 'Эрмек' },
+      false,
+    )).toBe(true);
+  });
+
+  it('does not lock orders for a cashier', () => {
+    expect(requiresOrderTakeover(
+      { id: 'employee-3', name: 'Кассир', role: 'cashier' },
+      { ownerEmployeeId: 'employee-2', waiter: 'Эрмек' },
+      false,
+    )).toBe(false);
   });
 });
 

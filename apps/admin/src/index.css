@@ -104,6 +104,65 @@ body {
   font-family: 'Onest', system-ui, -apple-system, sans-serif;
 }
 
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+@supports (height: 100dvh) {
+  .h-screen {
+    height: 100dvh;
+  }
+}
+
+@media (max-width: 767px) {
+  main > div {
+    max-width: none !important;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+    min-height: 44px;
+  }
+}
+
+.page-shell {
+  width: 100%;
+  padding: 2rem;
+}
+
+.page-shell--wide {
+  max-width: 73.75rem;
+}
+
+.page-shell--narrow {
+  max-width: 48rem;
+}
+
+.page-shell--form {
+  max-width: 40rem;
+  padding-bottom: 6rem;
+}
+
+@media (max-width: 767px) {
+  .page-shell {
+    padding: 1rem;
+  }
+}
+
+.sidebar-nav {
+  scrollbar-width: none;
+}
+
+.sidebar-nav::-webkit-scrollbar {
+  display: none;
+}
+
 /* Override browser default bold on <th> — use medium (500) for consistency */
 th {
   font-weight: 500;

@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { createServer } from 'node:http';
 import { init } from '@instantdb/admin';
 import { runInstantCommand } from './instant-command-runner.mjs';
@@ -6,6 +6,11 @@ import { runWarehouseCommand } from './warehouse-command-runner.mjs';
 import { runStaffCommand } from './staff-command-runner.mjs';
 import { runAdminCommand } from './admin-command-runner.mjs';
 import { consumeRateLimit } from './rate-limit.mjs';
+import {
+  resolveActivationChallenge,
+  resolveAdminMembership,
+  resolveDeviceActivation,
+} from './activation-policy.mjs';
 import {
   projectFinancialContributionByKey,
   rebuildVenueAnalytics,
@@ -25,7 +30,9 @@ const allowedOrigins = new Set(
     .filter(Boolean),
 );
 const db = init({ appId, adminToken });
-const ADMIN_ROLES = new Set(['owner', 'manager']);
+const ACTIVATION_CHALLENGE_TTL_MS = 10 * 60_000;
+const ACTIVATION_RESEND_AFTER_SECONDS = 60;
+
 
 function send(response, status, body, origin) {
   response.writeHead(status, {
@@ -101,6 +108,7 @@ function queueFinancialProjection(venueId, operationId) {
   );
 }
 
+
 async function verifyBearerToken(request) {
   const authorization = request.headers.authorization;
   if (!authorization?.startsWith('Bearer ')) throw commandError('Missing bearer token', 401);
@@ -112,16 +120,27 @@ async function verifyBearerToken(request) {
 }
 
 async function authorizeDevice(request) {
-  const user = await verifyBearerToken(request);
-  const data = await db.query({
-    devices: {
-      $: { where: { 'authUser.id': user.id, status: 'active' }, limit: 2 },
-      venue: {},
-      authUser: {},
-      authorizations: {},
-    },
-  });
-  const device = data.devices.find(
+  const authorization = request.headers.authorization;
+  if (!authorization?.startsWith('Bearer ')) throw commandError('Missing bearer token', 401);
+
+  let data;
+  try {
+    data = await db.asUser({ token: authorization.slice('Bearer '.length) }).query({
+      $users: {
+        $: { where: { 'devices.status': 'active' } },
+        devices: {
+          $: { where: { status: 'active' } },
+          venue: {},
+          authorizations: { $: { where: { status: 'active' } } },
+        },
+      },
+    });
+  } catch {
+    throw commandError('Invalid bearer token', 401);
+  }
+
+  const devices = data.$users.flatMap((user) => user.devices ?? []);
+  const device = devices.find(
     (candidate) => candidate.authorizations.some((authorization) => authorization.status === 'active'),
   );
   if (!device) throw commandError('An active device authorization is required', 403);
@@ -182,6 +201,13 @@ async function createPosOrder(request, response, origin) {
   if (!Number.isSafeInteger(guestCount) || guestCount < 1) throw commandError('guestCount must be a positive integer');
   if (typeof body.isQuickCheck !== 'boolean') throw commandError('isQuickCheck must be a boolean');
 
+  const tableId = body.tableId === undefined ? undefined : nonEmptyString(body.tableId, 'tableId');
+  const preflight = {
+    shifts: { $: { where: { id: shiftId }, limit: 1 }, venue: {} },
+    employees: { $: { where: { id: actorEmployeeId }, limit: 1 }, venue: {} },
+    ...(tableId ? { tables: { $: { where: { id: tableId }, limit: 1 }, venue: {}, zone: {} } } : {}),
+  };
+
   const result = await runInstantCommand(
     {
       db,
@@ -191,14 +217,9 @@ async function createPosOrder(request, response, origin) {
       payload: body,
       deviceId: device.id,
       actorEmployeeId,
+      preflight,
     },
-    async () => {
-      const tableId = body.tableId === undefined ? undefined : nonEmptyString(body.tableId, 'tableId');
-      const references = await db.query({
-        shifts: { $: { where: { id: shiftId }, limit: 1 }, venue: {} },
-        employees: { $: { where: { id: actorEmployeeId }, limit: 1 }, venue: {} },
-        ...(tableId ? { tables: { $: { where: { id: tableId }, limit: 1 }, venue: {}, zone: {} } } : {}),
-      });
+    async (_command, references) => {
       const shift = entityForVenue(references.shifts, shiftId, device.venueId, 'Shift');
       if (shift.status !== 'open') throw commandError('Open shift is required', 409);
       const employee = entityForVenue(references.employees, actorEmployeeId, device.venueId, 'Employee');
@@ -280,6 +301,14 @@ async function addPosOrderLine(request, response, origin) {
     throw commandError('guestNumber must be a positive integer');
   }
   if (body.comment !== undefined && typeof body.comment !== 'string') throw commandError('comment must be a string');
+  const modifierIds = body.modifierIds ?? [];
+  if (
+    !Array.isArray(modifierIds) ||
+    modifierIds.length > 100 ||
+    modifierIds.some((modifierId) => typeof modifierId !== 'string' || modifierId.trim() === '')
+  ) {
+    throw commandError('modifierIds must be an array of non-empty strings');
+  }
 
   const result = await runInstantCommand(
     {
@@ -290,23 +319,55 @@ async function addPosOrderLine(request, response, origin) {
       payload: body,
       deviceId: device.id,
       actorEmployeeId,
-    },
-    async () => {
-      const references = await db.query({
+      preflight: {
         orders: { $: { where: { id: orderId }, limit: 1 }, venue: {} },
         employees: { $: { where: { id: actorEmployeeId }, limit: 1 }, venue: {} },
         products: {
           $: { where: { id: productId }, limit: 1 },
           venue: {},
+          modifierGroups: { modifiers: {} },
           recipeItems: { ingredient: { venue: {} } },
         },
-      });
+      },
+    },
+    async (_command, references) => {
       const order = entityForVenue(references.orders, orderId, device.venueId, 'Order');
       if (order.status !== 'active') throw commandError('Order is not active', 409);
       const employee = entityForVenue(references.employees, actorEmployeeId, device.venueId, 'Employee');
       if (employee.status !== 'active') throw commandError('Active employee is required', 403);
       const product = entityForVenue(references.products, productId, device.venueId, 'Product');
       if (product.status !== 'active') throw commandError('Product is not available', 409);
+
+      const modifierGroups = (product.modifierGroups ?? []).filter((group) => group.status === 'active');
+      const availableModifiers = new Map();
+      for (const group of modifierGroups) {
+        if (group.venueId !== device.venueId) {
+          throw commandError('Product includes a modifier group outside this venue', 409);
+        }
+        for (const modifier of group.modifiers ?? []) {
+          if (modifier.venueId !== device.venueId) {
+            throw commandError('Product includes a modifier outside this venue', 409);
+          }
+          if (modifier.status === 'active') availableModifiers.set(modifier.id, { group, modifier });
+        }
+      }
+
+      const selectedModifiers = modifierIds.map((modifierId) => {
+        const selection = availableModifiers.get(modifierId);
+        if (!selection) throw commandError('Modifier is not available for this product', 409);
+        return selection;
+      });
+      const modifierCountByGroup = new Map();
+      for (const { group } of selectedModifiers) {
+        modifierCountByGroup.set(group.id, (modifierCountByGroup.get(group.id) ?? 0) + 1);
+      }
+      for (const group of modifierGroups) {
+        const count = modifierCountByGroup.get(group.id) ?? 0;
+        if (group.isRequired && count === 0) throw commandError(`Modifier group ${group.name} is required`, 409);
+        if (group.maxSelect > 0 && count > group.maxSelect) {
+          throw commandError(`Modifier group ${group.name} allows at most ${group.maxSelect}`, 409);
+        }
+      }
 
       const consumption = product.recipeItems.map((recipeItem) => {
         const ingredient = Array.isArray(recipeItem.ingredient) ? recipeItem.ingredient[0] : recipeItem.ingredient;
@@ -336,7 +397,11 @@ async function addPosOrderLine(request, response, origin) {
       const now = new Date().toISOString();
       const itemId = deterministicUuid('order-item', `${device.venueId}:${operationId}`);
       const eventId = deterministicUuid('order-event-item-added', `${device.venueId}:${operationId}`);
-      const lineAmount = product.priceTiyin * body.quantity;
+      const modifierUnitAmount = selectedModifiers.reduce(
+        (sum, { modifier }) => sum + modifier.priceTiyin,
+        0,
+      );
+      const lineAmount = (product.priceTiyin + modifierUnitAmount) * body.quantity;
       if (!Number.isSafeInteger(lineAmount) || lineAmount < 0) throw commandError('Product price is invalid', 409);
       const newTotal = order.totalAmountTiyin + lineAmount;
       if (!Number.isSafeInteger(newTotal)) throw commandError('Order total is invalid', 409);
@@ -352,10 +417,30 @@ async function addPosOrderLine(request, response, origin) {
             quantity: body.quantity,
             guestNumber: body.guestNumber,
             comment: body.comment,
-            consumptionSnapshotJson: JSON.stringify({ consumption }),
+            consumptionSnapshotJson: JSON.stringify({
+              consumption,
+              modifiers: selectedModifiers.map(({ modifier }) => ({
+                id: modifier.id,
+                name: modifier.name,
+                priceTiyin: modifier.priceTiyin,
+              })),
+            }),
             createdAt: now,
           })
           .link({ order: orderId, product: productId }),
+        ...selectedModifiers.map(({ modifier }, index) => {
+          const modifierSnapshotId = deterministicUuid(
+            'order-item-modifier',
+            `${device.venueId}:${operationId}:${index}`,
+          );
+          return db.tx.orderItemModifiers[modifierSnapshotId]
+            .update({
+              venueId: device.venueId,
+              modifierName: modifier.name,
+              modifierPriceTiyin: modifier.priceTiyin,
+            })
+            .link({ orderItem: itemId, modifier: modifier.id });
+        }),
         db.tx.orders[orderId].update({ totalAmountTiyin: newTotal, version: orderVersion + 1 }),
         db.tx.orderEvents[eventId]
           .update({
@@ -398,7 +483,11 @@ async function removePosOrderLine(request, response, origin) {
     async () => {
       const references = await db.query({
         orders: { $: { where: { id: orderId }, limit: 1 }, venue: {} },
-        orderItems: { $: { where: { id: orderItemId }, limit: 1 }, order: { venue: {} } },
+        orderItems: {
+          $: { where: { id: orderItemId }, limit: 1 },
+          order: { venue: {} },
+          modifiers: {},
+        },
         employees: { $: { where: { id: actorEmployeeId }, limit: 1 }, venue: {} },
       });
       const order = entityForVenue(references.orders, orderId, device.venueId, 'Order');
@@ -413,12 +502,17 @@ async function removePosOrderLine(request, response, origin) {
         throw commandError('Order line does not belong to this order', 403);
       }
 
-      const lineAmount = orderItem.productPriceTiyin * orderItem.quantity;
+      const modifierAmount = (orderItem.modifiers ?? []).reduce(
+        (sum, modifier) => sum + modifier.modifierPriceTiyin,
+        0,
+      );
+      const lineAmount = (orderItem.productPriceTiyin + modifierAmount) * orderItem.quantity;
       const newTotal = Math.max(0, order.totalAmountTiyin - lineAmount);
       const now = new Date().toISOString();
       const eventId = deterministicUuid('order-event-item-removed', `${device.venueId}:${operationId}`);
       const orderVersion = resourceVersion(order, 'Order');
       const steps = [
+        ...(orderItem.modifiers ?? []).map((modifier) => db.tx.orderItemModifiers[modifier.id].delete()),
         db.tx.orderItems[orderItemId].delete(),
         db.tx.orders[orderId].update({ totalAmountTiyin: newTotal, version: orderVersion + 1 }),
         db.tx.orderEvents[eventId]
@@ -907,9 +1001,7 @@ async function membershipsFor(userId) {
 
 async function authorizeAdmin(request, venueId) {
   const user = await verifyBearerToken(request);
-  const membership = (await membershipsFor(user.id)).find(
-    (candidate) => linkedId(candidate.venue) === venueId && ADMIN_ROLES.has(candidate.role),
-  );
+  const membership = resolveAdminMembership(await membershipsFor(user.id), venueId);
   if (!membership) {
     const error = new Error('Owner or manager membership is required');
     error.statusCode = 403;
@@ -1043,22 +1135,38 @@ async function recordPosUnlockAttempts(request, response, origin) {
   return send(response, 200, { acceptedIds: attempts.map((attempt) => attempt.id) }, origin);
 }
 
-async function activateDevice(request, response, origin) {
+async function requestDeviceActivationMagicCode(request, response, origin) {
   const body = await readJson(request);
-  const occurredAt = new Date().toISOString();
   const email = nonEmptyString(body.email, 'email').toLowerCase();
-  const magicCode = nonEmptyString(body.magicCode, 'magicCode');
   const installationId = nonEmptyString(body.installationId, 'installationId');
-  const label = nonEmptyString(body.label, 'label');
-  const platform = nonEmptyString(body.platform, 'platform');
   limitActivation(request, email, installationId);
-  const verification = await db.auth.checkMagicCode(email, magicCode);
-  const memberships = (await membershipsFor(verification.user.id))
-    .filter((candidate) => ADMIN_ROLES.has(candidate.role))
-    .sort((left, right) => {
-      const created = String(left.createdAt).localeCompare(String(right.createdAt));
-      return created || String(linkedId(left.venue)).localeCompare(String(linkedId(right.venue)));
-    });
+  consumeRateLimit('activation-resend', `${email}:${installationId}`, {
+    capacity: 1,
+    periodMs: ACTIVATION_RESEND_AFTER_SECONDS * 1_000,
+  });
+  await db.auth.sendMagicCode(email);
+  return send(response, 202, { resendAfterSeconds: ACTIVATION_RESEND_AFTER_SECONDS }, origin);
+}
+
+function activationVenue(membership) {
+  const venue = Array.isArray(membership.venue) ? membership.venue[0] : membership.venue;
+  if (!venue?.id) throw new Error('Membership is missing venue');
+  return { id: venue.id, name: venue.name };
+}
+
+async function activateAuthorizedDevice({
+  adminUserId,
+  membership,
+  installationId,
+  label,
+  platform,
+  challenge,
+}) {
+  const occurredAt = new Date().toISOString();
+  const venueId = linkedId(membership.venue);
+  if (!venueId) throw new Error('Membership is missing venue');
+  const organizationId = linkedId(membership.organization);
+  if (!organizationId) throw new Error('Membership is missing organization');
   const devices = await db.query({
     devices: {
       $: { where: { installationId }, limit: 1 },
@@ -1068,28 +1176,27 @@ async function activateDevice(request, response, origin) {
     },
   });
   const existing = devices.devices[0];
-  const existingVenueId = existing ? linkedId(existing.venue) : null;
-  const membership = existingVenueId
-    ? memberships.find((candidate) => linkedId(candidate.venue) === existingVenueId)
-    : memberships[0];
-  if (!membership) {
-    return send(response, 403, { error: 'An active owner or manager membership is required' }, origin);
+  if (existing && linkedId(existing.venue) !== venueId) {
+    throw commandError('Installation is already bound to another venue', 409);
   }
-  const venueId = linkedId(membership.venue);
-  if (!venueId) throw new Error('Membership is missing venue');
-  const organizationId = linkedId(membership.organization);
-  if (!organizationId) throw new Error('Membership is missing organization');
-  if (existing) {
-    if (linkedId(existing.venue) !== venueId) {
-      return send(response, 409, { error: 'Installation is already bound to another venue' }, origin);
-    }
+  const challengeSteps = challenge
+    ? [
+        db.tx.activationChallenges[challenge.id].update({ status: 'consumed', consumedAt: occurredAt }),
+        db.tx.activationChallengeClaims[randomUUID()].update({
+          claimKey: challenge.challengeHash,
+          challengeId: challenge.id,
+          createdAt: occurredAt,
+        }),
+      ]
+    : [];
 
+  if (existing) {
     const deviceUserId = linkedId(existing.authUser);
     if (!deviceUserId) throw new Error('Existing device is missing an auth user');
-
     const authorizationId = randomUUID();
     const auditEventId = randomUUID();
     await db.transact([
+      ...challengeSteps,
       db.tx.devices[existing.id].update({ label, platform, status: 'active' }),
       ...existing.authorizations
         .filter((authorization) => authorization.status === 'active')
@@ -1098,7 +1205,7 @@ async function activateDevice(request, response, origin) {
         ),
       db.tx.deviceAuthorizations[authorizationId]
         .update({ status: 'active', activatedAt: occurredAt })
-        .link({ device: existing.id, venue: venueId, activatedBy: verification.user.id }),
+        .link({ device: existing.id, venue: venueId, activatedBy: adminUserId }),
       db.tx.venues[venueId].link({ activeDeviceUsers: [deviceUserId] }),
       db.tx.auditEvents[auditEventId]
         .update({
@@ -1111,13 +1218,12 @@ async function activateDevice(request, response, origin) {
           organization: organizationId,
           venue: venueId,
           device: existing.id,
-          adminUser: verification.user.id,
+          adminUser: adminUserId,
         }),
     ]);
-
     await db.auth.signOut({ id: deviceUserId });
     const token = await db.auth.createToken({ email: `device-${existing.id}@devices.invalid` });
-    return send(response, 200, { deviceId: existing.id, venueId, token }, origin);
+    return { deviceId: existing.id, venueId, token };
   }
 
   const deviceId = randomUUID();
@@ -1130,12 +1236,13 @@ async function activateDevice(request, response, origin) {
 
   try {
     await db.transact([
+      ...challengeSteps,
       db.tx.devices[deviceId]
         .update({ installationId, label, platform, status: 'active', createdAt: occurredAt })
         .link({ venue: venueId, authUser: deviceUser.id }),
       db.tx.deviceAuthorizations[authorizationId]
         .update({ status: 'active', activatedAt: occurredAt })
-        .link({ device: deviceId, venue: venueId, activatedBy: verification.user.id }),
+        .link({ device: deviceId, venue: venueId, activatedBy: adminUserId }),
       db.tx.venues[venueId].link({ activeDeviceUsers: [deviceUser.id] }),
       db.tx.auditEvents[auditEventId]
         .update({
@@ -1148,14 +1255,11 @@ async function activateDevice(request, response, origin) {
           organization: organizationId,
           venue: venueId,
           device: deviceId,
-          adminUser: verification.user.id,
+          adminUser: adminUserId,
         }),
     ]);
-
-    return send(response, 201, { deviceId, venueId, token: deviceToken }, origin);
+    return { deviceId, venueId, token: deviceToken };
   } catch (cause) {
-    // Duplicate installationId — another request won the race.
-    // Re-query and fall through to the existing-device path.
     const retry = await db.query({
       devices: {
         $: { where: { installationId }, limit: 1 },
@@ -1165,47 +1269,123 @@ async function activateDevice(request, response, origin) {
       },
     });
     const raced = retry.devices[0];
-
-    // Clean up the auth user we just created (best-effort, not critical)
     await db.auth.signOut({ id: deviceUser.id }).catch(() => {});
-
-    const existingDeviceUserId = linkedId(raced.authUser);
-    if (!existingDeviceUserId) throw new Error('Existing device is missing an auth user');
-
-    const retryAuthorizationId = randomUUID();
-    const retryAuditEventId = randomUUID();
-    await db.transact([
-      db.tx.devices[raced.id].update({ label, platform, status: 'active' }),
-      ...raced.authorizations
-        .filter((authorization) => authorization.status === 'active')
-        .map((authorization) =>
-          db.tx.deviceAuthorizations[authorization.id].update({ status: 'revoked', revokedAt: occurredAt }),
-        ),
-      db.tx.deviceAuthorizations[retryAuthorizationId]
-        .update({ status: 'active', activatedAt: occurredAt })
-        .link({ device: raced.id, venue: venueId, activatedBy: verification.user.id }),
-      db.tx.venues[venueId].link({ activeDeviceUsers: [existingDeviceUserId] }),
-      db.tx.auditEvents[retryAuditEventId]
-        .update({
-          venueId,
-          action: 'device_reactivated',
-          occurredAt,
-          metadata: { installationId, label, platform, venueId },
-        })
-        .link({
-          organization: organizationId,
-          venue: venueId,
-          device: raced.id,
-          adminUser: verification.user.id,
-        }),
-    ]);
-
-    await db.auth.signOut({ id: existingDeviceUserId });
-    const retryToken = await db.auth.createToken({ email: `device-${raced.id}@devices.invalid` });
-    return send(response, 200, { deviceId: raced.id, venueId, token: retryToken }, origin);
+    if (!raced) throw cause;
+    if (linkedId(raced.venue) !== venueId) {
+      throw commandError('Installation is already bound to another venue', 409);
+    }
+    return activateAuthorizedDevice({
+      adminUserId,
+      membership,
+      installationId,
+      label,
+      platform,
+      challenge,
+    });
   }
+}
 
-  return send(response, 201, { deviceId, venueId, token: deviceToken }, origin);
+async function beginDeviceActivation(request, response, origin) {
+  const body = await readJson(request);
+  const email = nonEmptyString(body.email, 'email').toLowerCase();
+  const magicCode = nonEmptyString(body.magicCode, 'magicCode');
+  const installationId = nonEmptyString(body.installationId, 'installationId');
+  const label = nonEmptyString(body.label, 'label');
+  const platform = nonEmptyString(body.platform, 'platform');
+  limitActivation(request, email, installationId);
+  const verification = await db.auth.checkMagicCode(email, magicCode);
+  const memberships = await membershipsFor(verification.user.id);
+
+  const existingDevices = await db.query({
+    devices: { $: { where: { installationId }, limit: 1 }, venue: {} },
+  });
+  const resolution = resolveDeviceActivation(
+    memberships,
+    linkedId(existingDevices.devices[0]?.venue),
+  );
+  if (resolution.kind === 'forbidden') {
+    throw commandError('An active owner or manager membership is required', 403);
+  }
+  if (resolution.kind === 'forbidden-existing') {
+    throw commandError('An active owner or manager membership is required for this device venue', 403);
+  }
+  if (resolution.kind === 'activate') {
+    const activation = await activateAuthorizedDevice({
+      adminUserId: verification.user.id,
+      membership: resolution.membership,
+      installationId,
+      label,
+      platform,
+    });
+    return send(response, existingDevices.devices[0] ? 200 : 201, {
+      status: 'activated',
+      activation,
+    }, origin);
+  }
+  const eligibleMemberships = resolution.memberships;
+
+  const activationChallenge = randomBytes(32).toString('base64url');
+  const challengeHash = createHash('sha256').update(activationChallenge).digest('hex');
+  const challengeId = randomUUID();
+  const createdAt = new Date();
+  const challengeVenues = eligibleMemberships.map((membership) => ({
+    ...activationVenue(membership),
+    membershipId: membership.id,
+    organizationId: linkedId(membership.organization),
+  }));
+  await db.transact(
+    db.tx.activationChallenges[challengeId].update({
+      challengeHash,
+      adminUserId: verification.user.id,
+      email,
+      installationId,
+      label,
+      platform,
+      venuesJson: JSON.stringify(challengeVenues),
+      status: 'pending',
+      createdAt: createdAt.toISOString(),
+      expiresAt: new Date(createdAt.getTime() + ACTIVATION_CHALLENGE_TTL_MS).toISOString(),
+    }),
+  );
+  return send(response, 200, {
+    status: 'venue-selection',
+    selection: {
+      activationChallenge,
+      venues: challengeVenues.map(({ id, name }) => ({ id, name })),
+    },
+  }, origin);
+}
+
+async function completeDeviceActivation(request, response, origin) {
+  const body = await readJson(request);
+  const activationChallenge = nonEmptyString(body.activationChallenge, 'activationChallenge');
+  const venueId = nonEmptyString(body.venueId, 'venueId');
+  const challengeHash = createHash('sha256').update(activationChallenge).digest('hex');
+  const challengeData = await db.query({
+    activationChallenges: { $: { where: { challengeHash }, limit: 1 } },
+  });
+  const challenge = challengeData.activationChallenges[0];
+  const resolution = resolveActivationChallenge(challenge, venueId);
+  if (resolution.kind === 'invalid') {
+    throw commandError('Activation challenge is invalid or expired', 409);
+  }
+  if (resolution.kind === 'forbidden') {
+    throw commandError('Venue is not allowed by this activation challenge', 403);
+  }
+  const membership = {
+    id: resolution.venue.membershipId,
+    venue: [{ id: resolution.venue.id, name: resolution.venue.name }],
+    organization: [{ id: resolution.venue.organizationId }],
+  };
+  const activation = await activateAuthorizedDevice({
+    adminUserId: challenge.adminUserId,
+    membership,
+    installationId: challenge.installationId,
+    label: challenge.label,
+    platform: challenge.platform,
+    challenge,
+  });
+  return send(response, 201, { status: 'activated', activation }, origin);
 }
 
 
@@ -1271,8 +1451,14 @@ export const server = createServer(async (request, response) => {
     if (request.method === 'GET' && url.pathname === '/healthz') {
       return send(response, 200, { ok: true }, origin);
     }
+    if (request.method === 'POST' && url.pathname === '/v1/device-activation-codes') {
+      return await requestDeviceActivationMagicCode(request, response, origin);
+    }
     if (request.method === 'POST' && url.pathname === '/v1/device-activations') {
-      return await activateDevice(request, response, origin);
+      return await beginDeviceActivation(request, response, origin);
+    }
+    if (request.method === 'POST' && url.pathname === '/v1/device-activations/complete') {
+      return await completeDeviceActivation(request, response, origin);
     }
     if (request.method === 'POST' && url.pathname === '/v1/admin/warehouse-commands') {
       return await executeAdminWarehouseCommand(request, response, origin);

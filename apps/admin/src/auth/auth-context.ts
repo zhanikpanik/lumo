@@ -5,6 +5,7 @@ export interface AuthValue {
   loading: boolean;
   membershipLoading: boolean;
   venueId: string | null;
+  venueName: string | null;
   authError: Error | null;
   requestMagicCode: (email: string) => Promise<void>;
   verifyMagicCode: (email: string, code: string) => Promise<void>;

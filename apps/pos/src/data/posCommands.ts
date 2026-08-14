@@ -115,6 +115,7 @@ export interface AddPosOrderLineRequest {
   productId: string;
   quantity: number;
   guestNumber: number;
+  modifierIds?: string[];
   comment?: string;
 }
 

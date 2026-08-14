@@ -31,35 +31,33 @@ export function AnalyticsPage() {
   const { data, isPending, error } = useAnalytics(start, queryEnd);
 
   return (
-    <div className="p-6 lg:p-8 max-w-[1180px]">
-      {/* Header */}
-      <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4 mb-6">
-        <div>
-          <h2 className="text-2xl font-bold mb-1 text-foreground">Аналитика</h2>
-          <p className="text-sm text-muted-foreground">Alto Coffee Bishkek</p>
-        </div>
-        <PeriodPicker start={start} end={end} onChange={(s, e) => { setStart(s); setEnd(e); }} />
+    <div className="page-shell page-shell--wide">{/* Header */}
+    <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4 mb-6">
+      <div>
+        <h2 className="text-2xl font-bold mb-1 text-foreground">Аналитика</h2>
+        <p className="text-sm text-muted-foreground">Alto Coffee Bishkek</p>
       </div>
-
-      {/* KPI Row */}
-      <KpiRow data={data ?? null} isPending={isPending} error={error} />
-
-      {/* Revenue Chart + Heatmap */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <RevenueChart data={data ?? null} isPending={isPending} error={error} />
-        <HeatmapChart data={data ?? null} isPending={isPending} error={error} />
-      </div>
-
-      {/* Overconsumption */}
-      <div className="mb-6">
-        <Overconsumption data={data ?? null} isPending={isPending} error={error} />
-      </div>
-
-      {/* Drinks + Shifts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        <DrinksList data={data ?? null} isPending={isPending} error={error} />
-        <ShiftsList data={data ?? null} isPending={isPending} error={error} />
-      </div>
+      <PeriodPicker start={start} end={end} onChange={(s, e) => { setStart(s); setEnd(e); }} />
     </div>
+    
+    {/* KPI Row */}
+    <KpiRow data={data ?? null} isPending={isPending} error={error} />
+    
+    {/* Revenue Chart + Heatmap */}
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <RevenueChart data={data ?? null} isPending={isPending} error={error} />
+      <HeatmapChart data={data ?? null} isPending={isPending} error={error} />
+    </div>
+    
+    {/* Overconsumption */}
+    <div className="mb-6">
+      <Overconsumption data={data ?? null} isPending={isPending} error={error} />
+    </div>
+    
+    {/* Drinks + Shifts */}
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <DrinksList data={data ?? null} isPending={isPending} error={error} />
+      <ShiftsList data={data ?? null} isPending={isPending} error={error} />
+    </div></div>
   );
 }

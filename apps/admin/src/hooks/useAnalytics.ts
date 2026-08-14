@@ -1,13 +1,22 @@
 import { useQuery } from '@tanstack/react-query';
-import { supabase, VENUE_ID } from '@/lib/supabase';
-
-// ── Portion — the data particle ──
+import type { InstaQLParams } from '@instantdb/react';
+import {
+  adminDashboardDishesWithRecipesQuery,
+  adminDashboardPeriodPaidOrdersQuery,
+  adminDeliveriesQuery,
+  adminTransfersQuery,
+  adminWriteOffsQuery,
+  type AppSchema,
+} from '@lumo/data';
+import { getInstantClient } from '@/data/instant';
+import { instantOne } from '@/lib/instantLink';
+import { useVenueId } from './useVenueId';
 
 export interface Portion {
   orderId: string;
   date: string;
   hour: number;
-  dayOfWeek: number; // 0=Mon..6=Sun
+  dayOfWeek: number;
   productName: string;
   price: number;
   quantity: number;
@@ -17,8 +26,6 @@ export interface Portion {
   marginPct: number;
   shiftId: string;
 }
-
-// ── Aggregated views ──
 
 export interface DailyStats {
   date: string;
@@ -63,7 +70,6 @@ export interface IngredientDiscrepancy {
   actualConsumption: number;
   discrepancy: number;
   discrepancySom: number;
-  // per-shift breakdown
   byShift: {
     shiftId: string;
     cashierName: string;
@@ -78,59 +84,39 @@ export interface StockStatus {
   unit: string;
   weeklyConsumption: number;
   daysLeft: number;
-  isBar: boolean; // true = opened bottle (bar), false = warehouse
+  isBar: boolean;
 }
 
-/** Одна строка расхода: ингредиент + сколько ушло + сколько пришло + покрытие */
 export interface ConsumptionRow {
   productId: string;
   productName: string;
   unit: string;
-  /** Теоретический расход: recipe_items × проданные порции */
   consumption: number;
-  /** Поступления за период (delivery items) */
   incomingDelivery: number;
-  /** Чистые перемещения (in − out) */
   transferNet: number;
-  /** Списания */
   writeoffQty: number;
-  /** Покрытие: доля расхода перекрытая поставками (0..1+) */
   coverageRatio: number;
 }
 
-/** Одна строка перерасхода: теория vs факт с привязкой к инвентаризациям */
 export interface OverconsumptionRow {
   productId: string;
   productName: string;
   unit: string;
-  /** Теоретический расход: recipe_items × проданные порции */
   theoretical: number;
-  /** Фактический расход: нач.остаток + поставки − кон.остаток (null если нет граничных инвентаризаций) */
   actual: number | null;
-  /** Разница: actual − theoretical (null если нет actual) */
   delta: number | null;
-  /** Потери в сомах: delta × cost_price (null если нет actual или нет цены) */
   lossSom: number | null;
-  /** Начальный остаток (из инвентаризации на начало периода) */
   startingStock: number | null;
-  /** Конечный остаток (из инвентаризации на конец периода) */
   endingStock: number | null;
-  /** Поставки за период */
   deliveries: number;
-  /** Цена за единицу */
   costPrice: number | null;
 }
 
 export interface OverconsumptionData {
-  /** true когда есть инвентаризации на ОБЕИХ границах периода */
   hasBoundaries: boolean;
-  /** Дата начальной инвентаризации */
   startInventoryDate: string | null;
-  /** Дата конечной инвентаризации */
   endInventoryDate: string | null;
-  /** Строки перерасхода, отсортированы по убыванию потерь */
   rows: OverconsumptionRow[];
-  /** Суммарные потери в сомах (null если нет границ) */
   totalLossSom: number | null;
 }
 
@@ -147,504 +133,341 @@ export interface AnalyticsData {
   periodLabel: string;
 }
 
-// ── Helpers ──
+interface IngredientFlow {
+  consumption: number;
+  incoming: number;
+  transfer: number;
+  writeoff: number;
+}
 
-function iso(date: Date): string {
-  return date.toISOString().slice(0, 10);
+interface IngredientInfo {
+  name: string;
+  unit: string;
+  cost: number;
 }
 
 const DAY_LABELS = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
+const MONTH_LABELS = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
 
-function dayOfWeekIndex(ts: string): number {
-  const d = new Date(ts).getDay(); // 0=Sun
-  return d === 0 ? 6 : d - 1; // 0=Mon
+function dateKey(value: Date | string | number): string {
+  return new Date(value).toISOString().slice(0, 10);
 }
 
-// ── Cost calculation ──
-
-interface CostIndex {
-  [dishId: string]: number; // cost per 1 portion
+function dayOfWeekIndex(value: Date | string | number): number {
+  const day = new Date(value).getDay();
+  return day === 0 ? 6 : day - 1;
 }
 
-async function buildCostIndex(): Promise<CostIndex> {
-  // Fetch all recipe items with ingredient costs
-  const { data: recipes } = await supabase
-    .from('recipe_items')
-    .select('product_id, ingredient_id, quantity, unit');
-
-  if (!recipes?.length) return {};
-
-  const ingredientIds = Array.from(new Set(recipes.map((r) => r.ingredient_id as string)));
-  const { data: ingredients } = await supabase
-    .from('products')
-    .select('id, cost_price')
-    .in('id', ingredientIds);
-
-  const costMap = new Map<string, number>();
-  for (const ing of ingredients || []) {
-    costMap.set(ing.id as string, Number(ing.cost_price) || 0);
-  }
-
-  // Sum ingredient costs per dish
-  const dishCost: CostIndex = {};
-  for (const r of recipes) {
-    const dishId = r.product_id as string;
-    const ingCost = costMap.get(r.ingredient_id as string) || 0;
-    const qty = Number(r.quantity) || 0;
-    // cost_price is per base unit (kg for solids, L for liquids)
-    const lineCost = qty * ingCost;
-    dishCost[dishId] = (dishCost[dishId] || 0) + lineCost;
-  }
-
-  return dishCost;
+function inPeriod(value: Date | string | number, start: string, end: string): boolean {
+  const timestamp = new Date(value).getTime();
+  return timestamp >= new Date(start).getTime() && timestamp < new Date(end).getTime();
 }
 
-// ── Main fetch ──
+function periodLabel(start: string, end: string): string {
+  const first = new Date(start);
+  const last = new Date(end);
+  last.setDate(last.getDate() - 1);
+  return first.getMonth() === last.getMonth()
+    ? `${first.getDate()}–${last.getDate()} ${MONTH_LABELS[last.getMonth()]} ${last.getFullYear()}`
+    : `${first.getDate()} ${MONTH_LABELS[first.getMonth()]} – ${last.getDate()} ${MONTH_LABELS[last.getMonth()]} ${last.getFullYear()}`;
+}
 
-async function fetchAnalytics(periodStart: string, periodEnd: string): Promise<AnalyticsData> {
-  // Parallel: cost index + order_items
-  const [costIndex, { data: items, error }] = await Promise.all([
-    buildCostIndex(),
-    supabase
-      .from('order_items')
-      .select('product_name, quantity, product_price, order_id, product_id, orders!inner(opened_at, shift_id)')
-      .eq('orders.venue_id', VENUE_ID)
-      .eq('orders.status', 'paid')
-      .gte('orders.opened_at', periodStart)
-      .lt('orders.opened_at', periodEnd),
+function warehouseOperationsQuery(venueId: string) {
+  return {
+    shifts: {
+      $: { where: { 'venue.id': venueId }, limit: 1000 },
+      openedBy: {},
+    },
+    stockItems: {
+      $: { where: { venueId }, limit: 9999 },
+      product: {},
+      warehouse: {},
+    },
+    inventorySessions: {
+      $: { where: { 'venue.id': venueId }, limit: 1000 },
+      lines: { product: {} },
+    },
+  } satisfies InstaQLParams<AppSchema>;
+}
+
+async function fetchAnalytics(venueId: string, start: string, end: string): Promise<AnalyticsData> {
+  const db = getInstantClient();
+  const [ordersResult, dishesResult, operationsResult, deliveriesResult, writeOffsResult, transfersResult] = await Promise.all([
+    db.queryOnce(adminDashboardPeriodPaidOrdersQuery(venueId, start, end)),
+    db.queryOnce(adminDashboardDishesWithRecipesQuery(venueId)),
+    db.queryOnce(warehouseOperationsQuery(venueId)),
+    db.queryOnce(adminDeliveriesQuery(venueId, 1000)),
+    db.queryOnce(adminWriteOffsQuery(venueId, 1000)),
+    db.queryOnce(adminTransfersQuery(venueId, 1000)),
   ]);
 
-  if (error) throw error;
+  const ingredientInfo = new Map<string, IngredientInfo>();
+  const recipeByDish = new Map<string, Array<{ ingredientId: string; quantity: number }>>();
+  for (const dish of dishesResult.data.products ?? []) {
+    const recipe: Array<{ ingredientId: string; quantity: number }> = [];
+    for (const recipeItem of dish.recipeItems ?? []) {
+      const ingredient = instantOne(recipeItem.ingredient);
+      if (!ingredient) continue;
+      ingredientInfo.set(ingredient.id, {
+        name: ingredient.name,
+        unit: ingredient.unit,
+        cost: (ingredient.costTiyin ?? 0) / 100,
+      });
+      recipe.push({ ingredientId: ingredient.id, quantity: (recipeItem.quantityMilli ?? 0) / 1000 });
+    }
+    recipeByDish.set(dish.id, recipe);
+  }
 
-  // Build portions
   const portions: Portion[] = [];
-  const shiftIds = new Set<string>();
+  const orderIdsByDay = new Map<string, Set<string>>();
+  const soldByDish = new Map<string, number>();
+  const cashierByShift = new Map<string, string>();
 
-  for (const item of items || []) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const ordersRaw = (item as any).orders;
-    const orders: { opened_at: string; shift_id: string } | null =
-      Array.isArray(ordersRaw) ? ordersRaw[0] : ordersRaw;
-    if (!orders) continue;
+  for (const order of ordersResult.data.orders ?? []) {
+    const shift = instantOne(order.shift);
+    const cashier = instantOne(shift?.openedBy);
+    if (shift) cashierByShift.set(shift.id, cashier?.displayName ?? `Смена ${shift.id.slice(0, 8)}`);
+    const day = dateKey(order.openedAt);
+    const dayOrders = orderIdsByDay.get(day) ?? new Set<string>();
+    dayOrders.add(order.id);
+    orderIdsByDay.set(day, dayOrders);
 
-    const ts = orders.opened_at;
-    const qty = Number(item.quantity) || 1;
-    const price = Number(item.product_price) || 0;
-    const revenue = qty * price;
-    const dishId = item.product_id as string;
-    const unitCost = costIndex[dishId] || 0;
-    const cost = qty * unitCost;
-    const margin = revenue - cost;
-
-    portions.push({
-      date: ts.slice(0, 10),
-      hour: new Date(ts).getHours(),
-      dayOfWeek: dayOfWeekIndex(ts),
-      productName: item.product_name as string || '—',
-      price,
-      quantity: qty,
-      revenue,
-      cost,
-      margin,
-      marginPct: revenue > 0 ? (margin / revenue) * 100 : 0,
-      orderId: item.order_id as string,
-      shiftId: orders.shift_id,
-    });
-
-    shiftIds.add(orders.shift_id);
-  }
-
-  // ── Fetch shift → cashier mapping ──
-  const shiftCashierMap = new Map<string, string>();
-  if (shiftIds.size > 0) {
-    const shiftArr = Array.from(shiftIds);
-    // Batch in groups of 100 for IN clause
-    for (let i = 0; i < shiftArr.length; i += 100) {
-      const batch = shiftArr.slice(i, i + 100);
-      const { data: shifts } = await supabase
-        .from('shifts')
-        .select('id, cashier_id')
-        .in('id', batch);
-      for (const s of shifts || []) {
-        shiftCashierMap.set(s.id as string, s.cashier_id as string);
-      }
-    }
-  }
-
-  // Fetch user names
-  const cashierIds = Array.from(new Set(shiftCashierMap.values()));
-  const cashierNameMap = new Map<string, string>();
-  if (cashierIds.length > 0) {
-    for (let i = 0; i < cashierIds.length; i += 100) {
-      const batch = cashierIds.slice(i, i + 100);
-      const { data: users } = await supabase
-        .from('users')
-        .select('id, name')
-        .in('id', batch);
-      for (const u of users || []) {
-        cashierNameMap.set(u.id as string, u.name as string || '—');
-      }
-    }
-  }
-
-  // ── Daily aggregation ──
-  const dayMap = new Map<string, { revenue: number; cost: number }>();
-  for (const p of portions) {
-    const d = dayMap.get(p.date) || { revenue: 0, cost: 0 };
-    d.revenue += p.revenue;
-    d.cost += p.cost;
-    dayMap.set(p.date, d);
-  }
-
-  // Generate all days in range
-  const dailyStats: DailyStats[] = [];
-  const start = new Date(periodStart);
-  const end = new Date(periodEnd);
-  for (let d = new Date(start); d < end; d.setDate(d.getDate() + 1)) {
-    const dateKey = iso(d);
-    const entry = dayMap.get(dateKey) || { revenue: 0, cost: 0 };
-    dailyStats.push({
-      date: dateKey,
-      dayOfWeek: DAY_LABELS[d.getDay()],
-      revenue: entry.revenue,
-      cost: entry.cost,
-      margin: entry.revenue - entry.cost,
-      orderCount: 0, // filled below
-      avgCheck: 0,
-    });
-  }
-
-  // ── Get actual order counts per day ──
-  const { data: orderCounts } = await supabase
-    .from('orders')
-    .select('opened_at')
-    .eq('venue_id', VENUE_ID)
-    .eq('status', 'paid')
-    .gte('opened_at', periodStart)
-    .lt('opened_at', periodEnd);
-
-  const ordersPerDay = new Map<string, number>();
-  for (const o of orderCounts || []) {
-    const dk = (o.opened_at as string).slice(0, 10);
-    ordersPerDay.set(dk, (ordersPerDay.get(dk) || 0) + 1);
-  }
-
-  for (const ds of dailyStats) {
-    ds.orderCount = ordersPerDay.get(ds.date) || 0;
-    ds.avgCheck = ds.orderCount > 0 ? Math.round(ds.revenue / ds.orderCount) : 0;
-  }
-
-  // ── Hourly aggregation ──
-  const hourlyBuckets: HourlyBucket[] = [];
-  for (let dayIdx = 0; dayIdx < 7; dayIdx++) {
-    for (let hour = 7; hour <= 23; hour++) {
-      const bucket = portions.filter((p) => p.dayOfWeek === dayIdx && p.hour === hour);
-      const revenue = bucket.reduce((s, p) => s + p.revenue, 0);
-      const orderCount = new Set(bucket.map((p) => p.orderId)).size;
-      hourlyBuckets.push({
-        dayIndex: dayIdx,
-        hour,
-        orderCount,
+    for (const item of order.items ?? []) {
+      const product = instantOne(item.product);
+      const quantity = Number(item.quantity) || 1;
+      const price = (Number(item.productPriceTiyin) || 0) / 100;
+      const unitCost = (Number(product?.costTiyin) || 0) / 100;
+      const revenue = price * quantity;
+      const cost = unitCost * quantity;
+      const timestamp = new Date(order.openedAt);
+      portions.push({
+        orderId: order.id,
+        date: day,
+        hour: timestamp.getHours(),
+        dayOfWeek: dayOfWeekIndex(timestamp),
+        productName: item.productName || product?.name || '—',
+        price,
+        quantity,
         revenue,
-        avgCheck: orderCount > 0 ? Math.round(revenue / orderCount) : 0,
+        cost,
+        margin: revenue - cost,
+        marginPct: revenue > 0 ? ((revenue - cost) / revenue) * 100 : 0,
+        shiftId: shift?.id ?? 'Без смены',
+      });
+      if (product) soldByDish.set(product.id, (soldByDish.get(product.id) ?? 0) + quantity);
+    }
+  }
+
+  const dailyTotals = new Map<string, { revenue: number; cost: number }>();
+  const drinkTotals = new Map<string, { revenue: number; cost: number; count: number }>();
+  const shiftTotals = new Map<string, { revenue: number; cost: number; count: number }>();
+  for (const portion of portions) {
+    const daily = dailyTotals.get(portion.date) ?? { revenue: 0, cost: 0 };
+    daily.revenue += portion.revenue;
+    daily.cost += portion.cost;
+    dailyTotals.set(portion.date, daily);
+
+    const drink = drinkTotals.get(portion.productName) ?? { revenue: 0, cost: 0, count: 0 };
+    drink.revenue += portion.revenue;
+    drink.cost += portion.cost;
+    drink.count += portion.quantity;
+    drinkTotals.set(portion.productName, drink);
+
+    const shift = shiftTotals.get(portion.shiftId) ?? { revenue: 0, cost: 0, count: 0 };
+    shift.revenue += portion.revenue;
+    shift.cost += portion.cost;
+    shift.count += portion.quantity;
+    shiftTotals.set(portion.shiftId, shift);
+  }
+
+  const dailyStats: DailyStats[] = [];
+  for (let cursor = new Date(start); cursor < new Date(end); cursor.setDate(cursor.getDate() + 1)) {
+    const day = dateKey(cursor);
+    const totals = dailyTotals.get(day) ?? { revenue: 0, cost: 0 };
+    const orderCount = orderIdsByDay.get(day)?.size ?? 0;
+    dailyStats.push({
+      date: day,
+      dayOfWeek: DAY_LABELS[cursor.getDay()],
+      revenue: totals.revenue,
+      cost: totals.cost,
+      margin: totals.revenue - totals.cost,
+      orderCount,
+      avgCheck: orderCount > 0 ? totals.revenue / orderCount : 0,
+    });
+  }
+
+  const hourlyBuckets: HourlyBucket[] = [];
+  for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
+    for (let hour = 7; hour <= 23; hour++) {
+      const bucket = portions.filter((portion) => portion.dayOfWeek === dayIndex && portion.hour === hour);
+      const orders = new Set(bucket.map((portion) => portion.orderId));
+      const revenue = bucket.reduce((sum, portion) => sum + portion.revenue, 0);
+      hourlyBuckets.push({
+        dayIndex,
+        hour,
+        orderCount: orders.size,
+        revenue,
+        avgCheck: orders.size > 0 ? revenue / orders.size : 0,
       });
     }
   }
 
-  // ── Drink aggregation ──
-  const drinkMap = new Map<string, { revenue: number; cost: number; count: number }>();
-  for (const p of portions) {
-    const d = drinkMap.get(p.productName) || { revenue: 0, cost: 0, count: 0 };
-    d.revenue += p.revenue;
-    d.cost += p.cost;
-    d.count += p.quantity;
-    drinkMap.set(p.productName, d);
-  }
+  const drinkStats = Array.from(drinkTotals, ([name, totals]) => ({
+    name,
+    revenue: totals.revenue,
+    cost: totals.cost,
+    margin: totals.revenue - totals.cost,
+    marginPct: totals.revenue > 0 ? ((totals.revenue - totals.cost) / totals.revenue) * 100 : 0,
+    portions: totals.count,
+  })).sort((a, b) => b.revenue - a.revenue);
 
-  const drinkStats: DrinkStats[] = Array.from(drinkMap.entries())
-    .map(([name, d]) => ({
-      name,
-      revenue: d.revenue,
-      cost: d.cost,
-      margin: d.revenue - d.cost,
-      marginPct: d.revenue > 0 ? ((d.revenue - d.cost) / d.revenue) * 100 : 0,
-      portions: d.count,
-    }))
-    .sort((a, b) => b.revenue - a.revenue);
+  const shiftStats = Array.from(shiftTotals, ([shiftId, totals]) => ({
+    shiftId,
+    cashierName: cashierByShift.get(shiftId) ?? shiftId,
+    revenue: totals.revenue,
+    margin: totals.revenue - totals.cost,
+    marginPct: totals.revenue > 0 ? ((totals.revenue - totals.cost) / totals.revenue) * 100 : 0,
+    portions: totals.count,
+  })).sort((a, b) => b.revenue - a.revenue);
 
-  // ── Shift aggregation ──
-  const shiftMap = new Map<string, { revenue: number; cost: number; count: number }>();
-  for (const p of portions) {
-    const s = shiftMap.get(p.shiftId) || { revenue: 0, cost: 0, count: 0 };
-    s.revenue += p.revenue;
-    s.cost += p.cost;
-    s.count += p.quantity;
-    shiftMap.set(p.shiftId, s);
-  }
+  const flows = new Map<string, IngredientFlow>();
+  const flowFor = (productId: string): IngredientFlow => {
+    const current = flows.get(productId) ?? { consumption: 0, incoming: 0, transfer: 0, writeoff: 0 };
+    flows.set(productId, current);
+    return current;
+  };
 
-  const shiftStats: ShiftStats[] = Array.from(shiftMap.entries())
-    .map(([shiftId, s]) => ({
-      shiftId,
-      cashierName: cashierNameMap.get(shiftCashierMap.get(shiftId) || '') || `Смена ${shiftId.slice(0, 8)}`,
-      revenue: s.revenue,
-      margin: s.revenue - s.cost,
-      marginPct: s.revenue > 0 ? ((s.revenue - s.cost) / s.revenue) * 100 : 0,
-      portions: s.count,
-    }))
-    .sort((a, b) => b.revenue - a.revenue);
-
-  // ── Consumption from RPC (theoretical usage vs deliveries) ──
-  const consumptionRows: ConsumptionRow[] = [];
-
-  // Maps shared between consumption and overconsumption sections
-  const merged = new Map<string, { consumption: number; incoming: number; transfer: number; writeoff: number }>();
-  const productMap = new Map<string, { name: string; unit: string }>();
-
-  // Get warehouse IDs for this venue
-  const { data: warehouses } = await supabase
-    .from('warehouses')
-    .select('id')
-    .eq('venue_id', VENUE_ID);
-
-  if (warehouses?.length) {
-    // Fetch movements per warehouse via RPC
-    const movementMaps = await Promise.all(
-      warehouses.map((w) => {
-        const whId = w.id as string;
-        return supabase
-          .rpc('admin_inventory_period_movements', {
-            p_venue_id: VENUE_ID,
-            p_warehouse_id: whId,
-            p_from: periodStart,
-            p_to: periodEnd,
-          })
-          .then(({ data }) => ({ whId, data }));
-      }),
-    );
-
-    // Merge: product_id → summed values
-    merged.clear();
-    for (const { data } of movementMaps) {
-      for (const raw of (data ?? []) as Record<string, unknown>[]) {
-        const pid = raw.product_id as string;
-        if (!pid) continue;
-        const prev = merged.get(pid) || { consumption: 0, incoming: 0, transfer: 0, writeoff: 0 };
-        merged.set(pid, {
-          consumption: prev.consumption + (Number(raw.consumption) || 0),
-          incoming: prev.incoming + (Number(raw.incoming_delivery) || 0),
-          transfer: prev.transfer + (Number(raw.transfer_net) || 0),
-          writeoff: prev.writeoff + (Number(raw.writeoff_qty) || 0),
-        });
-      }
+  for (const [dishId, sold] of soldByDish) {
+    for (const recipeItem of recipeByDish.get(dishId) ?? []) {
+      flowFor(recipeItem.ingredientId).consumption += recipeItem.quantity * sold;
     }
-
-    // Get product names for consumed ingredients
-    const consumedProductIds = Array.from(merged.keys());
-    if (consumedProductIds.length > 0) {
-      productMap.clear();
-      // Batch in groups of 100
-      for (let i = 0; i < consumedProductIds.length; i += 100) {
-        const batch = consumedProductIds.slice(i, i + 100);
-        const { data: prods } = await supabase
-          .from('products')
-          .select('id, name')
-          .in('id', batch);
-        for (const p of prods || []) {
-          productMap.set(p.id as string, { name: p.name as string || '—', unit: 'кг' });
-        }
-      }
-
-      // Build rows — only for ingredients with consumption > 0
-      for (const [pid, vals] of merged) {
-        if (vals.consumption <= 0) continue;
-        const prod = productMap.get(pid);
-        const effectiveSupply = vals.incoming + vals.transfer;
-        consumptionRows.push({
-          productId: pid,
-          productName: prod?.name || pid.slice(0, 8),
-          unit: prod?.unit || 'кг',
-          consumption: vals.consumption,
-          incomingDelivery: vals.incoming,
-          transferNet: vals.transfer,
-          writeoffQty: vals.writeoff,
-          coverageRatio: vals.consumption > 0 ? effectiveSupply / vals.consumption : 0,
-        });
-      }
-
-      // Sort by consumption descending
-      consumptionRows.sort((a, b) => b.consumption - a.consumption);
+  }
+  for (const document of deliveriesResult.data.deliveryDocuments ?? []) {
+    if (!inPeriod(document.deliveryDate, start, end) || document.status === 'Отменено' || document.status === 'cancelled') continue;
+    for (const line of document.lines ?? []) {
+      const product = instantOne(line.product);
+      if (product) flowFor(product.id).incoming += (line.quantityMilli ?? 0) / 1000;
+    }
+  }
+  for (const document of writeOffsResult.data.writeOffDocuments ?? []) {
+    if (!inPeriod(document.writeOffDate, start, end) || document.status === 'Отменено' || document.status === 'cancelled') continue;
+    for (const line of document.lines ?? []) {
+      const product = instantOne(line.product);
+      if (product) flowFor(product.id).writeoff += (line.quantityMilli ?? 0) / 1000;
+    }
+  }
+  for (const document of transfersResult.data.transferDocuments ?? []) {
+    if (!inPeriod(document.transferDate, start, end) || document.status === 'Отменено' || document.status === 'cancelled') continue;
+    for (const line of document.lines ?? []) {
+      const product = instantOne(line.product);
+      if (product) flowFor(product.id).transfer += 0;
     }
   }
 
-  // ── Overconsumption (inventory-anchored) ──
+  const consumptionRows = Array.from(flows, ([productId, flow]) => {
+    const info = ingredientInfo.get(productId);
+    const effectiveSupply = flow.incoming + flow.transfer;
+    return {
+      productId,
+      productName: info?.name ?? productId.slice(0, 8),
+      unit: info?.unit ?? '',
+      consumption: flow.consumption,
+      incomingDelivery: flow.incoming,
+      transferNet: flow.transfer,
+      writeoffQty: flow.writeoff,
+      coverageRatio: flow.consumption > 0 ? effectiveSupply / flow.consumption : 0,
+    };
+  }).filter((row) => row.consumption > 0).sort((a, b) => b.consumption - a.consumption);
+
+  const postedSessions = (operationsResult.data.inventorySessions ?? [])
+    .filter((session) => ['posted', 'Проведено'].includes(session.status))
+    .sort((a, b) => new Date(a.conductedAt).getTime() - new Date(b.conductedAt).getTime());
+  const beforeSession = [...postedSessions].reverse().find((session) => new Date(session.conductedAt) <= new Date(start)) ?? null;
+  const afterSession = postedSessions.find((session) => new Date(session.conductedAt) >= new Date(end)) ?? null;
   const overconsumption: OverconsumptionData = {
-    hasBoundaries: false,
-    startInventoryDate: null,
-    endInventoryDate: null,
+    hasBoundaries: Boolean(beforeSession && afterSession && beforeSession.id !== afterSession.id),
+    startInventoryDate: beforeSession ? dateKey(beforeSession.conductedAt) : null,
+    endInventoryDate: afterSession ? dateKey(afterSession.conductedAt) : null,
     rows: [],
     totalLossSom: null,
   };
 
-  // Find nearest inventory sessions around period boundaries
-  const { data: allSessions } = await supabase
-    .from('warehouse_inventory_sessions')
-    .select('id, conducted_at')
-    .eq('venue_id', VENUE_ID)
-    .eq('status', 'posted')
-    .order('conducted_at', { ascending: true });
-
-  if (allSessions?.length) {
-    // Find closest session BEFORE periodStart
-    let beforeSession: (typeof allSessions)[0] | null = null;
-    for (const s of allSessions) {
-      if (s.conducted_at <= periodStart) beforeSession = s;
-    }
-
-    // Find closest session AFTER periodEnd
-    let afterSession: (typeof allSessions)[0] | null = null;
-    for (const s of allSessions) {
-      if (s.conducted_at >= periodEnd) {
-        afterSession = s;
-        break;
-      }
-    }
-
-    if (beforeSession && afterSession && beforeSession.id !== afterSession.id) {
-      overconsumption.hasBoundaries = true;
-      overconsumption.startInventoryDate = (beforeSession.conducted_at as string).slice(0, 10);
-      overconsumption.endInventoryDate = (afterSession.conducted_at as string).slice(0, 10);
-
-      // Fetch lines for both sessions
-      const [{ data: beforeLines }, { data: afterLines }] = await Promise.all([
-        supabase.from('warehouse_inventory_lines').select('product_id, actual, unit_price').eq('session_id', beforeSession.id),
-        supabase.from('warehouse_inventory_lines').select('product_id, actual, unit_price').eq('session_id', afterSession.id),
-      ]);
-
-      // Build maps: product_id → { actual, unit_price }
-      const beforeMap = new Map<string, { actual: number; price: number }>();
-      for (const l of beforeLines || []) {
-        beforeMap.set(l.product_id as string, {
-          actual: Number(l.actual) || 0,
-          price: Number(l.unit_price) || 0,
+  if (overconsumption.hasBoundaries && beforeSession && afterSession) {
+    const inventoryMap = (session: typeof beforeSession) => {
+      const result = new Map<string, { actual: number; price: number }>();
+      for (const line of session.lines ?? []) {
+        const product = instantOne(line.product);
+        if (!product) continue;
+        result.set(product.id, {
+          actual: (line.actualMilli ?? 0) / 1000,
+          price: (line.unitPriceTiyin ?? product.costTiyin ?? 0) / 100,
         });
       }
-
-      const afterMap = new Map<string, { actual: number; price: number }>();
-      for (const l of afterLines || []) {
-        afterMap.set(l.product_id as string, {
-          actual: Number(l.actual) || 0,
-          price: Number(l.unit_price) || 0,
-        });
-      }
-
-      // Build overconsumption rows from merged consumption data
-      // (reuse the merged map from consumption section)
-      if (merged.size > 0) {
-        const allProductIds = Array.from(
-          new Set([...merged.keys(), ...beforeMap.keys(), ...afterMap.keys()])
-        );
-
-        for (const pid of allProductIds) {
-          const moves = merged.get(pid) || { consumption: 0, incoming: 0, transfer: 0, writeoff: 0 };
-          const startInv = beforeMap.get(pid);
-          const endInv = afterMap.get(pid);
-
-          const startingStock = startInv?.actual ?? null;
-          const endingStock = endInv?.actual ?? null;
-          const costPrice = startInv?.price ?? endInv?.price ?? null;
-
-          // Actual = starting + incoming + transfer_net - ending - writeoff
-          // Only calculate when both boundaries exist for this product
-          const actual: number | null =
-            startingStock !== null && endingStock !== null
-              ? startingStock + moves.incoming + moves.transfer - endingStock - moves.writeoff
-              : null;
-
-          const delta: number | null =
-            actual !== null ? actual - moves.consumption : null;
-
-          const lossSom: number | null =
-            delta !== null && costPrice !== null && delta > 0
-              ? Math.round(delta * costPrice)
-              : null;
-
-          if (moves.consumption > 0 || (startingStock !== null && endingStock !== null)) {
-            const prod = productMap.get(pid);
-            overconsumption.rows.push({
-              productId: pid,
-              productName: prod?.name || pid.slice(0, 8),
-              unit: prod?.unit || 'кг',
-              theoretical: moves.consumption,
-              actual,
-              delta,
-              lossSom,
-              startingStock,
-              endingStock,
-              deliveries: moves.incoming,
-              costPrice,
-            });
-          }
-        }
-
-        // Sort by loss descending, then by theoretical consumption
-        overconsumption.rows.sort((a, b) => {
-          if (a.lossSom !== null && b.lossSom !== null) return b.lossSom - a.lossSom;
-          if (a.lossSom !== null) return -1;
-          if (b.lossSom !== null) return 1;
-          return b.theoretical - a.theoretical;
-        });
-
-        // Total losses
-        let total = 0;
-        let hasAnyLoss = false;
-        for (const r of overconsumption.rows) {
-          if (r.lossSom !== null) {
-            total += r.lossSom;
-            hasAnyLoss = true;
-          }
-        }
-        if (hasAnyLoss) overconsumption.totalLossSom = total;
-      }
+      return result;
+    };
+    const before = inventoryMap(beforeSession);
+    const after = inventoryMap(afterSession);
+    const productIds = new Set([...flows.keys(), ...before.keys(), ...after.keys()]);
+    for (const productId of productIds) {
+      const flow = flows.get(productId) ?? { consumption: 0, incoming: 0, transfer: 0, writeoff: 0 };
+      const opening = before.get(productId);
+      const closing = after.get(productId);
+      const startingStock = opening?.actual ?? null;
+      const endingStock = closing?.actual ?? null;
+      const actual = startingStock !== null && endingStock !== null
+        ? startingStock + flow.incoming + flow.transfer - endingStock - flow.writeoff
+        : null;
+      const delta = actual === null ? null : actual - flow.consumption;
+      const costPrice = opening?.price ?? closing?.price ?? ingredientInfo.get(productId)?.cost ?? null;
+      const lossSom = delta !== null && delta > 0 && costPrice !== null ? delta * costPrice : null;
+      const info = ingredientInfo.get(productId);
+      overconsumption.rows.push({
+        productId,
+        productName: info?.name ?? productId.slice(0, 8),
+        unit: info?.unit ?? '',
+        theoretical: flow.consumption,
+        actual,
+        delta,
+        lossSom,
+        startingStock,
+        endingStock,
+        deliveries: flow.incoming,
+        costPrice,
+      });
     }
+    overconsumption.rows.sort((a, b) => (b.lossSom ?? -1) - (a.lossSom ?? -1));
+    const losses = overconsumption.rows.flatMap((row) => row.lossSom === null ? [] : [row.lossSom]);
+    overconsumption.totalLossSom = losses.length > 0 ? losses.reduce((sum, loss) => sum + loss, 0) : null;
   }
 
-  // ── Stock status ──
-  const { data: stockItems } = await supabase
-    .from('stock_items')
-    .select('product_id, quantity, warehouse_id');
-
-  // Get product names for stock
-  const stockProductIds = Array.from(new Set((stockItems || []).map((s) => s.product_id as string)));
-  const productNameMap = new Map<string, string>();
-  if (stockProductIds.length > 0) {
-    const { data: products } = await supabase
-      .from('products')
-      .select('id, name')
-      .in('id', stockProductIds);
-    for (const p of products || []) {
-      productNameMap.set(p.id as string, p.name as string);
-    }
+  const stockByProduct = new Map<string, { quantity: number; isBar: boolean }>();
+  for (const stockItem of operationsResult.data.stockItems ?? []) {
+    const product = instantOne(stockItem.product);
+    const warehouse = instantOne(stockItem.warehouse);
+    if (!product) continue;
+    ingredientInfo.set(product.id, {
+      name: product.name,
+      unit: product.unit,
+      cost: (product.costTiyin ?? 0) / 100,
+    });
+    const current = stockByProduct.get(product.id) ?? { quantity: 0, isBar: false };
+    current.quantity += (stockItem.quantityMilli ?? 0) / 1000;
+    current.isBar ||= warehouse?.name.toLocaleLowerCase('ru').includes('бар') ?? false;
+    stockByProduct.set(product.id, current);
   }
-
-  // Calculate weekly consumption from portions per ingredient
-  // (Simplified: assume stock_items quantity is in the same unit as recipe_items)
-  const stockStatus: StockStatus[] = (stockItems || []).map((s) => ({
-    productName: productNameMap.get(s.product_id as string) || '—',
-    currentStock: Number(s.quantity) || 0,
-    unit: 'кг',
-    weeklyConsumption: 0, // placeholder — needs ingredient-level aggregation
-    daysLeft: 99,
-    isBar: false,
-  }));
-
-  // ── Period label ──
-  const sDate = new Date(periodStart);
-  const eDate = new Date(periodEnd);
-  eDate.setDate(eDate.getDate() - 1);
-  const months = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
-  const periodLabel = sDate.getMonth() === eDate.getMonth()
-    ? `${sDate.getDate()}–${eDate.getDate()} ${months[eDate.getMonth()]} ${eDate.getFullYear()}`
-    : `${sDate.getDate()} ${months[sDate.getMonth()]} – ${eDate.getDate()} ${months[eDate.getMonth()]} ${eDate.getFullYear()}`;
+  const periodDays = Math.max(1, (new Date(end).getTime() - new Date(start).getTime()) / 86_400_000);
+  const stockStatus = Array.from(stockByProduct, ([productId, stock]) => {
+    const info = ingredientInfo.get(productId);
+    const weeklyConsumption = ((flows.get(productId)?.consumption ?? 0) / periodDays) * 7;
+    return {
+      productName: info?.name ?? productId.slice(0, 8),
+      currentStock: stock.quantity,
+      unit: info?.unit ?? '',
+      weeklyConsumption,
+      daysLeft: weeklyConsumption > 0 ? (stock.quantity / weeklyConsumption) * 7 : 99,
+      isBar: stock.isBar,
+    };
+  });
 
   return {
     portions,
@@ -656,17 +479,16 @@ async function fetchAnalytics(periodStart: string, periodEnd: string): Promise<A
     consumptionRows,
     overconsumption,
     stockStatus,
-    periodLabel,
+    periodLabel: periodLabel(start, end),
   };
 }
 
-// ── Hook ──
-
 export function useAnalytics(start: string, end: string) {
+  const venueId = useVenueId();
   return useQuery({
-    queryKey: ['analytics', VENUE_ID, start, end],
-    queryFn: () => fetchAnalytics(start, end),
+    queryKey: ['instant-analytics', venueId, start, end],
+    queryFn: () => fetchAnalytics(venueId, start, end),
     staleTime: 2 * 60 * 1000,
-    placeholderData: (prev: unknown) => prev as AnalyticsData | undefined,
+    placeholderData: (previous: AnalyticsData | undefined) => previous,
   });
 }

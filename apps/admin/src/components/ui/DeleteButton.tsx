@@ -21,7 +21,7 @@ export function DeleteButton({ onClick, className = '', variant = 'row', label }
       <button
         type="button"
         onClick={onClick}
-        className={`px-4 py-1.5 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors ${className}`}
+        className={`min-h-11 px-4 py-1.5 rounded-lg text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors ${className}`}
       >
         {label}
       </button>
@@ -35,7 +35,7 @@ export function DeleteButton({ onClick, className = '', variant = 'row', label }
         type="button"
         aria-label="Удалить"
         onClick={onClick}
-        className={`p-2 text-muted-foreground hover:text-red-500 transition-colors rounded-md hover:bg-red-50 cursor-pointer ${className}`}
+        className={`flex size-11 items-center justify-center text-muted-foreground hover:text-destructive transition-colors rounded-md hover:bg-destructive/10 cursor-pointer md:size-8 ${className}`}
       >
         <X className="w-3.5 h-3.5" />
       </button>
@@ -48,7 +48,7 @@ export function DeleteButton({ onClick, className = '', variant = 'row', label }
       type="button"
       aria-label="Удалить"
       onClick={(e) => { e.stopPropagation(); onClick(); }}
-      className={`p-2 rounded-md text-muted-foreground group-hover:bg-secondary hover:bg-red-50 hover:text-red-500 transition-colors cursor-pointer ${className}`}
+      className={`flex size-11 items-center justify-center rounded-md text-muted-foreground group-hover:bg-secondary hover:bg-destructive/10 hover:text-destructive transition-colors cursor-pointer md:size-8 ${className}`}
     >
       <X className="w-3.5 h-3.5" />
     </button>

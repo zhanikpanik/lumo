@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { View, StyleSheet, Text, TextInput, TouchableOpacity, SafeAreaView, StatusBar, useWindowDimensions } from 'react-native';
+import { Alert, View, StyleSheet, Text, TextInput, TouchableOpacity, SafeAreaView, StatusBar, useWindowDimensions } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { theme } from '../theme/colors';
 import { SearchIcon, CrossIcon, ChevronUpIcon, ChevronDownIcon } from '../components/Icons';
 import { NotificationBell } from '../components/NotificationBell';
@@ -89,7 +90,7 @@ function InstantOrdersScreenImpl({ navigation }: { navigation: any }) {
   const COLUMNS = getCols(width);
   const CELLS_PER_PAGE = COLUMNS * ROWS;
   const ORDER_SLOTS = CELLS_PER_PAGE - 1;
-  const rightGroupWidth = Math.round((width - 2 * PADDING) * 0.40);
+  const rightGroupWidth = Math.round((width - 2 * PADDING) * (width < 1100 ? 0.32 : 0.40));
   const gridHeight = height - 44 - GAP - 56 - PADDING * 2;
   const cardHeight = (gridHeight - GAP * (ROWS - 1)) / ROWS;
   const scale = Math.max(0.8, Math.min(1.5, cardHeight / 120));
@@ -149,6 +150,7 @@ function InstantOrdersScreenImpl({ navigation }: { navigation: any }) {
   // Open an order for editing — sets local UI state so PosScreen can render
   const openInstantOrder = (order: Order) => {
     usePosUiStore.getState().setCurrentOrderId(order.id);
+    usePosUiStore.getState().setCreatingOrder(false);
     usePosUiStore.getState().selectItem(null);
     usePosUiStore.getState().setActiveAction(null);
   };
@@ -157,6 +159,9 @@ function InstantOrdersScreenImpl({ navigation }: { navigation: any }) {
     if (!openShift) return;
     if (!currentUser) { console.warn('handleQuickCheck: no currentUser'); return; }
     const operationId = `order-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    usePosUiStore.getState().setCurrentOrderId(null);
+    usePosUiStore.getState().setCreatingOrder(true);
+    navigation.navigate('Pos');
     try {
       const { orderId } = await createPosOrder({
         operationId,
@@ -170,9 +175,10 @@ function InstantOrdersScreenImpl({ navigation }: { navigation: any }) {
       usePosUiStore.getState().setCurrentOrderId(orderId);
       usePosUiStore.getState().selectItem(null);
       usePosUiStore.getState().setActiveAction(null);
-      navigation.navigate('Pos');
-    } catch (e) {
-      console.error('createOrder failed:', e);
+    } catch (e: unknown) {
+      usePosUiStore.getState().setCreatingOrder(false);
+      navigation.navigate('Orders');
+      Alert.alert('Не удалось создать заказ', e instanceof Error ? e.message : 'Повторите попытку');
     }
   };
 
@@ -193,28 +199,33 @@ function InstantOrdersScreenImpl({ navigation }: { navigation: any }) {
     if (existingOrder) {
       openInstantOrder(existingOrder);
       navigation.navigate(existingOrder.status === 'paid' ? 'PaidCheck' : 'Pos');
-    } else {
-      if (!openShift) return;
-      if (!currentUser) { console.warn('handleTablePress: no currentUser'); return; }
-      const operationId = `order-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-      try {
-        const { orderId } = await createPosOrder({
-          operationId,
-          actorEmployeeId: currentUser.id,
-          shiftId: openShift.id,
-          tableId: table.id,
-          guestCount: 1,
-          orderType: 'Общий',
-          isQuickCheck: false,
-          orderNumber: nextOrderNumber,
-        });
-        usePosUiStore.getState().setCurrentOrderId(orderId);
-        usePosUiStore.getState().selectItem(null);
-        usePosUiStore.getState().setActiveAction(null);
-        navigation.navigate('Pos');
-      } catch (e) {
-        console.error('createOrder failed:', e);
-      }
+      return;
+    }
+    if (!openShift) return;
+    if (!currentUser) { console.warn('handleTablePress: no currentUser'); return; }
+
+    const operationId = `order-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    usePosUiStore.getState().setCurrentOrderId(null);
+    usePosUiStore.getState().setCreatingOrder(true);
+    navigation.navigate('Pos');
+    try {
+      const { orderId } = await createPosOrder({
+        operationId,
+        actorEmployeeId: currentUser.id,
+        shiftId: openShift.id,
+        tableId: table.id,
+        guestCount: 1,
+        orderType: 'Общий',
+        isQuickCheck: false,
+        orderNumber: nextOrderNumber,
+      });
+      usePosUiStore.getState().setCurrentOrderId(orderId);
+      usePosUiStore.getState().selectItem(null);
+      usePosUiStore.getState().setActiveAction(null);
+    } catch (e: unknown) {
+      usePosUiStore.getState().setCreatingOrder(false);
+      navigation.navigate('Orders');
+      Alert.alert('Не удалось создать заказ', e instanceof Error ? e.message : 'Повторите попытку');
     }
   };
 
@@ -337,11 +348,11 @@ function InstantOrdersScreenImpl({ navigation }: { navigation: any }) {
                     {cell.kind === 'actions' && (
                       <View style={styles.actionCell}>
                         <TouchableOpacity style={styles.actionBtn} onPress={handleNewOrder}>
-                          <Text style={{ color: '#fff', fontSize: 24 }}>+</Text>
+                          <Feather name="plus" size={24} color={theme.colors.white} />
                           <Text style={styles.actionLabel}>Новый заказ</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.actionBtn} onPress={handleQuickCheck}>
-                          <Text style={{ color: '#fff', fontSize: 24 }}>+</Text>
+                          <Feather name="plus" size={24} color={theme.colors.white} />
                           <Text style={styles.actionLabel}>Быстрый чек</Text>
                         </TouchableOpacity>
                       </View>
@@ -358,7 +369,7 @@ function InstantOrdersScreenImpl({ navigation }: { navigation: any }) {
                           onPress={handlePageUp}
                           disabled={page === 0}
                         >
-                          <ChevronUpIcon size={28} color={page === 0 ? '#999' : theme.colors.tabActive} />
+                          <ChevronUpIcon size={28} color={page === 0 ? theme.colors.textSecondary : theme.colors.tabActive} />
                         </TouchableOpacity>
                         <View style={styles.pageDivider} />
                         <TouchableOpacity
@@ -366,7 +377,7 @@ function InstantOrdersScreenImpl({ navigation }: { navigation: any }) {
                           onPress={handlePageDown}
                           disabled={page >= totalPages - 1}
                         >
-                          <ChevronDownIcon size={28} color={page >= totalPages - 1 ? '#999' : theme.colors.tabActive} />
+                          <ChevronDownIcon size={28} color={page >= totalPages - 1 ? theme.colors.textSecondary : theme.colors.tabActive} />
                         </TouchableOpacity>
                       </View>
                     )}
@@ -376,7 +387,7 @@ function InstantOrdersScreenImpl({ navigation }: { navigation: any }) {
             ))}
             {sortedOrders.length === 0 && !isLoading && (
               <View style={[styles.emptyOverlay, { pointerEvents: 'none' }]}>
-                <Text style={{ fontSize: 48, color: theme.colors.textDisabled }}>📭</Text>
+                <Feather name="inbox" size={48} color={theme.colors.textDisabled} />
                 <Text style={styles.emptyOrdersText}>Нет заказов</Text>
               </View>
             )}
@@ -393,7 +404,7 @@ function InstantOrdersScreenImpl({ navigation }: { navigation: any }) {
             if (isTakeaway && tab === 'tables') return;
             setActiveTab(tab);
           }}
-          onMenuPress={() => setMenuVisible(true)}
+          onMenuPress={() => setTimeout(() => setMenuVisible(true), 0)}
           onLockPress={() => navigation.navigate('Lock', { mode: 'lock' })}
           showTablesTab={!isTakeaway}
           scale={scale}
@@ -422,30 +433,151 @@ function InstantOrdersScreenImpl({ navigation }: { navigation: any }) {
 const formatAmount = (n: number) => Number(n / 100).toLocaleString('ru-RU');
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, minWidth: 0, overflow: 'hidden', backgroundColor: theme.colors.background },
-  root: { flex: 1, minWidth: 0, overflow: 'hidden', backgroundColor: theme.colors.background },
-  headerRow: { minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: GAP, paddingVertical: 6 },
-  rightGroup: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6 },
-  userChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.surface, borderRadius: 8, paddingHorizontal: 10, height: 36, gap: 6 },
-  onlineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: theme.colors.accent },
-  chipText: { color: theme.colors.textPrimary, fontFamily: theme.fonts.medium, fontSize: 14 },
-  iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  searchInputWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: theme.colors.surface, borderRadius: 8, paddingHorizontal: 10, height: 36, gap: 6 },
-  searchInput: { flex: 1, color: theme.colors.textPrimary, fontFamily: theme.fonts.regular, fontSize: 14, padding: 0 },
-  searchCloseBtn: { padding: 4 },
-  gridArea: { flex: 1 },
-  gridRow: { flexDirection: 'row' },
-  cellWrap: { flex: 1 },
-  actionCell: { flex: 1, gap: GAP },
-  actionBtn: { flex: 1, backgroundColor: theme.colors.surface, borderRadius: 10, alignItems: 'center', justifyContent: 'center', gap: 4 },
-  actionLabel: { color: theme.colors.textPrimary, fontFamily: theme.fonts.medium, fontSize: 13 },
-  paginationCell: { flex: 1, backgroundColor: theme.colors.surface, borderRadius: 10, overflow: 'hidden' },
-  pageHalf: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  pageDisabled: { opacity: 0.4 },
-  pageDivider: { height: 1, backgroundColor: theme.colors.divider },
-  floorPlanArea: { flex: 1 },
-  emptyOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  emptyOrdersText: { color: theme.colors.textDisabled, fontFamily: theme.fonts.medium, fontSize: 16 },
+  safeArea: {
+    flex: 1,
+    minWidth: 0,
+    overflow: 'hidden',
+    backgroundColor: theme.colors.background,
+  },
+  root: {
+    flex: 1,
+    minWidth: 0,
+    overflow: 'hidden',
+    backgroundColor: theme.colors.background,
+  },
+  headerRow: {
+    minHeight: 56,
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    marginTop: PADDING,
+    zIndex: 1000,
+  },
+  rightGroup: {
+    flexDirection: 'row',
+    gap: GAP,
+  },
+  iconBtn: {
+    flex: 1,
+    height: 56,
+    backgroundColor: theme.colors.surfaceLight,
+    borderRadius: theme.borderRadius,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  userChip: {
+    flex: 1,
+    height: 56,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
+  },
+  onlineDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: theme.colors.online,
+  },
+  chipText: {
+    color: theme.colors.textPrimary,
+    fontSize: 16,
+    fontFamily: theme.fonts.regular,
+    maxWidth: 120,
+  },
+  searchInputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.surfaceLight,
+    borderRadius: theme.borderRadius,
+    paddingHorizontal: 12,
+    gap: 8,
+    height: 56,
+  },
+  searchInput: {
+    flex: 1,
+    color: theme.colors.textPrimary,
+    fontSize: 15,
+    fontFamily: theme.fonts.regular,
+    paddingVertical: 0,
+    outlineStyle: 'none',
+  } as any,
+  searchCloseBtn: {
+    padding: 4,
+  },
+  gridArea: {
+    flex: 1,
+    marginTop: GAP,
+    marginBottom: GAP,
+  },
+  gridRow: {
+    flex: 1,
+    flexDirection: 'row',
+  },
+  cellWrap: {
+    flex: 1,
+    borderRadius: theme.borderRadius,
+    overflow: 'hidden',
+  },
+  actionCell: {
+    flex: 1,
+    borderRadius: theme.borderRadius,
+    overflow: 'hidden',
+    flexDirection: 'row',
+    gap: GAP,
+  },
+  actionBtn: {
+    flex: 1,
+    backgroundColor: theme.colors.accent,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: theme.borderRadius,
+  },
+  actionLabel: {
+    color: theme.colors.white,
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
+    textAlign: 'center',
+  },
+  paginationCell: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: theme.colors.surfaceLight,
+    borderRadius: theme.borderRadius,
+    overflow: 'hidden',
+  },
+  pageHalf: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pageDisabled: {
+    opacity: 0.4,
+  },
+  pageDivider: {
+    width: 1,
+    backgroundColor: theme.colors.pageDivider,
+  },
+  floorPlanArea: {
+    flex: 1,
+    marginTop: GAP,
+    marginBottom: GAP,
+  },
+  emptyOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+  },
+  emptyOrdersText: {
+    color: theme.colors.textDisabled,
+    fontSize: 18,
+    fontFamily: theme.fonts.medium,
+  },
 });
 
 /**

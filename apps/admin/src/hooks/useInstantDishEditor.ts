@@ -2,6 +2,7 @@ import { getInstantClient } from '@/data/instant';
 import { useVenueId } from './useVenueId';
 import type { InstaQLParams } from '@instantdb/react';
 import type { AppSchema } from '@lumo/data';
+import { instantOne } from '@/lib/instantLink';
 
 // ─── Types (compatible with useDishData.ts) ────────────────────────
 
@@ -76,12 +77,13 @@ export function useInstantDish(id: string | undefined) {
   const result = db.useQuery(id ? dishQuery(id, venueId) : null);
   const product = result.data?.products?.[0];
 
+  const category = instantOne(product?.category);
   const data: DishDetail | undefined = product ? {
     id: product.id,
     name: product.name,
     price: tyinToSom(product.priceTiyin ?? 0),
     cost_price: tyinToSom(product.costTiyin ?? 0),
-    category_id: product.category?.id ?? null,
+    category_id: category?.id ?? null,
     workshop_id: null,
     output_weight: null,
     is_active: product.status === 'active',
@@ -111,15 +113,18 @@ export function useInstantDishRecipe(dishId: string | undefined) {
   const result = db.useQuery(dishId ? dishRecipeQuery(dishId, venueId) : null);
   const product = result.data?.products?.[0];
 
-  const data: RecipeItem[] = (product?.recipeItems ?? []).map(ri => ({
-    id: ri.id,
-    ingredient_id: ri.ingredient?.id ?? '',
-    ingredient_name: ri.ingredient?.name ?? '—',
-    ingredient_price: tyinToSom(ri.ingredient?.costTiyin ?? 0),
-    ingredient_unit: ri.ingredient?.unit ?? null,
-    quantity: (ri.quantityMilli ?? 0) / 1000,
-    unit: ri.unit ?? '',
-  }));
+  const data: RecipeItem[] = (product?.recipeItems ?? []).map(ri => {
+    const ingredient = instantOne(ri.ingredient);
+    return {
+      id: ri.id,
+      ingredient_id: ingredient?.id ?? '',
+      ingredient_name: ingredient?.name ?? '—',
+      ingredient_price: tyinToSom(ingredient?.costTiyin ?? 0),
+      ingredient_unit: ingredient?.unit ?? null,
+      quantity: (ri.quantityMilli ?? 0) / 1000,
+      unit: ri.unit ?? '',
+    };
+  });
 
   return { data, isLoading: result.isLoading, error: result.error };
 }

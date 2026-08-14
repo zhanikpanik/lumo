@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { RotateCcw, Search, X, PackageCheck, Check } from 'lucide-react';
+import { RotateCcw, X, PackageCheck, Check } from 'lucide-react';
 import { type ColumnDef } from '@tanstack/react-table';
 import { DataTable } from '@/components/ui/DataTable';
 import { EditButton } from '@/components/ui/EditButton';
 import { Badge } from '@/components/ui/Badge';
 import { SegmentTabs } from '@/components/ui/SegmentTabs';
 import { AddButton } from '@/components/ui/ActionButtons';
+import { TableToolbar } from '@/components/ui/TableToolbar';
 import {
  useInstantDeliveriesList as useWarehouseDeliveries,
  type DeliveryRow,
@@ -41,6 +42,7 @@ import {
 import { useInstantWarehouses } from '@/hooks/useInstantWarehouses';
 import { getInstantClient } from '@/data/instant';
 import { somRounded } from '@/lib/formatSom';
+import { operationalStatusLabel } from '@/lib/operationalLabels';
 
 // ─── Helpers ───
 
@@ -366,7 +368,7 @@ export function AllOperations() {
             op.status === 'Отменено' ? 'text-red-600' :
             'text-muted-foreground'
           }`}>
-            {op.status}
+            {operationalStatusLabel(op.status)}
           </span>
         );
       },
@@ -467,49 +469,38 @@ export function AllOperations() {
   const canExpand = (op: UnifiedOp) => op.items.length > 0;
 
   return (
-    <div className="p-8">
-
-      {/* ═══ HEADER ═══ */}
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold">Все операции</h2>
-        <div className="flex items-center gap-2">
-          <AddButton onClick={() => navigate('/warehouse/deliveries/new')} label="+ Поставка" />
-          <AddButton onClick={() => navigate('/warehouse/write-offs/new')} label="+ Списание" />
-          <AddButton onClick={() => navigate('/warehouse/transfers/new')} label="+ Перемещение" />
-          <AddButton onClick={() => navigate('/warehouse/inventory')} label="+ Инвентаризация" />
-        </div>
+    <div className="page-shell">{/* ═══ HEADER ═══ */}
+    <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <h2 className="text-2xl font-bold">Все операции</h2>
+      <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+        <AddButton onClick={() => navigate('/warehouse/deliveries/new')} label="+ Поставка" />
+        <AddButton variant="outline" onClick={() => navigate('/warehouse/write-offs/new')} label="+ Списание" />
+        <AddButton variant="outline" onClick={() => navigate('/warehouse/transfers/new')} label="+ Перемещение" />
+        <AddButton variant="outline" onClick={() => navigate('/warehouse/inventory?create=true')} label="+ Инвентаризация" />
       </div>
-
-      {/* ═══ FILTERS ═══ */}
-      <div className="mb-4 space-y-2">
-        {/* Search row */}
-        <div className="flex items-center gap-2 border rounded-lg px-3 py-1.5 w-56">
-          <Search className="w-3.5 h-3.5 opacity-40 shrink-0" />
-          <input
-            className="bg-transparent text-sm outline-none flex-1"
-            placeholder="Поиск…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          {search && (
-            <button
-              type="button"
-              onClick={() => setSearch('')}
-              className="shrink-0 p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
-
-        {/* Tabs row */}
-        <div className="flex items-center gap-2 flex-wrap">
+    </div>
+    
+    <TableToolbar
+      search={search}
+      onSearchChange={setSearch}
+      searchPlaceholder="Поиск по документам…"
+      resultCount={filtered.length}
+      onReset={search || period !== 'all' || typeFilter !== 'all' || whFilter !== 'all'
+        ? () => {
+            setSearch('');
+            setPeriod('all');
+            setTypeFilter('all');
+            setWhFilter('all');
+            setSearchParams({});
+          }
+        : undefined}
+      filters={(
+        <>
           <SegmentTabs
             options={PERIOD_OPTIONS}
             value={period}
-            onChange={(v) => { setPeriod(v); updateParam('period', v); }}
+            onChange={(value) => { setPeriod(value); updateParam('period', value); }}
           />
-
           <SegmentTabs
             options={[
               { value: 'all' as const, label: 'Все' },
@@ -519,33 +510,91 @@ export function AllOperations() {
               { value: 'inventory' as const, label: 'Инвентаризации' },
             ]}
             value={typeFilter}
-            onChange={(v) => { setTypeFilter(v); updateParam('type', v); }}
+            onChange={(value) => { setTypeFilter(value); updateParam('type', value); }}
           />
-
           <SegmentTabs
             options={[
-              { value: 'all', label: 'Все' },
-              ...warehouses.map((w) => ({ value: w.id, label: w.name })),
+              { value: 'all', label: 'Все склады' },
+              ...warehouses.map((warehouse) => ({ value: warehouse.id, label: warehouse.name })),
             ]}
             value={whFilter}
-            onChange={(v) => { setWhFilter(v); updateParam('warehouse', v); }}
+            onChange={(value) => { setWhFilter(value); updateParam('warehouse', value); }}
           />
-        </div>
-      </div>
-
-      {/* ═══ TABLE ═══ */}
-      <DataTable
-        data={filtered}
-        columns={columns}
-        dense
-        emptyMessage={
-          q || typeFilter !== 'all' || whFilter !== 'all'
-            ? 'Ничего не найдено — попробуйте изменить фильтры'
-            : 'Операций за период нет — создайте поставку или списание'
-        }
-        expandedRows={expandedRows}
-        onExpandedChange={(rowId) => {
+        </>
+      )}
+    />
+    
+    {/* ═══ TABLE ═══ */}
+    <DataTable
+      data={filtered}
+      columns={columns}
+      dense
+      emptyMessage={
+        q || typeFilter !== 'all' || whFilter !== 'all'
+          ? 'Ничего не найдено — попробуйте изменить фильтры'
+          : 'Операций за период нет — создайте поставку или списание'
+      }
+      expandedRows={expandedRows}
+      onExpandedChange={(rowId) => {
+        setExpandedRows(prev => {
+          const next = { ...prev };
+          if (next[rowId]) {
+            delete next[rowId];
+          } else {
+            next[rowId] = true;
+          }
+          return next;
+        });
+      }}
+      renderExpandedRow={(row) => {
+        const op = row.original;
+        if (op.items.length === 0) return null;
+        return (
+          <table className="w-full max-w-lg text-sm">
+            <thead>
+              <tr className="text-muted-foreground">
+                <th className="text-left font-medium py-0.5 pr-2">Ингредиент</th>
+                <th className="text-right font-medium py-0.5 px-2 w-16">Кол-во</th>
+                <th className="text-right font-medium py-0.5 px-2 w-16">Цена</th>
+                <th className="text-right font-medium py-0.5 pl-2 w-20">Итого</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colSpan={4} className="py-0.5" /></tr>
+              {op.items.map((item, idx) => (
+                <tr key={idx}>
+                  <td className="py-0.5 pr-2">
+                    {item.name}
+                    {item.reason && <span className="text-muted-foreground"> ({item.reason})</span>}
+                  </td>
+                  <td className="py-0.5 px-2 text-right">{item.quantity} {item.unit}</td>
+                  <td className="py-0.5 px-2 text-right">
+                    {item.price != null ? `${item.price.toLocaleString('ru-RU')} сом` : '—'}
+                  </td>
+                  <td className="py-0.5 pl-2 text-right">
+                    {item.total != null
+                      ? `${(item.total ?? item.quantity * (item.price ?? 0)).toLocaleString('ru-RU')} сом`
+                      : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        );
+      }}
+      getRowId={(op) => `${op.type}-${op.id}`}
+      getRowClassName={(row) => {
+        const op = row.original;
+        const classes: string[] = ['group'];
+        if (isCancelledStatus(op)) classes.push('opacity-50');
+        if (canExpand(op) || op.type === 'inventory') classes.push('cursor-pointer');
+        return classes.join(' ');
+      }}
+      onRowClick={(row) => {
+        const op = row.original;
+        if (canExpand(op)) {
           setExpandedRows(prev => {
+            const rowId = `${op.type}-${op.id}`;
             const next = { ...prev };
             if (next[rowId]) {
               delete next[rowId];
@@ -554,98 +603,38 @@ export function AllOperations() {
             }
             return next;
           });
-        }}
-        renderExpandedRow={(row) => {
-          const op = row.original;
-          if (op.items.length === 0) return null;
-          return (
-            <table className="w-full max-w-lg text-sm">
-              <thead>
-                <tr className="text-muted-foreground">
-                  <th className="text-left font-medium py-0.5 pr-2">Ингредиент</th>
-                  <th className="text-right font-medium py-0.5 px-2 w-16">Кол-во</th>
-                  <th className="text-right font-medium py-0.5 px-2 w-16">Цена</th>
-                  <th className="text-right font-medium py-0.5 pl-2 w-20">Итого</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr><td colSpan={4} className="py-0.5" /></tr>
-                {op.items.map((item, idx) => (
-                  <tr key={idx}>
-                    <td className="py-0.5 pr-2">
-                      {item.name}
-                      {item.reason && <span className="text-muted-foreground"> ({item.reason})</span>}
-                    </td>
-                    <td className="py-0.5 px-2 text-right">{item.quantity} {item.unit}</td>
-                    <td className="py-0.5 px-2 text-right">
-                      {item.price != null ? `${item.price.toLocaleString('ru-RU')} сом` : '—'}
-                    </td>
-                    <td className="py-0.5 pl-2 text-right">
-                      {item.total != null
-                        ? `${(item.total ?? item.quantity * (item.price ?? 0)).toLocaleString('ru-RU')} сом`
-                        : '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          );
-        }}
-        getRowId={(op) => `${op.type}-${op.id}`}
-        getRowClassName={(row) => {
-          const op = row.original;
-          const classes: string[] = ['group'];
-          if (isCancelledStatus(op)) classes.push('opacity-50');
-          if (canExpand(op) || op.type === 'inventory') classes.push('cursor-pointer');
-          return classes.join(' ');
-        }}
-        onRowClick={(row) => {
-          const op = row.original;
-          if (canExpand(op)) {
-            setExpandedRows(prev => {
-              const rowId = `${op.type}-${op.id}`;
-              const next = { ...prev };
-              if (next[rowId]) {
-                delete next[rowId];
-              } else {
-                next[rowId] = true;
-              }
-              return next;
-            });
-          } else if (op.type === 'inventory') {
-            navigate(op.editUrl);
-          }
-        }}
-        className="max-w-4xl"
-      />
-
-      {/* ═══ SUMMARY ═══ */}
-      {(summary.deliveries > 0 || summary.writeOffs > 0 || summary.inventories > 0) && (
-        <div className="max-w-4xl mt-2 py-2 text-sm border-t border-border/40">
-
-          {summary.deliveries > 0 && (
-            <span className="text-foreground font-medium">
-              Поставки <span className="text-emerald-600">+{Math.round(summary.delTotal).toLocaleString()} сом</span>
+        } else if (op.type === 'inventory') {
+          navigate(op.editUrl);
+        }
+      }}
+      className="max-w-4xl"
+    />
+    
+    {/* ═══ SUMMARY ═══ */}
+    {(summary.deliveries > 0 || summary.writeOffs > 0 || summary.inventories > 0) && (
+      <div className="max-w-4xl mt-2 py-2 text-sm border-t border-border/40">
+    
+        {summary.deliveries > 0 && (
+          <span className="text-foreground font-medium">
+            Поставки <span className="text-emerald-600">+{Math.round(summary.delTotal).toLocaleString()} сом</span>
+          </span>
+        )}
+        {summary.deliveries > 0 && (summary.writeOffs > 0 || summary.inventories > 0) && <span className="mx-1.5">·</span>}
+        {summary.writeOffs > 0 && (
+          <span className="text-foreground font-medium">
+            Списания <span className="text-red-600">−{Math.round(summary.woTotal).toLocaleString()} сом</span>
+          </span>
+        )}
+        {summary.writeOffs > 0 && summary.inventories > 0 && <span className="mx-1.5">·</span>}
+        {summary.inventories > 0 && (
+          <span className="text-foreground font-medium">
+            Инвентаризации{' '}
+            <span className={summary.invTotal >= 0 ? 'text-emerald-600' : 'text-red-600'}>
+              {summary.invTotal >= 0 ? '+' : ''}{Math.round(summary.invTotal).toLocaleString()} сом
             </span>
-          )}
-          {summary.deliveries > 0 && (summary.writeOffs > 0 || summary.inventories > 0) && <span className="mx-1.5">·</span>}
-          {summary.writeOffs > 0 && (
-            <span className="text-foreground font-medium">
-              Списания <span className="text-red-600">−{Math.round(summary.woTotal).toLocaleString()} сом</span>
-            </span>
-          )}
-          {summary.writeOffs > 0 && summary.inventories > 0 && <span className="mx-1.5">·</span>}
-          {summary.inventories > 0 && (
-            <span className="text-foreground font-medium">
-              Инвентаризации{' '}
-              <span className={summary.invTotal >= 0 ? 'text-emerald-600' : 'text-red-600'}>
-                {summary.invTotal >= 0 ? '+' : ''}{Math.round(summary.invTotal).toLocaleString()} сом
-              </span>
-            </span>
-          )}
-        </div>
-      )}
-
-    </div>
+          </span>
+        )}
+      </div>
+    )}</div>
   );
 }

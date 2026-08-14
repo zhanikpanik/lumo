@@ -498,10 +498,10 @@ Worker использует Admin SDK и поэтому не получает з
 2. Мигрировать активные PIN в verifier records либо потребовать controlled reset, если plaintext migration недопустима.
 3. Добавить `credentialsVersion`, cache expiry и audit events.
 4. Удалить `employees.pin` из schema, hooks, mutations, search и UI display.
-5. POS хранит verifier, attempt counter и lockout только в platform secure storage.
-6. Offline cache TTL — не более 24 часов; 5 failures → 15-minute lockout.
+5. POS хранит verifier и очередь unlock attempts только в platform secure storage.
+6. Offline cache TTL — не более 24 часов; локальный lockout не применяется, чтобы ошибки одного пользователя не блокировали общий POS.
 7. Online unlock attempts отправляются сразу; offline attempts queued durably и синхронизируются после reconnect.
-8. Зафиксировать threat model: извлечённый low-entropy offline verifier подвержен brute force; рассмотреть 6-digit PIN и memory-hard verifier.
+8. Threat model: извлечённый low-entropy offline verifier подвержен brute force; PIN обеспечивает attribution, а security boundary остаётся за active device identity и trusted worker authorization.
 
 ### Acceptance
 
@@ -571,7 +571,7 @@ Worker использует Admin SDK и поэтому не получает з
 - concurrent receive/write-off/transfer;
 - stock version conflict and retry;
 - document line replacement;
-- PIN expiry/reset/lockout;
+- PIN expiry/reset и audit повторных ошибок без блокировки терминала;
 - pagination next/previous and infinite load;
 - analytics rebuild.
 
@@ -645,7 +645,7 @@ Rollback до production write cutover — previous app/client version. Посл
 - Admin переведён с Supabase auth на Instant magic code; active venue выводится из active membership, а owner/manager role назначается server-side.
 - POS activation создаёт отдельную active device identity и custom token; device authorization можно revoke, после чего старый token перестаёт давать доступ.
 - Plaintext `employees.pin` удалён. Worker создаёт versioned PBKDF2 verifier с salt и expiry; поддержаны create/reset/deactivate и offline verification без отправки PIN в InstantDB.
-- Offline unlock получил TTL, failed-attempt lockout и replayable audit attempts.
+- Offline unlock получил TTL и replayable audit attempts без terminal-wide lockout.
 - Tenant keys стали required/indexed для operational entities; bootstrap, backfill и audit scripts закрывают missing, ambiguous и cross-venue links.
 
 #### Schema, permissions и query contracts
@@ -677,6 +677,7 @@ Rollback до production write cutover — previous app/client version. Посл
 
 - `App.tsx` и `useInstantShift.ts` изменены так, чтобы venue-scoped shift query был disabled до завершения device authentication.
 - Загрузка offline PIN cache в `InstantLockScreen.tsx` перенесена после завершения employee query; промежуточный loading state больше не сохраняет пустой список сотрудников.
+- Terminal-wide PIN lockout удалён из native и Web POS: повторные ошибки остаются auditable, но не останавливают приём заказов на общем устройстве.
 
 
 ## 24. Официальные источники

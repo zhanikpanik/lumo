@@ -1,4 +1,5 @@
 import { getInstantClient } from '@/data/instant';
+import { instantRecord } from '@/lib/instantLink';
 
 /**
  * Ingredient row matching the existing IngredientListItem contract
@@ -39,8 +40,8 @@ export function useInstantWarehouseIngredients(warehouseId: string | null) {
   const data: InstantWarehouseIngredient[] = raw
     .map((s) => {
       const rec = s as Record<string, unknown>;
-      const product = (rec.product ?? {}) as Record<string, unknown>;
-      const wh = (rec.warehouse ?? {}) as Record<string, unknown>;
+      const product = instantRecord(rec.product) ?? {};
+      const wh = instantRecord(rec.warehouse) ?? {};
 
       return {
         id: String(product.id ?? ''),

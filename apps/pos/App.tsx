@@ -25,6 +25,7 @@ import { flushPendingPosCommands } from './src/data/posCommands';
 import { useUserStore } from './src/store/userStore';
 import { useInstantShift } from './src/store/useInstantShift';
 import { theme } from './src/theme/colors';
+import { resolveShiftEntry } from './src/utils/permissions';
 // Ignore specific warnings coming from react-native-web or navigation libraries
 LogBox.ignoreLogs([
   'props.pointerEvents is deprecated',
@@ -73,26 +74,38 @@ export default function App() {
 
   // ── Shift guard ────────────────────────────────────────────────
   const currentUser = useUserStore((s) => s.currentUser);
-  const { openShift } = useInstantShift(
+  const logout = useUserStore((s) => s.logout);
+  const { openShift, isLoading: isShiftLoading } = useInstantShift(
     currentUser?.id,
     bootstrap?.status === 'authenticated',
   );
   const hasShift = openShift !== null;
+  const shiftEntry = resolveShiftEntry(currentUser?.role, hasShift, isShiftLoading);
 
   useEffect(() => {
-    if (!navigationRef.isReady()) return;
+    if (!navigationRef.isReady() || shiftEntry === 'loading') return;
     const route = navigationRef.getCurrentRoute()?.name;
-    if (!hasShift && route && SHIFT_REQUIRED_ROUTES.includes(route)) {
-      navigationRef.reset({ index: 0, routes: [{ name: 'OpenShift' }] });
+    if (!route) return;
+    if (shiftEntry === 'orders' && route === 'OpenShift') {
+      navigationRef.reset({ index: 0, routes: [{ name: 'Orders' }] });
+      return;
     }
-  }, [hasShift]);
+    if (shiftEntry === 'open-shift' && SHIFT_REQUIRED_ROUTES.includes(route)) {
+      navigationRef.reset({ index: 0, routes: [{ name: 'OpenShift' }] });
+      return;
+    }
+    if (shiftEntry === 'lock' && (route === 'OpenShift' || SHIFT_REQUIRED_ROUTES.includes(route))) {
+      logout();
+      navigationRef.reset({ index: 0, routes: [{ name: 'Lock' }] });
+    }
+  }, [logout, shiftEntry]);
 
   // ── Initial route ──────────────────────────────────────────────
   const getInitialRoute = (): keyof RootStackParamList => {
     if (!bootstrap) return 'Lock';
     if (bootstrap.status === 'activation-required') return 'Activation';
-    if (!currentUser) return 'Lock';
-    if (!hasShift) return 'OpenShift';
+    if (!currentUser || shiftEntry === 'lock' || shiftEntry === 'loading') return 'Lock';
+    if (shiftEntry === 'open-shift') return 'OpenShift';
     return 'Orders';
   };
 
@@ -102,6 +115,13 @@ export default function App() {
     return (
       <View style={styles.loadingContainer}>
         <Text style={styles.loadingText}>Загрузка...</Text>
+      </View>
+    );
+  }
+  if (bootstrap.status === 'authenticated' && currentUser && isShiftLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={styles.loadingText}>Проверка смены...</Text>
       </View>
     );
   }

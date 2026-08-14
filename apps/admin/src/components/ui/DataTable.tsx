@@ -69,7 +69,7 @@ export function DataTable<TData>({
   columns,
   isLoading,
   error,
-  emptyMessage = 'Нет данных',
+  emptyMessage = 'Здесь пока нет данных',
   sorting: externalSorting,
   onSortingChange: externalOnSortingChange,
   renderExpandedRow,
@@ -102,8 +102,8 @@ export function DataTable<TData>({
   // ═══ Loading ═══
   if (isLoading) {
     return (
-      <div className={cn('overflow-x-auto', className)}>
-        <table className={cn(tableLayout, 'border-separate border-spacing-0', !dense && 'w-full', tableClassName)}>
+      <div className={cn('overflow-x-auto overscroll-x-contain', className)} role="region" aria-label="Таблица данных" tabIndex={0}>
+        <table className={cn(tableLayout, 'border-separate border-spacing-0 max-md:min-w-[720px]', !dense && 'w-full', tableClassName)}>
           <thead className="sticky top-0 z-10 bg-background">
             <tr className="border-b border-border">
               {columns.map((col, i) => (
@@ -123,7 +123,7 @@ export function DataTable<TData>({
           <tbody>
             <tr>
               <td colSpan={columns.length} className="py-12 text-center text-sm text-muted-foreground">
-                Загрузка…
+                Загружаем данные…
               </td>
             </tr>
           </tbody>
@@ -135,8 +135,8 @@ export function DataTable<TData>({
   // ═══ Error ═══
   if (error) {
     return (
-      <div className={cn('overflow-x-auto', className)}>
-        <table className={cn(tableLayout, 'border-separate border-spacing-0', !dense && 'w-full', tableClassName)}>
+      <div className={cn('overflow-x-auto overscroll-x-contain', className)} role="region" aria-label="Таблица данных" tabIndex={0}>
+        <table className={cn(tableLayout, 'border-separate border-spacing-0 max-md:min-w-[720px]', !dense && 'w-full', tableClassName)}>
           <thead className="sticky top-0 z-10 bg-background">
             <tr className="border-b border-border">
               {columns.map((col, i) => (
@@ -155,8 +155,9 @@ export function DataTable<TData>({
           </thead>
           <tbody>
             <tr>
-              <td colSpan={columns.length} className="py-12 text-center text-sm text-destructive">
-                {error.message || 'Ошибка загрузки'}
+              <td colSpan={columns.length} className="py-12 text-center" role="alert">
+                <p className="text-sm font-medium text-destructive">Не удалось загрузить данные</p>
+                <p className="mt-1 text-xs text-muted-foreground">{error.message}</p>
               </td>
             </tr>
           </tbody>
@@ -168,8 +169,8 @@ export function DataTable<TData>({
   // ═══ Empty ═══
   if (data.length === 0) {
     return (
-      <div className={cn('overflow-x-auto', className)}>
-        <table className={cn(tableLayout, 'border-separate border-spacing-0', !dense && 'w-full', tableClassName)}>
+      <div className={cn('overflow-x-auto overscroll-x-contain', className)} role="region" aria-label="Таблица данных" tabIndex={0}>
+        <table className={cn(tableLayout, 'border-separate border-spacing-0 max-md:min-w-[720px]', !dense && 'w-full', tableClassName)}>
           <thead className="sticky top-0 z-10 bg-background">
             <tr className="border-b border-border">
               {columns.map((col, i) => (
@@ -200,8 +201,8 @@ export function DataTable<TData>({
 
   // ═══ Normal ═══
   return (
-    <div className={cn('overflow-x-auto', className)}>
-      <table className={cn(tableLayout, 'border-separate border-spacing-0', !dense && 'w-full', tableClassName)}>
+    <div className={cn('overflow-x-auto overscroll-x-contain', className)} role="region" aria-label="Таблица данных" tabIndex={0}>
+      <table className={cn(tableLayout, 'border-separate border-spacing-0 max-md:min-w-[720px]', !dense && 'w-full', tableClassName)}>
         <thead className="sticky top-0 z-10 bg-background">
           {table.getHeaderGroups().map(headerGroup => (
             <tr key={headerGroup.id} className="border-b border-border">
@@ -211,29 +212,41 @@ export function DataTable<TData>({
                 const isFirst = header.index === 0;
                 const align = isFirst ? 'text-left' : 'text-right';
                 const headerMeta = (header.column.columnDef.meta ?? {}) as { align?: string; className?: string };
+                const ariaSort = sorted === 'asc' ? 'ascending' : sorted === 'desc' ? 'descending' : canSort ? 'none' : undefined;
                 return (
                   <th
                     key={header.id}
                     scope="col"
+                    aria-sort={ariaSort}
                     className={cn(
                       'py-1 px-3 text-sm font-medium text-foreground',
                       align,
                       denseClass(dense),
                       headerMeta.className,
-                      canSort && 'cursor-pointer select-none hover:bg-muted/50 transition-colors',
+                      isFirst && 'max-md:sticky max-md:left-0 max-md:z-20 max-md:bg-background',
                     )}
-                    onClick={header.column.getToggleSortingHandler()}
                   >
-                    <span className="inline-flex items-center gap-1">
-                      {flexRender(header.column.columnDef.header, header.getContext())}
-                      {sorted === 'asc' ? (
-                        <ArrowUp className="w-3 h-3" />
-                      ) : sorted === 'desc' ? (
-                        <ArrowDown className="w-3 h-3" />
-                      ) : canSort ? (
-                        <ArrowUpDown className="w-3 h-3 opacity-20" />
-                      ) : null}
-                    </span>
+                    {canSort ? (
+                      <button
+                        type="button"
+                        className="inline-flex min-h-11 w-full items-center gap-1 text-inherit max-md:justify-start md:min-h-0"
+                        onClick={header.column.getToggleSortingHandler()}
+                        aria-label={`Сортировать: ${String(header.column.columnDef.header ?? header.id)}`}
+                      >
+                        {flexRender(header.column.columnDef.header, header.getContext())}
+                        {sorted === 'asc' ? (
+                          <ArrowUp className="w-3 h-3" />
+                        ) : sorted === 'desc' ? (
+                          <ArrowDown className="w-3 h-3" />
+                        ) : (
+                          <ArrowUpDown className="w-3 h-3 opacity-20" />
+                        )}
+                      </button>
+                    ) : (
+                      <span className="inline-flex items-center gap-1">
+                        {flexRender(header.column.columnDef.header, header.getContext())}
+                      </span>
+                    )}
                   </th>
                 );
               })}
@@ -252,7 +265,7 @@ export function DataTable<TData>({
                 <tr
                   key={row.id}
                   className={cn(
-                    'h-9 border-b border-border',
+                    'h-11 md:h-9 border-b border-border',
                     onRowClick && 'cursor-pointer hover:bg-muted/30 transition-colors',
                     rowClass,
                   )}
@@ -263,7 +276,15 @@ export function DataTable<TData>({
                     const align = isFirst ? 'text-left' : 'text-right';
                     const meta = cell.column.columnDef.meta as { align?: string } | undefined;
                     return (
-                      <td key={cell.id} className={cn('py-1 px-3 text-sm', denseClass(dense), meta?.align ?? align)}>
+                      <td
+                        key={cell.id}
+                        className={cn(
+                          'py-1 px-3 text-sm',
+                          denseClass(dense),
+                          meta?.align ?? align,
+                          isFirst && 'max-md:sticky max-md:left-0 max-md:z-10 max-md:bg-background',
+                        )}
+                      >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
                     );
@@ -277,25 +298,42 @@ export function DataTable<TData>({
               <Fragment key={row.id}>
                 <tr
                   className={cn(
-                    'h-9 border-b border-border',
+                    'h-11 md:h-9 border-b border-border',
                     'cursor-pointer hover:bg-muted/30 transition-colors',
                     rowClass,
                   )}
                   onClick={() => onExpandedChange?.(row.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      onExpandedChange?.(row.id);
+                    }
+                  }}
+                  tabIndex={0}
+                  aria-expanded={isExpanded}
+                  aria-controls={`${row.id}-details`}
                 >
                   {row.getVisibleCells().map((cell, cellIndex) => {
                     const isFirst = cellIndex === 0;
                     const align = isFirst ? 'text-left' : 'text-right';
                     const meta = cell.column.columnDef.meta as { align?: string } | undefined;
                     return (
-                      <td key={cell.id} className={cn('py-1 px-3 text-sm', denseClass(dense), meta?.align ?? align)}>
+                      <td
+                        key={cell.id}
+                        className={cn(
+                          'py-1 px-3 text-sm',
+                          denseClass(dense),
+                          meta?.align ?? align,
+                          isFirst && 'max-md:sticky max-md:left-0 max-md:z-10 max-md:bg-background',
+                        )}
+                      >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
                     );
                   })}
                 </tr>
                 {isExpanded && (
-                  <tr key={`${row.id}-expand`} className="border-b border-border">
+                  <tr id={`${row.id}-details`} key={`${row.id}-expand`} className="border-b border-border">
                     <td colSpan={columns.length} className="py-2 pl-8 pr-3 bg-muted/20">
                       {renderExpandedRow(row)}
                     </td>

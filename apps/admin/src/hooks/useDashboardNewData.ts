@@ -13,6 +13,8 @@
 import { useMemo, useState, useEffect } from 'react';
 import { getInstantClient } from '@/data/instant';
 import { useVenueId } from './useVenueId';
+import { instantOne } from '@/lib/instantLink';
+import { orderEventLabel } from '@/lib/operationalLabels';
 import {
   venueToday,
   venueYesterday,
@@ -239,12 +241,13 @@ export function useDashboardNewData(period: DashboardPeriod = 'today', offset: n
       const dishMap = new Map<string, { name: string; qty: number; revenue: number }>();
       for (const o of paidPeriod) {
         for (const item of (o.items ?? [])) {
-          const pid = item.product?.id;
+          const product = instantOne(item.product);
+          const pid = product?.id;
           if (!pid) continue;
           const qty = Number(item.quantity) || 1;
           const price = Number(item.productPriceTiyin) || 0;
           const existing = dishMap.get(pid) || {
-            name: (item.productName as string) || item.product?.name || pid,
+            name: (item.productName as string) || product?.name || pid,
             qty: 0,
             revenue: 0,
           };
@@ -263,7 +266,7 @@ export function useDashboardNewData(period: DashboardPeriod = 'today', offset: n
         const totalSold = info.qty;
         let cost = 0;
         for (const ri of dish.recipeItems) {
-          const ing = ri.ingredient;
+          const ing = instantOne(ri.ingredient);
           if (!ing) continue;
           const ingCostTiyin = Number(ing.costTiyin) || 0;
           const riQty = Number(ri.quantityMilli) || 0;
@@ -437,8 +440,8 @@ export function useDashboardNewData(period: DashboardPeriod = 'today', offset: n
           hour: '2-digit',
           minute: '2-digit',
         }),
-        actor: (ev as any).actorEmployee?.displayName ?? '—',
-        action: ev.action === 'paid' ? 'Оплата' : ev.action,
+        actor: instantOne(ev.actorEmployee)?.displayName ?? '—',
+        action: orderEventLabel(ev.action),
         detail: null,
         type: ev.action === 'paid' ? 'order_paid' : 'order_new',
       });

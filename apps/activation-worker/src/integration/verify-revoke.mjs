@@ -14,7 +14,7 @@ const ownerToken = await db.auth.createToken({ email: 'owner@alto-coffee.test' }
 const ownerUser = await db.auth.getUser({ email: 'owner@alto-coffee.test' });
 if (!ownerUser) throw new Error('Owner fixture user was not found');
 const deviceEmail = `revoke-fixture-${randomUUID()}@devices.invalid`;
-await db.auth.createToken({ email: deviceEmail });
+const deviceToken = await db.auth.createToken({ email: deviceEmail });
 const deviceUser = await db.auth.getUser({ email: deviceEmail });
 if (!deviceUser) throw new Error('Could not create revoke fixture auth user');
 const membershipData = await db.query({
@@ -58,6 +58,28 @@ async function waitForWorker() {
   throw new Error('Activation worker did not become ready within 5 seconds');
 }
 
+const scopedDeviceQuery = {
+  $users: {
+    $: { where: { 'devices.status': 'active' } },
+    devices: {
+      $: { where: { status: 'active' } },
+      venue: {},
+      authorizations: { $: { where: { status: 'active' } } },
+    },
+  },
+};
+const activeDeviceView = await db.asUser({ token: deviceToken }).query(scopedDeviceQuery);
+assert.deepEqual(
+  activeDeviceView.$users.flatMap((user) => user.devices).map((candidate) => candidate.id),
+  [deviceId],
+  'a device token resolves only its own active device',
+);
+assert.equal(
+  activeDeviceView.$users[0]?.devices[0]?.authorizations.filter((candidate) => candidate.status === 'active').length,
+  1,
+  `a device token sees its active authorization: ${JSON.stringify(activeDeviceView.$users)}`,
+);
+
 const devices = await db.query({
   devices: { $: { where: { id: deviceId }, limit: 1 }, authorizations: {} },
 });
@@ -67,9 +89,24 @@ if (!device) throw new Error('Revoke fixture device was not found');
 process.env.PORT = String(port);
 // The worker reads PORT while loading and owns the server lifecycle.
 const { server } = await import('../server.mjs');
+const probeDeviceEndpoint = (token) => fetch(`${baseUrl}/v1/pos/unlock-attempts`, {
+  method: 'POST',
+  headers: {
+    authorization: `Bearer ${token}`,
+    'content-type': 'application/json',
+  },
+  body: '{}',
+});
+
 
 try {
   await waitForWorker();
+  const activeProbe = await probeDeviceEndpoint(deviceToken);
+  const activeProbeBody = await activeProbe.text();
+  assert.equal(activeProbe.status, 400, `an active device token reaches POS input validation: ${activeProbeBody}`);
+  const ownerProbe = await probeDeviceEndpoint(ownerToken);
+  assert.equal(ownerProbe.status, 403, 'an admin token cannot impersonate a POS device');
+
 
   const response = await fetch(`${baseUrl}/v1/devices/${device.id}/revoke`, {
     method: 'POST',
@@ -78,6 +115,9 @@ try {
   const responseBody = await response.json();
   assert.equal(response.status, 200, `owner can revoke a device: ${JSON.stringify(responseBody)}`);
   assert.deepEqual(responseBody, { deviceId: device.id, status: 'revoked' });
+  const revokedProbe = await probeDeviceEndpoint(deviceToken);
+  assert.equal(revokedProbe.status, 401, 'a revoked device token loses POS worker access immediately');
+
 
   const [updatedDevices, deviceView] = await Promise.all([
     db.query({ devices: { authorizations: {} } }),
@@ -91,6 +131,10 @@ try {
   );
   assert.deepEqual(deviceView.venues, [], 'a revoked tablet no longer sees its venue');
 
+  await assert.rejects(
+    () => db.asUser({ token: deviceToken }).query(scopedDeviceQuery),
+    'the revoked device token must fail user-scoped queries immediately',
+  );
   console.log('Verified activation revoke: owner revokes the fixture device and its venue access ends immediately.');
 } finally {
   if (server.listening) {

@@ -88,6 +88,11 @@ export function InstantOpenShiftScreen({ navigation }: Props) {
           {isLoading && <Text style={styles.loading}>Проверка смены...</Text>}
           {error && <Text style={styles.error}>{error}</Text>}
 
+          {!canOpenShift ? (
+            <Text style={styles.waiterHint}>
+              Официант не может открыть смену. Дождитесь кассира или менеджера.
+            </Text>
+          ) : null}
           <TouchableOpacity
             style={[styles.openBtn, (submitting || isLoading || !canOpenShift) && styles.openBtnDisabled]}
             onPress={handleOpen}
@@ -105,22 +110,80 @@ export function InstantOpenShiftScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: theme.colors.background },
-  container: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
-  content: { width: '100%', maxWidth: 400, alignItems: 'center' },
-  title: { color: theme.colors.textPrimary, fontFamily: theme.fonts.bold, fontSize: 28, marginBottom: 8 },
-  cashierName: { color: theme.colors.textSecondary, fontFamily: theme.fonts.regular, fontSize: 18, marginBottom: 24 },
-  subtitle: { color: theme.colors.textSecondary, fontFamily: theme.fonts.regular, fontSize: 14, marginBottom: 16 },
-  numpadWrap: { width: '100%', height: 300, marginBottom: 20 },
-  loading: { color: theme.colors.textSecondary, fontFamily: theme.fonts.regular, fontSize: 14, marginBottom: 12 },
-  error: { color: theme.colors.destructive, fontFamily: theme.fonts.regular, fontSize: 14, marginBottom: 12 },
-  openBtn: {
-    backgroundColor: theme.colors.accent,
-    borderRadius: 10,
-    paddingVertical: 16,
-    paddingHorizontal: 48,
+  safeArea: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  container: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  openBtnDisabled: { opacity: 0.5 },
-  openText: { color: '#fff', fontFamily: theme.fonts.bold, fontSize: 18 },
+  content: {
+    alignItems: 'center',
+    width: 320,
+  },
+  numpadWrap: {
+    width: '100%',
+    height: 340,
+    marginBottom: 16,
+  },
+  title: {
+    fontSize: 28,
+    fontFamily: theme.fonts.medium,
+    color: theme.colors.textPrimary,
+    marginBottom: 8,
+  },
+  cashierName: {
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
+    color: theme.colors.tabActive,
+    marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 16,
+    fontFamily: theme.fonts.regular,
+    color: theme.colors.textSecondary,
+    marginBottom: 24,
+  },
+  loading: {
+    color: theme.colors.textSecondary,
+    fontFamily: theme.fonts.regular,
+    fontSize: 14,
+    marginBottom: 12,
+  },
+  error: {
+    color: theme.colors.destructive,
+    fontFamily: theme.fonts.regular,
+    fontSize: 14,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  openBtn: {
+    width: '100%',
+    height: 56,
+    backgroundColor: theme.colors.accent,
+    borderRadius: theme.borderRadius,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 16,
+    marginBottom: 16,
+  },
+  openBtnDisabled: {
+    opacity: 0.45,
+  },
+  waiterHint: {
+    color: theme.colors.warningSubtle,
+    fontSize: 16,
+    fontFamily: theme.fonts.regular,
+    textAlign: 'center',
+    marginTop: 12,
+    marginBottom: 4,
+    lineHeight: 20,
+  },
+  openText: {
+    color: theme.colors.white,
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
+  },
 });

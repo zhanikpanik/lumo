@@ -29,35 +29,33 @@ export function AnalyticsProfitPage() {
   }, [ebData]);
 
   return (
-    <div className="p-6 lg:p-8 max-w-[1180px]">
-      {/* Header */}
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold mb-1 text-foreground">Аналитика прибыли</h2>
-        <p className="text-sm text-muted-foreground">Alto Coffee Bishkek</p>
-      </div>
-
-      {/* Сегодня: три карточки + раскладка */}
-      <div className="mb-2">
-        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Сегодня</h3>
-      </div>
-      <KpiTrio rows={todayRows} isPending={ebPending} error={ebError} />
-      <PrimeCostBar rows={todayRows} isPending={ebPending} error={ebError} />
-
-      {/* Тепловая карта SPLH: последние 4 недели */}
-      <div className="mt-8 mb-2">
-        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-          Выручка на час работы · последние 4 недели
-        </h3>
-      </div>
-      <SplhHeatmap cells={heatData?.splhHeatmap ?? []} isPending={heatPending} error={heatError} />
-
-      {/* EBIT: последние 14 дней */}
-      <div className="mt-8 mb-2">
-        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-          Итог дня · последние 14 дней
-        </h3>
-      </div>
-      <EbitChart rows={ebData?.rows ?? []} isPending={ebPending} error={ebError} />
+    <div className="page-shell page-shell--wide">{/* Header */}
+    <div className="mb-6">
+      <h2 className="text-2xl font-bold mb-1 text-foreground">Аналитика прибыли</h2>
+      <p className="text-sm text-muted-foreground">Alto Coffee Bishkek</p>
     </div>
+    
+    {/* Сегодня: три карточки + раскладка */}
+    <div className="mb-2">
+      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Сегодня</h3>
+    </div>
+    <KpiTrio rows={todayRows} isPending={ebPending} error={ebError} />
+    <PrimeCostBar rows={todayRows} isPending={ebPending} error={ebError} />
+    
+    {/* Тепловая карта SPLH: последние 4 недели */}
+    <div className="mt-8 mb-2">
+      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+        Выручка на час работы · последние 4 недели
+      </h3>
+    </div>
+    <SplhHeatmap cells={heatData?.splhHeatmap ?? []} isPending={heatPending} error={heatError} />
+    
+    {/* EBIT: последние 14 дней */}
+    <div className="mt-8 mb-2">
+      <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+        Итог дня · последние 14 дней
+      </h3>
+    </div>
+    <EbitChart rows={ebData?.rows ?? []} isPending={ebPending} error={ebError} /></div>
   );
 }

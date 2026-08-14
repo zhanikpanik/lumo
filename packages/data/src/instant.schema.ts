@@ -46,6 +46,24 @@ const _schema = i.schema({
       activatedAt: i.date().indexed(),
       revokedAt: i.date().optional(),
     }),
+    activationChallenges: i.entity({
+      challengeHash: i.string().unique().indexed(),
+      adminUserId: i.string().indexed(),
+      email: i.string().indexed(),
+      installationId: i.string().indexed(),
+      label: i.string(),
+      platform: i.string(),
+      venuesJson: i.string(),
+      status: i.string().indexed(),
+      createdAt: i.date().indexed(),
+      expiresAt: i.date().indexed(),
+      consumedAt: i.date().optional().indexed(),
+    }),
+    activationChallengeClaims: i.entity({
+      claimKey: i.string().unique().indexed(),
+      challengeId: i.string().indexed(),
+      createdAt: i.date().indexed(),
+    }),
     employees: i.entity({
       venueId: i.string().indexed(),
       displayName: i.string(),
@@ -551,6 +569,10 @@ const _schema = i.schema({
     auditAdminUser: {
       forward: { on: 'auditEvents', has: 'one', label: 'adminUser' },
       reverse: { on: '$users', has: 'many', label: 'auditEvents' },
+    },
+    auditOperation: {
+      forward: { on: 'auditEvents', has: 'one', label: 'operation' },
+      reverse: { on: 'commandOperations', has: 'many', label: 'auditEvents' },
     },
     ticketOrder: {
       forward: { on: 'kitchenTickets', has: 'one', label: 'order', required: true },

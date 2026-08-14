@@ -90,9 +90,10 @@ export const ModifierGrid: React.FC<ModifierGridProps> = ({ items, modifierGroup
   const currentGroupIdx = activeGroup ? availableGroups.findIndex(g => g.id === activeGroup.id) : -1;
 
   // Adapt InstantDB modifiers to the Modifier shape expected by the grid
-  const modifiers: { id: string; name: string; price: number }[] = isModifiers && activeGroup
+  const modifiers: Modifier[] = isModifiers && activeGroup
     ? activeGroup.modifiers.map(m => ({
         id: m.id,
+        sourceModifierId: m.id,
         name: m.name,
         price: m.priceTiyin,
       }))
@@ -192,23 +193,60 @@ export const ModifierGrid: React.FC<ModifierGridProps> = ({ items, modifierGroup
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', height: 44 },
-  headerBack: { width: 44, justifyContent: 'center', alignItems: 'center' },
-  headerText: { flex: 1, color: theme.colors.textPrimary, fontSize: 16, fontFamily: theme.fonts.medium, textAlign: 'center' },
-
-  grid: { flex: 1 },
-  row: { flex: 1, flexDirection: 'row' },
-  cellWrap: { flex: 1 },
-
+  container: {
+    flex: 1,
+  },
+  header: {
+    height: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.colors.surfaceLight,
+    marginBottom: GAP,
+  },
+  headerBack: {
+    width: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerText: {
+    flex: 1,
+    color: theme.colors.textPrimary,
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
+    textAlign: 'center',
+  },
+  grid: {
+    flex: 1,
+  },
+  row: {
+    flex: 1,
+    flexDirection: 'row',
+  },
+  cellWrap: {
+    flex: 1,
+  },
   modBtn: {
-    flex: 1, borderRadius: 10, backgroundColor: theme.colors.surfaceLight,
-    justifyContent: 'center', alignItems: 'center', padding: 4,
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: theme.colors.surfaceLight,
+    paddingHorizontal: 4,
   },
   modActive: {
     backgroundColor: theme.colors.white,
   },
-  modText: { color: theme.colors.textPrimary, fontSize: 12, fontFamily: theme.fonts.medium, textAlign: 'center' },
-  modTextActive: { color: theme.colors.background },
-  emptyCell: { flex: 1, backgroundColor: theme.colors.surfaceLight },
+  modText: {
+    color: theme.colors.textPrimary,
+    fontSize: 16,
+    fontFamily: theme.fonts.regular,
+    textAlign: 'center',
+  },
+  modTextActive: {
+    color: theme.colors.textDark,
+    fontFamily: theme.fonts.medium,
+  },
+  emptyCell: {
+    flex: 1,
+    backgroundColor: theme.colors.surfaceLight,
+  },
 });

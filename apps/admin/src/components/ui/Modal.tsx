@@ -17,7 +17,7 @@ export function Modal({ title, onClose, children, width = '420px' }: ModalProps)
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/30 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <Dialog.Content
-          className="fixed left-[50%] top-[50%] z-50 translate-x-[-50%] translate-y-[-50%] bg-white rounded-2xl shadow-xl p-6 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
+          className="fixed left-[50%] top-[50%] z-50 max-h-[calc(100dvh-2rem)] translate-x-[-50%] translate-y-[-50%] overflow-y-auto rounded-2xl border bg-popover p-5 text-popover-foreground shadow-xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:p-6"
           style={{ width: `min(calc(100vw - 2rem), ${width})` }}
           aria-describedby={undefined}
         >
@@ -26,7 +26,7 @@ export function Modal({ title, onClose, children, width = '420px' }: ModalProps)
             <h3 className="text-lg font-bold">{title}</h3>
             <Dialog.Close
               aria-label="Закрыть"
-              className="text-muted-foreground hover:text-foreground transition-colors"
+              className="flex size-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground transition-colors sm:size-8"
             >
               <X className="w-5 h-5" />
             </Dialog.Close>

@@ -16,7 +16,7 @@ export function SegmentTabs<T extends string>({
   return (
     <div
       className={cn(
-        'inline-flex rounded-lg bg-[#F2F2F7] p-0.5 shadow-[inset_0_1px_2px_rgba(0,0,0,0.04)]',
+        'inline-flex max-w-full overflow-x-auto rounded-lg bg-muted p-0.5 shadow-[inset_0_1px_2px_rgba(0,0,0,0.04)]',
         className,
       )}
     >
@@ -28,9 +28,9 @@ export function SegmentTabs<T extends string>({
             type="button"
             onClick={() => onChange(opt.value)}
             className={cn(
-              'px-4 py-1 text-sm font-medium rounded-md transition-all duration-150',
+              'min-h-11 shrink-0 px-4 py-1 text-sm font-medium rounded-md transition-all duration-150 sm:min-h-0',
               active
-                ? 'bg-white text-foreground shadow-sm'
+                ? 'bg-background text-foreground shadow-sm'
                 : 'text-muted-foreground hover:text-foreground',
             )}
           >

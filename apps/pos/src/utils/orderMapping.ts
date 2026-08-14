@@ -10,7 +10,7 @@ import type { Order, OrderItem, Modifier } from '../types';
 
 export interface InstantOrderRow {
   id: string; number?: string; status?: string; source?: string;
-  ownerEmployee?: { displayName?: string };
+  ownerEmployee?: { id?: string; displayName?: string } | { id?: string; displayName?: string }[];
   openedAt: string; closedAt?: string; zoneName?: string;
   orderType?: string; totalAmountTiyin?: number; tableNumber?: string;
   guestCount?: number; isQuickCheck?: boolean; comment?: string; closeReason?: string;
@@ -25,19 +25,22 @@ export interface InstantOrderItemRow {
 }
 
 export interface InstantModifierRow {
-  id: string; name?: string; priceTiyin?: number;
+  id: string; modifier?: { id?: string } | { id?: string }[];
+  name?: string; priceTiyin?: number; modifierName?: string; modifierPriceTiyin?: number;
 }
 
 // ── Mapping ───────────────────────────────────────────────
 
 /** Map a single InstantDB order row to the app Order type. */
 export function mapOrderRow(o: InstantOrderRow): Order {
+  const ownerEmployee = Array.isArray(o.ownerEmployee) ? o.ownerEmployee[0] : o.ownerEmployee;
   return {
     id: o.id,
     number: o.number ?? '',
     status: (o.status ?? 'active') as Order['status'],
     source: (o.source as Order['source']) ?? 'pos',
-    waiter: o.ownerEmployee?.displayName ?? 'Кассир',
+    waiter: ownerEmployee?.displayName ?? 'Кассир',
+    ownerEmployeeId: ownerEmployee?.id,
     openedAt: o.openedAt,
     closedAt: o.closedAt ?? undefined,
     zone: o.zoneName ?? '',
@@ -69,10 +72,12 @@ function mapItemRow(i: InstantOrderItemRow): OrderItem {
 }
 
 function mapModifierRow(m: InstantModifierRow): Modifier {
+  const modifier = Array.isArray(m.modifier) ? m.modifier[0] : m.modifier;
   return {
     id: m.id,
-    name: m.name ?? '',
-    price: m.priceTiyin ?? 0,
+    sourceModifierId: modifier?.id,
+    name: m.modifierName ?? m.name ?? '',
+    price: m.modifierPriceTiyin ?? m.priceTiyin ?? 0,
   };
 }
 
@@ -98,7 +103,16 @@ export function sortOrders(orders: Order[]): Order[] {
   });
 }
 
-/** map + sort in one call — the common path. */
+/** Map visible operational orders; empty cancelled drafts remain audit-only. */
 export function mapAndSortOrders(rows: InstantOrderRow[]): Order[] {
-  return sortOrders(rows.map(mapOrderRow));
+  const visibleOrders: Order[] = [];
+  for (const row of rows) {
+    const order = mapOrderRow(row);
+    const isEmptyCancelledDraft =
+      order.status === 'cancelled' &&
+      order.items.length === 0 &&
+      !order.comment?.trim();
+    if (!isEmptyCancelledDraft) visibleOrders.push(order);
+  }
+  return sortOrders(visibleOrders);
 }

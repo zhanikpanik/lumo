@@ -202,20 +202,18 @@ const styles = StyleSheet.create({
     bottom: 84,
     left: 14,
     width: POPOVER_WIDTH,
-    backgroundColor: theme.colors.iOSSurface,
+    backgroundColor: 'transparent',
     borderRadius: 14,
-    paddingVertical: 4,
     boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)',
     elevation: 20,
   },
   group: {
     backgroundColor: theme.colors.iOSSurface,
-    borderRadius: 0,
+    borderRadius: 14,
     overflow: 'hidden',
   },
   groupSpacing: {
-    borderBottomWidth: 8,
-    borderBottomColor: theme.colors.iOSBorder,
+    marginBottom: 8,
   },
   menuItem: {
     paddingVertical: 13,
@@ -260,6 +258,6 @@ const styles = StyleSheet.create({
     borderTopWidth: ARROW_SIZE,
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
-    borderTopColor: theme.colors.iOSBorderTop,
+    borderTopColor: theme.colors.iOSSurface,
   },
 });

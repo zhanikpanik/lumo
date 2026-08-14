@@ -12,6 +12,7 @@
     "test": "node --import tsx --test src/__tests__/*.test.ts",
     "push": "instant-cli --env ../../.env.local push all",
     "seed": "node --env-file=../../.env.local --import tsx/esm src/seed.ts",
+    "seed:admin-demo": "node --env-file=../../.env.local --import tsx/esm src/seed-admin-demo.ts",
     "seed:client": "node --env-file=../../.env.local --import tsx/esm src/seed-client.ts",
     "seed:poster": "node --env-file=../../.env.local --import tsx/esm src/seed-from-poster.ts",
     "verify:permissions": "node --env-file=../../.env.local --import tsx/esm src/integration/verify-permissions.ts",

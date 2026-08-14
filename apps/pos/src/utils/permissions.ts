@@ -13,6 +13,28 @@ export function can(role: UserRole, action: PermissionAction): boolean {
   if (role === 'waiter') return false;
   return true;
 }
+export type ShiftEntryDecision = 'loading' | 'orders' | 'open-shift' | 'lock';
+
+export function resolveShiftEntry(
+  role: UserRole,
+  hasOpenShift: boolean,
+  isLoading: boolean,
+): ShiftEntryDecision {
+  if (isLoading) return 'loading';
+  if (hasOpenShift) return 'orders';
+  return can(role, 'openShift') ? 'open-shift' : 'lock';
+}
+
+export function requiresOrderTakeover(
+  user: { id: string; name: string; role: UserRole } | null,
+  order: { ownerEmployeeId?: string; waiter: string } | null,
+  isTakeaway: boolean,
+): boolean {
+  if (!user || !order || user.role !== 'waiter' || isTakeaway) return false;
+  return order.ownerEmployeeId
+    ? order.ownerEmployeeId !== user.id
+    : order.waiter !== user.name;
+}
 
 /** Admin/owner can see sensitive data (expected cash balance, full audit). */
 export function isAdmin(role: UserRole): boolean {

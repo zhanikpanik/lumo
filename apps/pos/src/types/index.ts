@@ -14,6 +14,7 @@ export interface Product {
 
 export interface Modifier {
   id: string;
+  sourceModifierId?: string;
   name: string;
   price: number;
 }
@@ -37,6 +38,7 @@ export interface Order {
   source?: OrderSource;
   externalOrderId?: string;
   waiter: string;
+  ownerEmployeeId?: string;
   openedAt: string;  // ISO string
   closedAt?: string;  // ISO string, set when paid/cancelled
   zone: string;

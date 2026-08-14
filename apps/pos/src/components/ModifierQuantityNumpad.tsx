@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Feather } from '../components/Feather';
+import { Feather } from '@expo/vector-icons';
 import { theme } from '../theme/colors';
 import { usePosUiStore } from '../store/posUiStore';
 

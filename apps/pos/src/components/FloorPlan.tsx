@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Feather } from '../components/Feather';
+import { Feather } from '@expo/vector-icons';
 import { theme } from '../theme/colors';
 import { VenueTable, VenueZone, Order } from '../types';
 import { FloorPlanCanvas } from './FloorPlanCanvas';

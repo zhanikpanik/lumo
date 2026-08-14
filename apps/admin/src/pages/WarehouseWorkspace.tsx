@@ -6,11 +6,14 @@ import { toast } from 'sonner';
 import { useInstantWarehouses } from '@/hooks/useInstantWarehouses';
 import { useInstantWarehouseIngredients, type InstantWarehouseIngredient } from '@/hooks/useInstantWarehouseIngredients';
 import { useInstantUpdateWarehouse, useInstantDeleteWarehouse } from '@/hooks/useInstantWarehouseMutations';
-import { somRounded } from '@/lib/formatSom';
+import { formatSom } from '@/lib/formatSom';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { AddButton } from '@/components/ui/ActionButtons';
 import { EditButton } from '@/components/ui/EditButton';
 import { DataTable } from '@/components/ui/DataTable';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { TextInputDialog } from '@/components/ui/TextInputDialog';
+import { useInstantIngredientUsageMap } from '@/hooks/useInstantIngredientsDetailed';
 
 export function WarehouseWorkspace() {
   const { warehouseId } = useParams<{ warehouseId: string }>();
@@ -24,12 +27,13 @@ export function WarehouseWorkspace() {
 
   const [search, setSearch] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const { data: ingredients = [], isLoading: ingPending } = useInstantWarehouseIngredients(
     warehouseId ?? null,
   );
-  // Ingredient usage map not yet migrated to InstantDB — return empty
-  const usageMap: Record<string, { name: string }[]> = {};
+  const { data: usageMap = {} } = useInstantIngredientUsageMap();
 
 
   const q = search.trim().toLowerCase();
@@ -42,23 +46,26 @@ export function WarehouseWorkspace() {
   }, [filtered]);
 
 
-  async function handleRename() {
-    const name = window.prompt('Новое название склада', selected?.name)?.trim();
-    if (!name || !warehouseId || name === selected?.name) return;
+  async function handleRename(name: string) {
+    if (!warehouseId || name === selected?.name) {
+      setRenameOpen(false);
+      return;
+    }
     try {
       await renameWarehouse.update(warehouseId, { name });
       toast.success('Склад переименован');
+      setRenameOpen(false);
     } catch (e) {
       toast.error((e as Error)?.message || 'Не удалось переименовать');
     }
   }
 
   async function handleDelete() {
-    if (!confirm('Удалить склад? Разрешено только если нет остатков и активных документов.')) return;
     if (!warehouseId) return;
     try {
       await deleteWarehouse.remove(warehouseId);
       toast.success('Склад удалён');
+      setDeleteOpen(false);
       navigate('/warehouse/operations');
     } catch (e) {
       toast.error((e as Error)?.message || 'Не удалось удалить');
@@ -85,7 +92,7 @@ export function WarehouseWorkspace() {
       header: 'Стоимость',
       cell: ({ row }) => {
         const val = row.original.stock_quantity * row.original.price;
-        return <span>{somRounded(val)} сом</span>;
+        return <span>{formatSom(val)}</span>;
       },
     },
     {
@@ -120,73 +127,89 @@ export function WarehouseWorkspace() {
   if (!selected) return null;
 
   return (
-    <div className="p-8">
-
-      {/* ═══ HEADER ═══ */}
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h2 className="text-2xl font-bold">{selected.name}</h2>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Остатки на {somRounded(totalValue)} сом
-          </p>
-        </div>
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setMenuOpen(!menuOpen)}
-            className="p-2 rounded-lg hover:bg-accent transition-colors"
-          >
-            <MoreHorizontal className="w-5 h-5 text-muted-foreground" />
-          </button>
-          {menuOpen && (
-            <div
-              className="absolute right-0 top-full mt-1 z-30 bg-white border border-border rounded-lg shadow-lg py-1 min-w-[180px]"
-              onMouseLeave={() => setMenuOpen(false)}
-            >
-              <button
-                type="button"
-                onClick={() => { setMenuOpen(false); handleRename(); }}
-                className="w-full text-left px-3 py-1.5 text-sm hover:bg-accent transition-colors"
-              >
-                Переименовать
-              </button>
-              <button
-                type="button"
-                onClick={() => { setMenuOpen(false); handleDelete(); }}
-                className="w-full text-left px-3 py-1.5 text-sm text-red-600 hover:bg-accent transition-colors"
-              >
-                Удалить склад
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-            {/* ═══ STOCK TABLE ═══ */}
+    <div className="page-shell">{/* ═══ HEADER ═══ */}
+    <div className="flex items-start justify-between mb-6">
       <div>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-base font-medium">Остатки</h3>
-        </div>
-
-        <div className="flex items-center gap-2 mb-4">
-          <SearchInput value={search} onChange={setSearch} placeholder="Поиск по названию…" className="w-56" />
-          <AddButton
-            onClick={() => navigate(`/menu/ingredients/add?warehouse=${warehouseId}&back=warehouse`)}
-            label="Добавить ингредиент"
-          />
-        </div>
-
-        <DataTable
-          data={filtered}
-          columns={columns}
-          dense
-          isLoading={ingPending}
-          emptyMessage={search ? 'Ничего не найдено' : 'На этом складе пока нет ингредиентов'}
-          onRowClick={(row) => navigate(`/menu/ingredients/${row.original.id}?warehouse=${warehouseId}&back=warehouse`)}
-          className="max-w-2xl"
+        <h2 className="text-2xl font-bold">{selected.name}</h2>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          Остатки на {formatSom(totalValue)}
+        </p>
+      </div>
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => setMenuOpen(!menuOpen)}
+          className="p-2 rounded-lg hover:bg-accent transition-colors"
+        >
+          <MoreHorizontal className="w-5 h-5 text-muted-foreground" />
+        </button>
+        {menuOpen && (
+          <div
+            className="absolute right-0 top-full mt-1 z-30 bg-popover border border-border rounded-lg shadow-lg py-1 min-w-[180px]"
+            onMouseLeave={() => setMenuOpen(false)}
+          >
+            <button
+              type="button"
+              onClick={() => { setMenuOpen(false); setRenameOpen(true); }}
+              className="w-full text-left px-3 py-1.5 text-sm hover:bg-accent transition-colors"
+            >
+              Переименовать
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMenuOpen(false); setDeleteOpen(true); }}
+              className="w-full text-left px-3 py-1.5 text-sm text-destructive hover:bg-accent transition-colors"
+            >
+              Удалить склад
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+    
+          {/* ═══ STOCK TABLE ═══ */}
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-base font-medium">Остатки</h3>
+      </div>
+    
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+        <SearchInput value={search} onChange={setSearch} placeholder="Поиск по названию…" className="w-full sm:w-56" />
+        <AddButton
+          onClick={() => navigate(`/menu/ingredients/add?warehouse=${warehouseId}&back=warehouse`)}
+          label="Добавить ингредиент"
         />
       </div>
-
+    
+      <DataTable
+        data={filtered}
+        columns={columns}
+        dense
+        isLoading={ingPending}
+        emptyMessage={search ? 'Ничего не найдено' : 'На этом складе пока нет ингредиентов'}
+        onRowClick={(row) => navigate(`/menu/ingredients/${row.original.id}?warehouse=${warehouseId}&back=warehouse`)}
+        className="max-w-2xl"
+      />
     </div>
+    
+    {renameOpen && (
+      <TextInputDialog
+        title="Переименовать склад"
+        label="Название"
+        initialValue={selected.name}
+        onSubmit={handleRename}
+        onClose={() => setRenameOpen(false)}
+      />
+    )}
+    {deleteOpen && (
+      <ConfirmDialog
+        title={`Удалить «${selected.name}»?`}
+        description="Удаление возможно только если на складе нет остатков и активных документов. Это действие нельзя отменить."
+        confirmLabel="Удалить склад"
+        destructive
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteOpen(false)}
+      />
+    )}</div>
   );
 }

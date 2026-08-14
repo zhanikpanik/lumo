@@ -1,6 +1,13 @@
 import { init, type InstantReactNativeDatabase } from '@instantdb/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { AppSchema, DeviceActivationRequest, DeviceActivationResult } from '@lumo/data';
+import type {
+  AppSchema,
+  CompleteDeviceActivationRequest,
+  DeviceActivationMagicCodeResult,
+  DeviceActivationRequest,
+  DeviceActivationResponse,
+  DeviceActivationResult,
+} from '@lumo/data';
 import { clearOfflinePinState } from './offlinePinState';
 
 export type InstantPosClient = InstantReactNativeDatabase<AppSchema, false>;
@@ -170,23 +177,20 @@ export interface BootstrapResult {
  */
 export async function bootstrapInstantDevice(): Promise<BootstrapResult> {
   // Development token path — sign in with dev token, auto-provision device auth
-  if (DEVELOPMENT_DEVICE_AUTH && process.env.EXPO_PUBLIC_DEV_DEVICE_TOKEN) {
+  const devToken = process.env.EXPO_PUBLIC_DEV_DEVICE_TOKEN;
+  if (DEVELOPMENT_DEVICE_AUTH && devToken) {
     try {
       await authenticateDevelopmentDevice();
       const existingAuth = await loadStoredDeviceAuth();
-      if (existingAuth) {
-        return { status: 'authenticated', deviceId: existingAuth.deviceId, venueId: existingAuth.venueId };
-      }
-      // First run in dev mode: use known seed device IDs (queryOnce unreliable in web)
-      const DEV_DEVICE_ID = 'bc06127e-7f60-4e15-8498-e3f5a14f0106';
-      const DEV_VENUE_ID = 'bc06127e-7f60-4e15-8498-e3f5a14f0102';
-      const syntheticAuth: DeviceActivationResult = {
-        deviceId: DEV_DEVICE_ID,
-        venueId: DEV_VENUE_ID,
-        token: process.env.EXPO_PUBLIC_DEV_DEVICE_TOKEN!,
-      };
-      await saveDeviceAuth(syntheticAuth);
-      return { status: 'authenticated', deviceId: DEV_DEVICE_ID, venueId: DEV_VENUE_ID };
+      const deviceAuth: DeviceActivationResult = existingAuth
+        ? { ...existingAuth, token: devToken }
+        : {
+            deviceId: 'bc06127e-7f60-4e15-8498-e3f5a14f0106',
+            venueId: 'bc06127e-7f60-4e15-8498-e3f5a14f0102',
+            token: devToken,
+          };
+      await saveDeviceAuth(deviceAuth);
+      return { status: 'authenticated', deviceId: deviceAuth.deviceId, venueId: deviceAuth.venueId };
     } catch (err) {
       console.error('bootstrapInstantDevice dev path failed:', err);
       return { status: 'activation-required' };
@@ -225,26 +229,15 @@ export async function tryStoredDeviceAuth(): Promise<boolean> {
 
 // ── Activation ─────────────────────────────────────────────────────
 
-/**
- * Activates this device with the activation worker.
- * The persistent installation ID is injected automatically for idempotency.
- * Caller provides email, magic code, venue, label, and platform.
- */
-export async function activateInstantDevice(
-  request: Omit<DeviceActivationRequest, 'installationId'>,
-): Promise<DeviceActivationResult> {
+async function activationRequest(path: string, body: unknown): Promise<unknown> {
   const workerUrl = process.env.EXPO_PUBLIC_ACTIVATION_WORKER_URL;
   if (!workerUrl) {
     throw new Error('EXPO_PUBLIC_ACTIVATION_WORKER_URL is required before a device can be activated');
   }
-
-  // Use persistent installation ID so retries don't create duplicate devices
-  const installationId = await getInstallationId();
-
-  const response = await fetch(`${workerUrl}/v1/device-activations`, {
+  const response = await fetch(`${workerUrl}${path}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ ...request, installationId }),
+    body: JSON.stringify(body),
   });
   const payload: unknown = await response.json();
   if (!response.ok) {
@@ -254,9 +247,79 @@ export async function activateInstantDevice(
         : 'Device activation failed';
     throw new Error(message);
   }
+  return payload;
+}
 
-  const result = parseActivationResult(payload);
+async function persistActivation(result: DeviceActivationResult): Promise<DeviceActivationResult> {
   await getInstantClient().auth.signInWithToken(result.token);
   await saveDeviceAuth(result);
   return result;
+}
+
+export async function requestDeviceActivationMagicCode(email: string): Promise<DeviceActivationMagicCodeResult> {
+  const installationId = await getInstallationId();
+  const payload = await activationRequest('/v1/device-activation-codes', { email, installationId });
+  if (
+    !payload ||
+    typeof payload !== 'object' ||
+    !('resendAfterSeconds' in payload) ||
+    typeof payload.resendAfterSeconds !== 'number'
+  ) {
+    throw new Error('Activation worker returned an invalid magic-code response');
+  }
+  return { resendAfterSeconds: payload.resendAfterSeconds };
+}
+
+export async function activateInstantDevice(
+  request: Omit<DeviceActivationRequest, 'installationId'>,
+): Promise<DeviceActivationResponse> {
+  const installationId = await getInstallationId();
+  const payload = await activationRequest('/v1/device-activations', { ...request, installationId });
+  if (!payload || typeof payload !== 'object' || !('status' in payload)) {
+    throw new Error('Activation worker returned an invalid response');
+  }
+  if (payload.status === 'activated' && 'activation' in payload) {
+    return { status: 'activated', activation: await persistActivation(parseActivationResult(payload.activation)) };
+  }
+  if (
+    payload.status === 'venue-selection' &&
+    'selection' in payload &&
+    payload.selection &&
+    typeof payload.selection === 'object' &&
+    'activationChallenge' in payload.selection &&
+    typeof payload.selection.activationChallenge === 'string' &&
+    'venues' in payload.selection &&
+    Array.isArray(payload.selection.venues)
+  ) {
+    const venues = payload.selection.venues.flatMap((venue) =>
+      venue && typeof venue === 'object' && 'id' in venue && 'name' in venue &&
+      typeof venue.id === 'string' && typeof venue.name === 'string'
+        ? [{ id: venue.id, name: venue.name }]
+        : [],
+    );
+    if (venues.length !== payload.selection.venues.length) {
+      throw new Error('Activation worker returned invalid venues');
+    }
+    return {
+      status: 'venue-selection',
+      selection: { activationChallenge: payload.selection.activationChallenge, venues },
+    };
+  }
+  throw new Error('Activation worker returned an invalid response');
+}
+
+export async function completeInstantDeviceActivation(
+  request: CompleteDeviceActivationRequest,
+): Promise<DeviceActivationResult> {
+  const payload = await activationRequest('/v1/device-activations/complete', request);
+  if (
+    !payload ||
+    typeof payload !== 'object' ||
+    !('status' in payload) ||
+    payload.status !== 'activated' ||
+    !('activation' in payload)
+  ) {
+    throw new Error('Activation worker returned an invalid completion response');
+  }
+  return persistActivation(parseActivationResult(payload.activation));
 }

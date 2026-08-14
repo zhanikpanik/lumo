@@ -8,6 +8,7 @@ import { useInstantOrders } from '../store/useInstantOrders';
 import { useInstantVenue } from '../store/useInstantVenue';
 import { useInstantShift } from '../store/useInstantShift';
 import { usePosUiStore } from '../store/posUiStore';
+import { useUserStore } from '../store/userStore';
 
 const PADDING = 8;
 
@@ -15,11 +16,11 @@ export const TablePickerScreen: React.FC<{ navigation?: any; route?: any }> = ({
   const mode: 'new' | 'transfer' = route?.params?.mode || 'transfer';
 
   // ── UI state ─────────────────────────────────────────
-  const { currentOrderId, setCurrentOrderId } = usePosUiStore();
+  const { currentOrderId, setCurrentOrderId, setCreatingOrder } = usePosUiStore();
 
   // ── InstantDB data ───────────────────────────────────
-  const { zones, employees } = useInstantVenue();
-  const currentUser = employees[0]; // TODO: proper current user from auth
+  const { zones } = useInstantVenue();
+  const currentUser = useUserStore((state) => state.currentUser);
   const { openShift: currentShift } = useInstantShift(currentUser?.id);
   const shiftId = currentShift?.id;
   const { orders } = useInstantOrders(shiftId);
@@ -31,10 +32,14 @@ export const TablePickerScreen: React.FC<{ navigation?: any; route?: any }> = ({
 
   const handleSelect = async (table: VenueTable) => {
     if (mode === 'new') {
+      if (!currentUser) { Alert.alert('Ошибка', 'Пользователь не выбран'); return; }
+      if (!shiftId) { Alert.alert('Ошибка', 'Смена не открыта'); return; }
+
+      const operationId = `create-order-${Date.now()}`;
+      setCurrentOrderId(null);
+      setCreatingOrder(true);
+      navigation?.replace('Pos');
       try {
-        if (!currentUser) { Alert.alert('Ошибка', 'Пользователь не выбран'); return; }
-        if (!shiftId) { Alert.alert('Ошибка', 'Смена не открыта'); return; }
-        const operationId = `create-order-${Date.now()}`;
         const result = await createPosOrder({
           operationId,
           actorEmployeeId: currentUser.id,
@@ -46,8 +51,9 @@ export const TablePickerScreen: React.FC<{ navigation?: any; route?: any }> = ({
           orderNumber: table.number,
         });
         setCurrentOrderId(result.orderId);
-        navigation?.replace('Pos', { orderId: result.orderId });
       } catch (e: unknown) {
+        setCreatingOrder(false);
+        navigation?.replace('Orders');
         const msg = e instanceof Error ? e.message : 'Не удалось создать заказ';
         Alert.alert('Ошибка', msg);
       }
@@ -121,7 +127,7 @@ export const TablePickerScreen: React.FC<{ navigation?: any; route?: any }> = ({
                 bgColor,
                 label: isCurrent ? 'Текущий' : order ? 'Занят' : undefined,
                 borderWidth: isCurrent ? 2 : 0,
-                borderColor: '#fff',
+                borderColor: theme.colors.white,
               };
             }}
             onTablePress={handleSelect}
@@ -154,45 +160,95 @@ export const TablePickerScreen: React.FC<{ navigation?: any; route?: any }> = ({
 };
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: theme.colors.background },
-  root: { flex: 1, backgroundColor: theme.colors.background },
-
+  safeArea: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
+  root: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+  },
   header: {
+    height: 56,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: PADDING,
-    paddingVertical: 10,
+    marginTop: 8,
+    marginBottom: 8,
   },
   backBtn: {
-    width: 80,
-    paddingVertical: 8,
+    height: 56,
+    paddingHorizontal: 16,
+    backgroundColor: theme.colors.surfaceLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: theme.borderRadius,
+    minWidth: 120,
   },
-  backText: { color: theme.colors.textPrimary, fontSize: 16, fontFamily: theme.fonts.medium },
-
-  headerCenter: { flex: 1, alignItems: 'center' },
-  headerRight: { width: 80 },
-
-  zoneTabs: { flexDirection: 'row', gap: 6 },
+  backText: {
+    color: theme.colors.textPrimary,
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  headerRight: {
+    width: 80,
+  },
+  zoneTabs: {
+    flexDirection: 'row',
+    gap: 6,
+  },
   zoneTab: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: theme.colors.surface,
+    height: 36,
+    paddingHorizontal: 16,
+    borderRadius: theme.borderRadius,
+    backgroundColor: theme.colors.surfaceLight,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   zoneTabActive: {
     backgroundColor: theme.colors.tabActive,
   },
-  zoneTabText: { color: theme.colors.textSecondary, fontSize: 14, fontFamily: theme.fonts.medium },
-  zoneTabTextActive: {
-    color: '#fff',
+  zoneTabText: {
+    color: theme.colors.textSecondary,
+    fontSize: 16,
+    fontFamily: theme.fonts.medium,
   },
-
-  emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  emptyText: { color: theme.colors.textSecondary, fontSize: 16, fontFamily: theme.fonts.regular },
-
-  legend: { flexDirection: 'row', justifyContent: 'center', gap: 20, paddingVertical: 12 },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  legendDot: { width: 12, height: 12, borderRadius: 6 },
-  legendText: { color: theme.colors.textSecondary, fontSize: 16, fontFamily: theme.fonts.regular },
+  zoneTabTextActive: {
+    color: theme.colors.white,
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyText: {
+    color: theme.colors.textSecondary,
+    fontSize: 16,
+    fontFamily: theme.fonts.regular,
+  },
+  legend: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 24,
+    paddingVertical: 12,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  legendDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  legendText: {
+    color: theme.colors.textSecondary,
+    fontSize: 16,
+    fontFamily: theme.fonts.regular,
+  },
 });

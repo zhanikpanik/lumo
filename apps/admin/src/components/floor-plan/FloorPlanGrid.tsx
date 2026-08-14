@@ -6,6 +6,7 @@ import { DraggableTable } from './DraggableTable';
 import { AddTableModal } from './AddTableModal';
 import type { FloorTable } from '../../../types/floor-plan';
 import { toast } from 'sonner';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 const CELL_SIZE = 36;
 const GRID_COLS = 24;
@@ -36,6 +37,7 @@ export function FloorPlanGrid() {
  const [renameValue, setRenameValue] = useState('');
  const [creating, setCreating] = useState(false);
  const [newZoneName, setNewZoneName] = useState('');
+ const [zoneToDelete, setZoneToDelete] = useState<ZoneItem | null>(null);
  const renameRef = useRef<HTMLInputElement>(null);
  const createRef = useRef<HTMLInputElement>(null);
  const menuRef = useRef<HTMLDivElement>(null);
@@ -100,14 +102,16 @@ export function FloorPlanGrid() {
   setRenamingId(null);
  }
 
- async function handleDeleteZone(id: string) {
-  if (!confirm('Удалить зал? Столы этого зала будут удалены.')) return;
+ async function handleDeleteZone() {
+  const zone = zoneToDelete;
+  if (!zone) return;
   try {
-   await deleteZone(id);
+   await deleteZone(zone.id);
    toast.success('Зал удален');
-   if (activeZoneId === id) {
-    setActiveZoneId(zones.find(z => z.id !== id)?.id ?? null);
+   if (activeZoneId === zone.id) {
+    setActiveZoneId(zones.find(candidate => candidate.id !== zone.id)?.id ?? null);
    }
+   setZoneToDelete(null);
   } catch (e) {
    toast.error((e as Error)?.message || 'Не удалось удалить зал');
   }
@@ -287,7 +291,7 @@ export function FloorPlanGrid() {
     setRenameValue={setRenameValue}
     onStartRename={startRename}
     onSubmitRename={submitRename}
-    onDeleteZone={handleDeleteZone}
+    onDeleteZone={(id) => setZoneToDelete(zones.find(zone => zone.id === id) ?? null)}
     creating={creating}
     newZoneName={newZoneName}
     setNewZoneName={setNewZoneName}
@@ -298,6 +302,7 @@ export function FloorPlanGrid() {
     menuRef={menuRef}
    />
 
+   <div className="-mx-4 overflow-x-auto px-4 pb-2">
    <div
     ref={gridRef}
     className="relative border border-border rounded-lg bg-background select-none"
@@ -307,7 +312,7 @@ export function FloorPlanGrid() {
     }}
    >
     {/* Grid lines */}
-    <svg className="absolute inset-0 w-full h-full pointer-events-none">
+    <svg className="absolute inset-0 w-full h-full pointer-events-none text-border">
      {Array.from({ length: GRID_COLS + 1 }, (_, i) => (
       <line
        key={`v-${i}`}
@@ -315,7 +320,7 @@ export function FloorPlanGrid() {
        y1={0}
        x2={i * CELL_SIZE}
        y2={GRID_ROWS * CELL_SIZE}
-       stroke="#e5e5e5"
+       stroke="currentColor"
        strokeWidth={1}
       />
      ))}
@@ -326,7 +331,7 @@ export function FloorPlanGrid() {
        y1={i * CELL_SIZE}
        x2={GRID_COLS * CELL_SIZE}
        y2={i * CELL_SIZE}
-       stroke="#e5e5e5"
+       stroke="currentColor"
        strokeWidth={1}
       />
      ))}
@@ -352,6 +357,7 @@ export function FloorPlanGrid() {
      ))}
     </div>
    </div>
+   </div>
 
    {isModalOpen && (
     <AddTableModal
@@ -364,6 +370,16 @@ export function FloorPlanGrid() {
      editingTable={editingTable}
      onAdd={({ name, shape }) => addTable(name, shape)}
      onEdit={(id, updates) => updateTable(id, updates)}
+    />
+   )}
+   {zoneToDelete && (
+    <ConfirmDialog
+     title={`Удалить зал «${zoneToDelete.name}»?`}
+     description="Все столы этого зала также будут удалены. Это действие нельзя отменить."
+     confirmLabel="Удалить зал"
+     destructive
+     onConfirm={handleDeleteZone}
+     onCancel={() => setZoneToDelete(null)}
     />
    )}
   </div>

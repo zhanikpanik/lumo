@@ -7,7 +7,7 @@ import {
   View,
 } from 'react-native';
 import { CrossIcon, ChevronDownIcon, ChevronUpIcon, SomIcon } from './Icons';
-import { Feather } from '../components/Feather';
+import { Feather } from '@expo/vector-icons';
 import { theme } from '../theme/colors';
 import { useUserStore } from '../store/userStore';
 import { useInstantShift } from '../store/useInstantShift';

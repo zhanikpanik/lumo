@@ -375,14 +375,16 @@ export const PaidCheckScreen: React.FC<{ navigation?: any }> = ({ navigation }) 
                 )}
                 {closedOrders.map((o) => {
                   const isRefunded = refundedOrderIds.has(o.id);
+                  const isSelected = selectedOrder?.id === o.id;
                   return (
                   <TouchableOpacity
                     key={o.id}
                     style={[
                       styles.listRow,
-                      selectedOrder?.id === o.id && styles.listRowSelected,
                       o.status === 'cancelled' && styles.listRowCancelled,
+                      isSelected && styles.listRowSelected,
                     ]}
+                    accessibilityState={{ selected: isSelected }}
                     onPress={() => setSelectedOrder(o)}
                     activeOpacity={0.7}
                   >
@@ -406,7 +408,7 @@ export const PaidCheckScreen: React.FC<{ navigation?: any }> = ({ navigation }) 
                           {orderListPreview(o)}
                         </Text>
                         <LinearGradient
-                          colors={[selectedOrder?.id === o.id ? 'transparent' : 'transparent', selectedOrder?.id === o.id ? theme.colors.surfaceLight : theme.colors.surface]}
+                          colors={['transparent', isSelected ? theme.colors.accentTint : theme.colors.surface]}
                           start={{ x: 0, y: 0 }}
                           end={{ x: 1, y: 0 }}
                           style={styles.listRowFade}
@@ -654,7 +656,12 @@ const styles = StyleSheet.create({
     marginBottom: 2,
     gap: 2,
   },
-  listRowSelected: { backgroundColor: theme.colors.surfaceLight },
+  listRowSelected: {
+    backgroundColor: theme.colors.accentTint,
+    borderWidth: 2,
+    borderColor: theme.colors.accent,
+    opacity: 1,
+  },
   listRowCancelled: { opacity: 0.6 },
   listRowTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   listRowNum: { color: theme.colors.textPrimary, fontSize: 16, fontFamily: theme.fonts.medium },

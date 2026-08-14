@@ -1,6 +1,7 @@
 import { getInstantClient } from '@/data/instant';
 import { adminDishesWithRecipesQuery } from '@lumo/data';
 import { useVenueId } from './useVenueId';
+import { instantOne } from '@/lib/instantLink';
 
 export interface DishRecipeLine {
   id: string;
@@ -45,21 +46,25 @@ export function useInstantDishesDetailed() {
   const result = db.useQuery(adminDishesWithRecipesQuery(venueId));
 
   const data: DishProduct[] = (result.data?.products ?? []).map(p => {
-    const recipeItems: DishRecipeLine[] = (p.recipeItems ?? []).map(ri => ({
-      id: ri.id,
-      ingredient_id: ri.ingredient?.id ?? '',
-      quantity: (ri.quantityMilli ?? 0) / 1000,
-      unit: ri.unit ?? '',
-      ingredient_name: ri.ingredient?.name ?? '—',
-      ingredient_cost: recipeIngredientCost(ri.quantityMilli ?? 0, ri.ingredient?.costTiyin ?? 0),
-    }));
+    const category = instantOne(p.category);
+    const recipeItems: DishRecipeLine[] = (p.recipeItems ?? []).map(ri => {
+      const ingredient = instantOne(ri.ingredient);
+      return {
+        id: ri.id,
+        ingredient_id: ingredient?.id ?? '',
+        quantity: (ri.quantityMilli ?? 0) / 1000,
+        unit: ri.unit ?? '',
+        ingredient_name: ingredient?.name ?? '—',
+        ingredient_cost: recipeIngredientCost(ri.quantityMilli ?? 0, ingredient?.costTiyin ?? 0),
+      };
+    });
 
     return {
       id: p.id,
       name: p.name,
       price: (p.priceTiyin ?? 0) / 100,
       cost_price: (p.costTiyin ?? 0) / 100,
-      category_id: p.category?.id ?? '',
+      category_id: category?.id ?? '',
       workshop_id: null,
       output_weight: null,
       is_active: p.status === 'active',
@@ -67,7 +72,7 @@ export function useInstantDishesDetailed() {
       sort_order: p.sortOrder ?? 0,
       recipe_count: recipeItems.length,
       recipe_items: recipeItems,
-      category_name: p.category?.name ?? '',
+      category_name: category?.name ?? '',
       workshop_name: '',
     };
   });

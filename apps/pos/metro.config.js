@@ -6,6 +6,11 @@ const monorepoRoot = path.resolve(projectRoot, '../..');
 const dataRoot = path.resolve(monorepoRoot, 'packages/data');
 const dataEntry = path.resolve(dataRoot, 'src/index.ts');
 const uuidEntry = path.resolve(dataRoot, 'node_modules/uuid/dist/index.js');
+const reactEntries = new Map([
+  ['react', require.resolve('react', { paths: [projectRoot] })],
+  ['react/jsx-runtime', require.resolve('react/jsx-runtime', { paths: [projectRoot] })],
+  ['react/jsx-dev-runtime', require.resolve('react/jsx-dev-runtime', { paths: [projectRoot] })],
+]);
 
 const config = getDefaultConfig(projectRoot);
 
@@ -22,6 +27,14 @@ config.resolver.extraNodeModules = {
 // @lumo/data publishes TypeScript source. Resolve its entry explicitly because
 // Expo 52's Metro cannot reliably follow pnpm's workspace symlink + exports map.
 config.resolver.resolveRequest = (context, moduleName, platform) => {
+  // The workspace also contains React 19 for admin. Dependencies resolved from
+  // pnpm's root store can otherwise mix React 19 JSX elements into this React
+  // 18 Expo bundle, which ReactDOM rejects as invalid children.
+  const reactEntry = reactEntries.get(moduleName);
+  if (reactEntry) {
+    return { type: 'sourceFile', filePath: reactEntry };
+  }
+
   if (moduleName === '@lumo/data') {
     return { type: 'sourceFile', filePath: dataEntry };
   }

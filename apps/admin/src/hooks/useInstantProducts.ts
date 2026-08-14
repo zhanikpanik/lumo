@@ -1,6 +1,7 @@
 import { getInstantClient } from '@/data/instant';
 import { adminProductsQuery } from '@lumo/data';
 import { useVenueId } from './useVenueId';
+import { instantOne } from '@/lib/instantLink';
 
 export interface InstantProduct {
   id: string;
@@ -29,8 +30,8 @@ export function useInstantProducts() {
     unit: p.unit,
     sortOrder: p.sortOrder,
     status: p.status,
-    categoryId: p.category?.id ?? null,
-    categoryName: p.category?.name ?? null,
+    categoryId: instantOne(p.category)?.id ?? null,
+    categoryName: instantOne(p.category)?.name ?? null,
   }));
 
   return { data, isLoading: result.isLoading, error: result.error };

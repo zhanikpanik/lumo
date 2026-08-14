@@ -28,10 +28,11 @@ export function useInstantOrderEditor({ orderId, actorEmployeeId, currentOrder }
         actorEmployeeId,
         productId: item.product.id,
         quantity: item.quantity,
+        modifierIds: item.modifiers.map((modifier) => modifier.sourceModifierId ?? modifier.id),
         guestNumber: 1,
         comment: item.comment,
       });
-      console.log('addOrderLine result:', result);
+      return result;
     } catch (e) {
       console.error('addOrderLine failed:', e);
       throw e;
@@ -55,13 +56,13 @@ export function useInstantOrderEditor({ orderId, actorEmployeeId, currentOrder }
     }
   }, [orderId, actorEmployeeId]);
 
-  const deleteCurrentOrder = useCallback(async () => {
-    if (!orderId) return;
+  const deleteCurrentOrder = useCallback(async (targetOrderId = orderId) => {
+    if (!targetOrderId) return;
     const operationId = `cancel-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     try {
       const result = await cancelPosOrder({
         operationId,
-        orderId,
+        orderId: targetOrderId,
         actorEmployeeId,
         closeReason: 'deleted',
       });

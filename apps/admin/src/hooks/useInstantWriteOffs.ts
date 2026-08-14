@@ -5,6 +5,7 @@ import {
   type WriteOffSnapshot,
 } from '@lumo/data';
 import { useVenueId } from './useVenueId';
+import { instantRecord } from '@/lib/instantLink';
 
 export interface InstantWriteOff {
   id: string;
@@ -39,11 +40,11 @@ function toDate(v: string | number): string {
 }
 
 function linkedId(entity: unknown): string {
-  return entity && typeof entity === 'object' ? String((entity as Record<string, unknown>).id ?? '') : '';
+  return String(instantRecord(entity)?.id ?? '');
 }
 
 function linkedName(entity: unknown): string {
-  return entity && typeof entity === 'object' ? String((entity as Record<string, unknown>).name ?? '') : '';
+  return String(instantRecord(entity)?.name ?? '');
 }
 
 export function useInstantWriteOffs(warehouseId?: string, limit = 50) {

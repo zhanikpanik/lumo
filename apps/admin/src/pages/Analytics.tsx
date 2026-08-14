@@ -39,39 +39,37 @@ export function AnalyticsPage() {
   const { data: topItems, isPending: topPending } = useTopItems(start, queryEnd);
 
   return (
-    <div className="p-8">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h2 className="text-2xl font-bold mb-1">Аналитика</h2>
-          <p className="text-sm text-muted-foreground">Alto Coffee Bishkek</p>
-        </div>
-        <PeriodPicker start={start} end={end} onChange={(s, e) => { setStart(s); setEnd(e); }} />
+    <div className="page-shell">{/* Header */}
+    <div className="flex items-start justify-between mb-6">
+      <div>
+        <h2 className="text-2xl font-bold mb-1">Аналитика</h2>
+        <p className="text-sm text-muted-foreground">Alto Coffee Bishkek</p>
       </div>
-
-      {/* Summary KPI */}
-      <SummaryBar data={monthlyData ?? []} isPending={monthlyPending} />
-
-      {/* Full width: Revenue chart */}
-      <div className="mb-6">
-        <MonthlyRevenueChart data={monthlyData ?? []} isPending={monthlyPending} />
-      </div>
-
-      {/* 2-col: Heatmap + Weekly comparison */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <HourlyHeatmap data={heatmapData ?? []} isPending={heatmapPending} />
-        <WeeklyComparison weeks={weeklyData ?? []} isPending={weeklyPending} />
-      </div>
-
-      {/* 2-col: Top items + Expense treemap */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <TopItems
-          dishes={topItems?.dishes ?? []}
-          ingredients={topItems?.ingredients ?? []}
-          isPending={topPending}
-        />
-        <ExpenseTreemap categories={expenseCategories ?? []} isPending={expensePending} />
-      </div>
+      <PeriodPicker start={start} end={end} onChange={(s, e) => { setStart(s); setEnd(e); }} />
     </div>
+    
+    {/* Summary KPI */}
+    <SummaryBar data={monthlyData ?? []} isPending={monthlyPending} />
+    
+    {/* Full width: Revenue chart */}
+    <div className="mb-6">
+      <MonthlyRevenueChart data={monthlyData ?? []} isPending={monthlyPending} />
+    </div>
+    
+    {/* 2-col: Heatmap + Weekly comparison */}
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <HourlyHeatmap data={heatmapData ?? []} isPending={heatmapPending} />
+      <WeeklyComparison weeks={weeklyData ?? []} isPending={weeklyPending} />
+    </div>
+    
+    {/* 2-col: Top items + Expense treemap */}
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <TopItems
+        dishes={topItems?.dishes ?? []}
+        ingredients={topItems?.ingredients ?? []}
+        isPending={topPending}
+      />
+      <ExpenseTreemap categories={expenseCategories ?? []} isPending={expensePending} />
+    </div></div>
   );
 }

@@ -4,7 +4,7 @@ import {
   clearOfflinePinState,
   loadOfflineEmployees,
   registerUnlockAttempt,
-  unlockLockedUntil,
+  pendingUnlockAttempts,
 } from '../data/offlinePinState.web';
 import type { OfflineEmployee } from '../data/employeePin';
 
@@ -35,13 +35,12 @@ test('revoking device auth clears cached offline verifiers', async () => {
   await expect(loadOfflineEmployees(venueId, now)).resolves.toEqual([]);
 });
 
-test('five wrong PIN attempts lock the terminal for fifteen minutes', async () => {
-  const venueId = 'lockout-venue';
-  for (let attempt = 0; attempt < 4; attempt += 1) {
-    await expect(registerUnlockAttempt(venueId, 'failure', undefined, now + attempt)).resolves.toBeNull();
+test('wrong PIN attempts remain auditable without blocking the terminal', async () => {
+  const venueId = 'repeated-failure-venue';
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    await registerUnlockAttempt(venueId, 'failure', undefined, now + attempt);
   }
-  const lockedUntil = await registerUnlockAttempt(venueId, 'failure', undefined, now + 4);
-  expect(Date.parse(lockedUntil!)).toBe(now + 4 + 15 * 60 * 1000);
-  await expect(unlockLockedUntil(venueId, now + 15 * 60 * 1000)).resolves.toBe(lockedUntil);
-  await expect(unlockLockedUntil(venueId, now + 15 * 60 * 1000 + 5)).resolves.toBeNull();
+  const attempts = await pendingUnlockAttempts(venueId);
+  expect(attempts).toHaveLength(6);
+  expect(attempts.every(({ outcome }) => outcome === 'failure')).toBe(true);
 });

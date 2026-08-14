@@ -1,13 +1,16 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Menu, MoreHorizontal } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useAuth } from '@/auth/useAuth';
 import { useInstantWarehouses } from '@/hooks/useInstantWarehouses';
 import { useInstantCreateWarehouse, useInstantUpdateWarehouse, useInstantDeleteWarehouse } from '@/hooks/useInstantWarehouseMutations';
 import { useInstantShifts } from '@/hooks/useInstantShifts';
 import { toast } from 'sonner';
 import { SvgIcon } from '@/components/dashboard/SvgIcon';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { TextInputDialog } from '@/components/ui/TextInputDialog';
 import iconOverview from '@/assets/icons/eye.svg?raw';
 import iconSales from '@/assets/icons/wallet.svg?raw';
 import iconMenu from '@/assets/icons/tableware.svg?raw';
@@ -72,7 +75,7 @@ const navItems: NavItem[] = [
 ];
 
 export function Layout() {
- const { signOut } = useAuth();
+ const { signOut, venueName } = useAuth();
  const navigate = useNavigate();
  const location = useLocation();
   const { data: warehouses = [] } = useInstantWarehouses();
@@ -81,62 +84,57 @@ export function Layout() {
   const deleteWarehouse = useInstantDeleteWarehouse();
  const { data: shifts } = useInstantShifts();
  const activeShift = shifts.find((shift) => shift.status === 'open');
- const [openMenuId, setOpenMenuId] = useState<string | null>(null);
  const [sidebarOpen, setSidebarOpen] = useState(false);
- const menuRef = useRef<HTMLDivElement>(null);
+ const [warehouseNameDialog, setWarehouseNameDialog] = useState<
+  { mode: 'create' } | { mode: 'rename'; id: string; currentName: string } | null
+ >(null);
+ const [warehouseToDelete, setWarehouseToDelete] = useState<{ id: string; name: string } | null>(null);
 
  // Auto-close sidebar on navigation (mobile)
  useEffect(() => {
   setSidebarOpen(false);
  }, [location.pathname]);
 
- // Close warehouse context menu on outside click
  useEffect(() => {
-  if (!openMenuId) return;
-  const handler = (e: MouseEvent) => {
-   if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-    setOpenMenuId(null);
-   }
+  if (!sidebarOpen) return;
+  const previousOverflow = document.body.style.overflow;
+  document.body.style.overflow = 'hidden';
+  return () => {
+   document.body.style.overflow = previousOverflow;
   };
-  document.addEventListener('mousedown', handler);
-  return () => document.removeEventListener('mousedown', handler);
- }, [openMenuId]);
+ }, [sidebarOpen]);
 
- async function handleCreateWarehouseFromSidebar() {
-  const name = window.prompt('Название нового склада')?.trim();
-  if (!name) return;
+
+ async function handleWarehouseName(name: string) {
+  const dialog = warehouseNameDialog;
+  if (!dialog) return;
   try {
-   await createWarehouse.create({ operationId: crypto.randomUUID(), name });
-   toast.success('Склад создан');
+   if (dialog.mode === 'create') {
+    await createWarehouse.create({ operationId: crypto.randomUUID(), name });
+    toast.success('Склад создан');
+   } else if (name !== dialog.currentName) {
+    await renameWarehouse.update(dialog.id, { name });
+    toast.success('Склад переименован');
+   }
+   setWarehouseNameDialog(null);
   } catch (e) {
-   toast.error((e as Error)?.message || 'Не удалось создать склад');
+   toast.error((e as Error)?.message || 'Не удалось сохранить склад');
   }
  }
 
- async function handleRenameWarehouse(id: string, currentName: string) {
-  const name = window.prompt('Новое название склада', currentName)?.trim();
-  if (!name || name === currentName) return;
+ async function handleDeleteWarehouse() {
+  const candidate = warehouseToDelete;
+  if (!candidate) return;
   try {
-   await renameWarehouse.update(id, { name });
-   toast.success('Склад переименован');
-  } catch (e) {
-   toast.error((e as Error)?.message || 'Не удалось переименовать');
-  }
-  setOpenMenuId(null);
- }
-
- async function handleDeleteWarehouse(id: string) {
-  if (!confirm('Удалить склад? Разрешено только если нет остатков и активных документов.')) return;
-  try {
-   await deleteWarehouse.remove(id);
+   await deleteWarehouse.remove(candidate.id);
    toast.success('Склад удален');
-   if (location.pathname.startsWith(`/warehouse/${id}`)) {
+   if (location.pathname.startsWith(`/warehouse/${candidate.id}`)) {
     navigate('/warehouse/operations');
    }
+   setWarehouseToDelete(null);
   } catch (e) {
    toast.error((e as Error)?.message || 'Не удалось удалить склад');
   }
-  setOpenMenuId(null);
  }
 
  const isChildActive = (item: NavItem) => {
@@ -160,16 +158,22 @@ export function Layout() {
    {/* Sidebar — Notion-style */}
    <aside
     className={cn(
-     'fixed inset-y-0 left-0 z-40 w-60 bg-[#F9F8F7] border-r border-border flex flex-col select-none transition-transform duration-200',
+     'fixed inset-y-0 left-0 z-40 w-60 bg-muted/40 border-r border-border flex flex-col select-none transition-transform duration-200',
      'md:static md:translate-x-0',
      sidebarOpen ? 'translate-x-0' : '-translate-x-full',
     )}
    >
-    <div className="px-3 pt-3 pb-2">
-     <h1 className="text-sm font-semibold px-2 py-1">r_keeper</h1>
+    <div className="px-3 pt-3 pb-3">
+     <div className="flex items-center gap-2 px-2 py-1">
+      <span className="flex size-7 items-center justify-center rounded-lg bg-primary text-xs font-bold text-primary-foreground">L</span>
+      <div className="min-w-0">
+       <h1 className="text-sm font-semibold leading-tight">Lumo</h1>
+       <p className="truncate text-xs text-muted-foreground">{venueName || 'Alto Coffee Bishkek'}</p>
+      </div>
+     </div>
     </div>
 
-    <nav className="flex-1 px-3 space-y-3">
+    <nav className="sidebar-nav min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 space-y-3">
      {navItems.map((item) => {
       if (item.children) {
        const isActive = isChildActive(item);
@@ -179,7 +183,7 @@ export function Layout() {
          <div
           className={cn(
            'flex items-center gap-0.5 px-2 py-1 rounded text-sm font-medium',
-           isActive ? 'text-[#37352f]' : 'text-[#9b9a97]'
+           isActive ? 'text-foreground' : 'text-muted-foreground'
           )}
          >
           {GROUP_ICONS[item.to] && (
@@ -196,10 +200,10 @@ export function Layout() {
             end={child.to === '/' || child.to === '/menu'}
             className={({ isActive }) =>
              cn(
-              'block px-2 py-1 rounded text-sm transition-colors',
+              'flex min-h-11 items-center px-2 py-1 rounded text-sm transition-colors md:min-h-0 md:block',
               isActive
-               ? 'bg-[#efefee] text-[#37352f]'
-               : 'text-[#37352f] hover:bg-[#efefee]'
+               ? 'bg-accent text-foreground'
+               : 'text-foreground hover:bg-accent'
              )
             }
            >
@@ -211,51 +215,49 @@ export function Layout() {
             {warehouses.map((warehouse) => {
              return (
              <div key={warehouse.id} className={cn(
-              'group relative flex items-center px-2 py-1 rounded transition-colors hover:bg-[#efefee]'
+              'group relative flex min-h-11 items-center px-2 py-1 rounded transition-colors hover:bg-accent md:min-h-0'
              )}>
-              <span className="flex-1 text-sm text-[#9b9a97] select-none">{warehouse.name}</span>
-              <button
-               type="button"
-               onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setOpenMenuId(openMenuId === warehouse.id ? null : warehouse.id);
-               }}
-               className={cn(
-                'shrink-0 px-1 py-0.5 rounded text-[#9b9a97] hover:bg-[#e8e7e4] hover:text-[#37352f] transition-colors',
-                openMenuId === warehouse.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-               )}
-              >
-               <MoreHorizontal className="w-3.5 h-3.5" />
-              </button>
-              {openMenuId === warehouse.id && (
-               <div
-                ref={menuRef}
-                className="absolute left-0 top-full mt-1 z-30 bg-white border border-[#F0EFED] rounded-lg shadow-lg py-1 min-w-[180px]"
-               >
+              <span className="flex-1 text-sm text-muted-foreground select-none">{warehouse.name}</span>
+              <DropdownMenu.Root>
+               <DropdownMenu.Trigger asChild>
                 <button
                  type="button"
-                 onClick={() => handleRenameWarehouse(warehouse.id, warehouse.name)}
-                 className="w-full text-left px-3 py-1.5 text-sm text-[#37352f] hover:bg-[#efefee] transition-colors"
+                 className="flex size-11 shrink-0 items-center justify-center rounded text-muted-foreground opacity-100 transition-colors hover:bg-accent hover:text-foreground md:size-auto md:px-1 md:py-0.5 md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100 data-[state=open]:opacity-100"
+                 aria-label={`Действия со складом ${warehouse.name}`}
                 >
-                 Переименовать
+                 <MoreHorizontal className="w-3.5 h-3.5" />
                 </button>
-                <button
-                 type="button"
-                 onClick={() => handleDeleteWarehouse(warehouse.id)}
-                 className="w-full text-left px-3 py-1.5 text-sm text-red-600 hover:bg-[#efefee] transition-colors"
+               </DropdownMenu.Trigger>
+               <DropdownMenu.Portal>
+                <DropdownMenu.Content
+                 side="right"
+                 align="start"
+                 sideOffset={8}
+                 collisionPadding={12}
+                 className="z-50 min-w-[180px] rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-lg"
                 >
-                 Удалить
-                </button>
-               </div>
-              )}
+                 <DropdownMenu.Item
+                  onSelect={() => setWarehouseNameDialog({ mode: 'rename', id: warehouse.id, currentName: warehouse.name })}
+                  className="flex min-h-11 cursor-pointer items-center rounded-md px-3 text-sm outline-none focus:bg-accent"
+                 >
+                  Переименовать
+                 </DropdownMenu.Item>
+                 <DropdownMenu.Item
+                  onSelect={() => setWarehouseToDelete({ id: warehouse.id, name: warehouse.name })}
+                  className="flex min-h-11 cursor-pointer items-center rounded-md px-3 text-sm text-destructive outline-none focus:bg-accent"
+                 >
+                  Удалить
+                 </DropdownMenu.Item>
+                </DropdownMenu.Content>
+               </DropdownMenu.Portal>
+              </DropdownMenu.Root>
              </div>
              );
             })}
             <button
              type="button"
-             onClick={handleCreateWarehouseFromSidebar}
-             className="w-full px-2 py-1 rounded text-sm text-[#9b9a97] hover:bg-[#efefee] hover:text-[#37352f] transition-colors text-left"
+             onClick={() => setWarehouseNameDialog({ mode: 'create' })}
+             className="min-h-11 w-full px-2 py-1 rounded text-sm text-muted-foreground hover:bg-accent hover:text-foreground transition-colors text-left md:min-h-0"
             >
              + Новый склад
             </button>
@@ -273,9 +275,9 @@ export function Layout() {
      {activeShift ? (
       <NavLink
        to={`/cash-shifts?shift=${activeShift.id}`}
-       className="flex items-center gap-2 px-2 py-1.5 rounded text-xs text-[#9b9a97] hover:bg-[#efefee] hover:text-[#37352f] transition-colors"
+       className="flex min-h-11 items-center gap-2 px-2 py-1.5 rounded text-xs text-muted-foreground hover:bg-accent hover:text-foreground transition-colors md:min-h-0"
       >
-       <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />
+       <span className="w-1.5 h-1.5 rounded-full bg-success shrink-0" />
        <span className="truncate">
         Смена открыта ({new Date(activeShift.openedAt).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })})
        </span>
@@ -283,20 +285,19 @@ export function Layout() {
      ) : (
       <NavLink
        to="/cash-shifts"
-       className="flex items-center gap-2 px-2 py-1.5 rounded text-xs text-[#9b9a97] hover:bg-[#efefee] hover:text-[#37352f] transition-colors"
+       className="flex min-h-11 items-center gap-2 px-2 py-1.5 rounded text-xs text-muted-foreground hover:bg-accent hover:text-foreground transition-colors md:min-h-0"
       >
-       <span className="w-1.5 h-1.5 rounded-full bg-[#d4d2ce] shrink-0" />
+       <span className="w-1.5 h-1.5 rounded-full bg-border shrink-0" />
        <span>Нет активной смены</span>
       </NavLink>
      )}
     </div>
 
-    <div className="p-4 text-xs text-[#9b9a97]">
-     <p>Alto Coffee Bishkek</p>
+    <div className="p-4 text-xs text-muted-foreground">
      <button
       type="button"
       onClick={() => void signOut()}
-      className="mt-1 block hover:text-[#37352f] transition-colors"
+      className="min-h-11 hover:text-foreground transition-colors md:min-h-0"
      >
       Выйти
      </button>
@@ -304,18 +305,43 @@ export function Layout() {
    </aside>
 
    {/* Main content */}
-   <main className="flex-1 overflow-y-auto">
-    {/* Mobile hamburger */}
-    <button
-     type="button"
-     onClick={() => setSidebarOpen(true)}
-     className="md:hidden fixed top-3 left-3 z-50 p-2 rounded-md bg-background border border-border shadow-sm hover:bg-muted transition-colors"
-     aria-label="Открыть меню"
-    >
-     <Menu className="w-5 h-5" />
-    </button>
+   <main className="flex-1 overflow-y-auto pt-[calc(3.5rem+env(safe-area-inset-top))] md:pt-0">
+    <header className="fixed inset-x-0 top-0 z-30 flex h-[calc(3.5rem+env(safe-area-inset-top))] items-end gap-2 border-b bg-background px-3 pb-1.5 md:hidden">
+     <button
+      type="button"
+      onClick={() => setSidebarOpen(true)}
+      className="flex size-11 items-center justify-center rounded-lg hover:bg-muted transition-colors"
+      aria-label="Открыть меню"
+     >
+      <Menu className="w-5 h-5" />
+     </button>
+     <div className="min-w-0 pb-1.5">
+      <p className="text-sm font-semibold leading-tight">Lumo</p>
+      <p className="truncate text-xs text-muted-foreground">{venueName || 'Alto Coffee Bishkek'}</p>
+     </div>
+    </header>
     <Outlet />
    </main>
+   {warehouseNameDialog && (
+    <TextInputDialog
+     title={warehouseNameDialog.mode === 'create' ? 'Новый склад' : 'Переименовать склад'}
+     label="Название"
+     initialValue={warehouseNameDialog.mode === 'rename' ? warehouseNameDialog.currentName : ''}
+     submitLabel={warehouseNameDialog.mode === 'create' ? 'Создать' : 'Сохранить'}
+     onSubmit={handleWarehouseName}
+     onClose={() => setWarehouseNameDialog(null)}
+    />
+   )}
+   {warehouseToDelete && (
+    <ConfirmDialog
+     title={`Удалить «${warehouseToDelete.name}»?`}
+     description="Удаление возможно только если на складе нет остатков и активных документов. Это действие нельзя отменить."
+     confirmLabel="Удалить склад"
+     destructive
+     onConfirm={handleDeleteWarehouse}
+     onCancel={() => setWarehouseToDelete(null)}
+    />
+   )}
   </div>
  );
 }

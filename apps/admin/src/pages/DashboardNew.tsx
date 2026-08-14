@@ -220,7 +220,7 @@ export function Dashboard() {
                         <span className="text-2xl font-bold text-foreground truncate">
                           {metric.format === 'percent' ? `${metric.todayValue}%` : fmtSom(metric.todayValue)}
                         </span>
-                        {metric.format === 'som' && <span className="text-sm text-foreground shrink-0">с</span>}
+                        {metric.format === 'som' && <span className="text-sm text-foreground shrink-0">сом</span>}
                       </div>
                       {metric.todayTrend != null && (() => {
                         const v = metric.todayTrend.value;
@@ -241,15 +241,15 @@ export function Dashboard() {
 
           {/* Period row */}
           <div>
-            <div className="flex items-center gap-3 mb-3">
+            <div className="mb-3 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3">
               <SegmentTabs options={PERIOD_OPTIONS} value={period} onChange={(v) => { setPeriod(v); setPeriodOffset(0); }} />
               <div className="flex items-center gap-2">
-                <button type="button" onClick={() => setPeriodOffset((o) => o - 1)} className="p-1 rounded hover:bg-muted transition-colors" title="Предыдущий">
+                <button type="button" onClick={() => setPeriodOffset((o) => o - 1)} className="flex size-11 items-center justify-center rounded hover:bg-muted transition-colors md:size-6" aria-label="Предыдущий период">
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 3L5 7l4 4"/></svg>
                 </button>
                 <span className="text-sm text-foreground font-medium tabular-nums select-none">{formatPeriodRange(period, periodOffset)}</span>
                 <button type="button" onClick={() => setPeriodOffset((o) => Math.min(0, o + 1))} disabled={periodOffset >= 0}
-                  className="p-1 rounded hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-default" title="Следующий">
+                  className="flex size-11 items-center justify-center rounded hover:bg-muted transition-colors disabled:opacity-30 disabled:cursor-default md:size-6" aria-label="Следующий период">
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M5 3l4 4-4 4"/></svg>
                 </button>
               </div>
@@ -263,7 +263,7 @@ export function Dashboard() {
                       <span className="text-2xl font-bold text-foreground truncate">
                         {metric.format === 'percent' ? `${metric.periodValue}%` : fmtSom(metric.periodValue)}
                       </span>
-                      {metric.format === 'som' && <span className="text-sm text-muted-foreground shrink-0">с</span>}
+                      {metric.format === 'som' && <span className="text-sm text-muted-foreground shrink-0">сом</span>}
                     </div>
                     {sparklineDailyData && sparklineDailyData[i] && (
                       <div className="mt-1">

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Feather } from '../components/Feather';
+import { Feather } from '@expo/vector-icons';
 import { ExclamationIcon, TrashIcon, CrossIcon } from './Icons';
 import { theme } from '../theme/colors';
 

@@ -135,45 +135,43 @@ export function Menu() {
   const showEmptyState = !menuPending && !menuError && filteredProducts.length === 0;
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold">Блюда</h2>
-        <AddButton onClick={() => navigate('/menu/dish/new')} label="Добавить блюдо" />
-      </div>
-
-      {/* Search + category filter */}
-      <div className="flex items-center gap-2 mb-4">
-        <SearchInput value={search} onChange={setSearch} className="w-56" />
-        <SegmentTabs
-          options={[
-            { value: 'all', label: 'Все' },
-            ...categories.map((cat) => ({ value: cat.id, label: cat.name })),
-          ]}
-          value={selectedCategory ?? 'all'}
-          onChange={(v) => setSelectedCategory(v === 'all' ? null : v)}
-        />
-      </div>
-
-      {showEmptyState ? (
-        <EmptyState
-          title={emptyMessage}
-          hint={search.trim() ? 'Попробуйте изменить поисковый запрос' : 'Добавьте первое блюдо, чтобы начать составлять меню'}
-          action={!search.trim() ? { label: 'Добавить блюдо', onClick: () => navigate('/menu/dish/new') } : undefined}
-        />
-      ) : (
-        <DataTable
-          data={filteredProducts}
-          columns={columns}
-          dense
-          isLoading={menuPending}
-          error={menuError ? new Error(menuErrorMessage) : null}
-          renderExpandedRow={renderRecipeRow}
-          expandedRows={expandedRecipe}
-          onExpandedChange={handleExpand}
-          getRowClassName={(row) => !row.original.is_active ? 'opacity-50' : ''}
-          className="max-w-4xl"
-        />
-      )}
+    <div className="page-shell"><div className="flex items-center justify-between mb-6">
+      <h2 className="text-2xl font-bold">Блюда</h2>
+      <AddButton onClick={() => navigate('/menu/dish/new')} label="Добавить блюдо" />
     </div>
+    
+    {/* Search + category filter */}
+    <div className="flex items-center gap-2 mb-4">
+      <SearchInput value={search} onChange={setSearch} className="w-56" />
+      <SegmentTabs
+        options={[
+          { value: 'all', label: 'Все' },
+          ...categories.map((cat) => ({ value: cat.id, label: cat.name })),
+        ]}
+        value={selectedCategory ?? 'all'}
+        onChange={(v) => setSelectedCategory(v === 'all' ? null : v)}
+      />
+    </div>
+    
+    {showEmptyState ? (
+      <EmptyState
+        title={emptyMessage}
+        hint={search.trim() ? 'Попробуйте изменить поисковый запрос' : 'Добавьте первое блюдо, чтобы начать составлять меню'}
+        action={!search.trim() ? { label: 'Добавить блюдо', onClick: () => navigate('/menu/dish/new') } : undefined}
+      />
+    ) : (
+      <DataTable
+        data={filteredProducts}
+        columns={columns}
+        dense
+        isLoading={menuPending}
+        error={menuError ? new Error(menuErrorMessage) : null}
+        renderExpandedRow={renderRecipeRow}
+        expandedRows={expandedRecipe}
+        onExpandedChange={handleExpand}
+        getRowClassName={(row) => !row.original.is_active ? 'opacity-50' : ''}
+        className="max-w-4xl"
+      />
+    )}</div>
   );
 }

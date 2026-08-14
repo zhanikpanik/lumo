@@ -22,6 +22,7 @@ import { toast } from 'sonner';
 import { DecimalSuffixInput } from '@/components/DecimalSuffixInput';
 import { parseDecimalField, quantitySuffix } from '@/lib/decimalMask';
 import { localDateTimeFromIso, qtyToString } from '@/lib/warehouse-form-utils';
+import { formatSom } from '@/lib/formatSom';
 
 interface LineItem {
  key: number;
@@ -263,9 +264,9 @@ function DeliveryFormInner({
     </div>
    )}
    <div className="space-y-4">
-    <div className="flex items-center gap-4">
-     <label className="w-32 text-sm text-foreground shrink-0 sm:w-36">Дата и время</label>
-     <div className="flex items-center gap-2">
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+     <label className="text-sm text-foreground sm:w-36 sm:shrink-0">Дата и время</label>
+     <div className="flex flex-wrap items-center gap-2">
       <DatePicker value={date} onChange={setDate} />
       <TimePicker value={time} onChange={setTime} />
      </div>
@@ -273,7 +274,7 @@ function DeliveryFormInner({
 
     <Field label="Поставщик">
      <input
-      className="w-full max-w-sm px-3 py-2 border border-border rounded-lg text-sm "
+      className="w-full px-3 py-2 border border-border rounded-lg text-base sm:max-w-sm sm:text-sm"
       placeholder="Название компании"
       value={supplier}
       onChange={(e) => setSupplier(e.target.value)}
@@ -298,7 +299,7 @@ function DeliveryFormInner({
 
     <Field label="Комментарий" topLabel>
      <textarea
-      className="w-full max-w-sm px-3 py-2 border border-border rounded-lg text-sm resize-none"
+      className="w-full px-3 py-2 border border-border rounded-lg text-base resize-none sm:max-w-sm sm:text-sm"
       rows={2}
       placeholder="Необязательно"
       value={comment}
@@ -326,7 +327,7 @@ function DeliveryFormInner({
      </div>
     )}
 
-    <div className="flex items-center gap-2 pb-2 mb-1 text-xs font-normal text-foreground">
+    <div className="hidden sm:flex items-center gap-2 pb-2 mb-1 text-xs font-normal text-foreground">
      <div className="flex-[3] min-w-0">Ингредиент</div>
      <div className="w-24 shrink-0 text-right">Кол-во</div>
      <div className="w-28 shrink-0 text-right">Цена</div>
@@ -336,8 +337,8 @@ function DeliveryFormInner({
 
     <div className="space-y-2">
      {lines.map((line) => (
-      <div key={line.key} className="flex items-center gap-2">
-       <div className="flex-[3] min-w-0">
+      <div key={line.key} className="grid grid-cols-[repeat(3,minmax(0,1fr))_2.75rem] items-center gap-2 sm:flex">
+       <div className="col-span-4 min-w-0 sm:col-span-1 sm:flex-[3]">
         <SearchableSelect
          ingredients={ingredients}
          valueId={line.product_id || null}
@@ -346,21 +347,21 @@ function DeliveryFormInner({
          disabled={!warehouseId}
         />
        </div>
-       <div className="w-24 shrink-0">
+       <div className="min-w-0 sm:w-24 sm:shrink-0">
         <DecimalSuffixInput
          value={line.quantity}
          onChange={(v) => updateQuantity(line.key, v)}
          suffix={quantitySuffix(line.unit)}
         />
        </div>
-       <div className="w-28 shrink-0">
+       <div className="min-w-0 sm:w-28 sm:shrink-0">
         <DecimalSuffixInput
          value={line.price}
          onChange={(v) => updatePrice(line.key, v)}
          suffix="сом"
         />
        </div>
-       <div className="w-28 shrink-0">
+       <div className="min-w-0 sm:w-28 sm:shrink-0">
         <DecimalSuffixInput
          value={line.sum}
          onChange={(v) => updateSum(line.key, v)}
@@ -368,7 +369,7 @@ function DeliveryFormInner({
          bold
         />
        </div>
-       <div className="w-9 flex justify-center">
+       <div className="flex size-11 items-center justify-center sm:w-9">
         <DeleteButton variant="line" onClick={() => removeLine(line.key)} />
        </div>
       </div>
@@ -378,7 +379,7 @@ function DeliveryFormInner({
     <button
      type="button"
      onClick={addRow}
-     className="flex items-center gap-1.5 mt-6 px-3 py-1.5 text-sm font-medium border rounded-md hover:bg-secondary transition-colors"
+     className="flex min-h-11 items-center gap-1.5 mt-6 px-3 py-1.5 text-sm font-medium border rounded-md hover:bg-secondary transition-colors"
     >
      <Plus className="w-4 h-4" />
      Добавить строку
@@ -390,7 +391,7 @@ function DeliveryFormInner({
      <div className="text-sm text-muted-foreground">
       Итого:{' '}
       <span className="text-foreground font-bold text-base">
-       {total.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} сом
+       {formatSom(total)}
       </span>
      </div>
     </div>

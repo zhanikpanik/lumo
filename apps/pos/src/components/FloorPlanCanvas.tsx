@@ -3,7 +3,6 @@ import { View, Text, TouchableOpacity, StyleSheet, LayoutChangeEvent } from 'rea
 import { theme } from '../theme/colors';
 import { VenueTable, VenueZone } from '../types';
 
-const GAP = 8;
 
 interface TableRenderInfo {
   table: VenueTable;
@@ -43,22 +42,26 @@ export const FloorPlanCanvas: React.FC<Props> = ({
     maxRow = Math.max(maxRow, t.row + sh);
   });
 
-  const availW = canvasSize.w - padding * 2;
-  const availH = canvasSize.h - padding * 2;
-  const cellW = availW > 0 ? (availW - (maxCol - 1) * GAP) / maxCol : 0;
-  const cellH = availH > 0 ? (availH - (maxRow - 1) * GAP) / maxRow : 0;
+  const availW = Math.max(0, canvasSize.w - padding * 2);
+  const availH = Math.max(0, canvasSize.h - padding * 2);
+  const cellSize =
+    maxCol > 0 && maxRow > 0
+      ? Math.min(availW / maxCol, availH / maxRow)
+      : 0;
+  const originX = padding + (availW - cellSize * maxCol) / 2;
+  const originY = padding + (availH - cellSize * maxRow) / 2;
 
   return (
     <View style={styles.canvas} onLayout={handleLayout}>
-      {cellW > 0 && cellH > 0 && zone.tables.map((table) => {
+      {cellSize > 0 && zone.tables.map((table) => {
         const { bgColor, label, borderWidth = 0, borderColor = 'transparent' } = getTableStyle(table);
 
         const sw = table.colSpan || 2;
         const sh = table.rowSpan || 2;
-        const left = padding + table.col * (cellW + GAP);
-        const top = padding + table.row * (cellH + GAP);
-        const width = cellW * sw + GAP * (sw - 1);
-        const height = cellH * sh + GAP * (sh - 1);
+        const left = originX + table.col * cellSize;
+        const top = originY + table.row * cellSize;
+        const width = cellSize * sw;
+        const height = cellSize * sh;
         const isCircle = table.size === 'circle';
         const isSquare = table.size === 'square';
         const radius = isCircle ? Math.min(width, height) / 2 : isSquare ? 4 : Math.min(width, height) * 0.12;

@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
-import { Feather } from '../components/Feather';
+import { Feather } from '@expo/vector-icons';
 import { theme } from '../theme/colors';
 import { verifyOfflineEmployeePin, type OfflineEmployee } from '../data/employeePin';
-import { loadOfflineEmployees, registerUnlockAttempt, unlockLockedUntil } from '../data/offlinePinState';
+import { loadOfflineEmployees, registerUnlockAttempt } from '../data/offlinePinState';
 import { flushPendingUnlockAttempts } from '../data/unlockAttempts';
 import { getVenueId } from '../data/instant';
 import { EMPLOYEE_PIN_LENGTH } from '@lumo/data';
@@ -47,11 +47,6 @@ export const TakeoverLock: React.FC<Props> = ({ onTakeover }) => {
       verifyingRef.current = true;
       setVerifying(true);
       try {
-        if (await unlockLockedUntil(venueId)) {
-          setError(true);
-          setPin('');
-          return;
-        }
         let match: OfflineEmployee | undefined;
         for (const employee of employees) {
           if (await verifyOfflineEmployeePin(employee, newPin)) {

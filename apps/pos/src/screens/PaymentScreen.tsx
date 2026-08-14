@@ -38,7 +38,7 @@ export const PaymentScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
   const totalSom = Math.round(total / 100);
   const canCloseWithoutPayment = can(currentUser?.role, 'closeWithoutPayment');
   const cashAmount = cashInput ? parseInt(cashInput, 10) : 0;
-  const change = cashAmount > totalSom ? cashAmount - totalSom : 0;
+  const changeTiyin = cashAmount > totalSom ? (cashAmount - totalSom) * 100 : 0;
   const canPay = method === 'card'
     || (method === 'none' && canCloseWithoutPayment && closeReason !== null)
     || (method === 'cash' && cashAmount >= totalSom);
@@ -207,10 +207,10 @@ export const PaymentScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
           )}
 
           {/* Cash change info */}
-          {method === 'cash' && cashAmount > 0 && cashAmount >= total && (
+          {method === 'cash' && cashAmount > 0 && cashAmount >= totalSom && (
             <View style={styles.changeSection}>
               <Text style={styles.changeLabel}>Сдача</Text>
-              <Text style={styles.changeAmount}>{formatAmount(change)} c</Text>
+              <Text style={styles.changeAmount}>{formatAmount(changeTiyin)} c</Text>
             </View>
           )}
 

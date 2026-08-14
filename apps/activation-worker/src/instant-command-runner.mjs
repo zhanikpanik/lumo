@@ -55,16 +55,27 @@ export async function runInstantCommand(
     adminUserId,
     claims = [],
     occurredAt = new Date().toISOString(),
+    preflight,
   },
   build,
 ) {
   const operationKey = `${venueId}:${operationId}`;
   const requestHash = canonicalRequestHash(payload);
-  const prior = await existingOperation(db, operationKey);
+  let preflightData;
+  let prior;
+  if (preflight) {
+    preflightData = await db.query({
+      ...preflight,
+      commandOperations: { $: { where: { operationKey }, limit: 1 } },
+    });
+    prior = preflightData.commandOperations[0];
+  } else {
+    prior = await existingOperation(db, operationKey);
+  }
   if (prior) return replayResult(prior, kind, requestHash);
 
   const operationEntityId = randomUUID();
-  const built = await build({ operationEntityId, operationKey });
+  const built = await build({ operationEntityId, operationKey }, preflightData);
   const effectiveClaims = built.claims ?? claims;
   const claimKeys = effectiveClaims.map(({ resourceType, resourceId, expectedVersion }) =>
     `${venueId}:${resourceType}:${resourceId}:${expectedVersion}`,

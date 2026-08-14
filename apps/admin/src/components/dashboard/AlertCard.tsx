@@ -52,7 +52,7 @@ export function AlertCard({
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); e.preventDefault(); setDismissed(true); onDismiss(); }}
-          className="shrink-0 rounded-sm opacity-40 hover:opacity-70 transition-opacity"
+          className="flex size-11 shrink-0 items-center justify-center rounded-md opacity-40 transition-opacity hover:bg-muted hover:opacity-70 md:size-8"
           aria-label="Скрыть"
         >
           <X className="w-3.5 h-3.5" />
@@ -118,7 +118,7 @@ export function AlertCard({
       <button
         type="button"
         onClick={() => { setDismissed(true); onDismiss(); }}
-        className="shrink-0 p-2 rounded-md hover:bg-muted transition-colors"
+        className="flex size-11 shrink-0 items-center justify-center rounded-md hover:bg-muted transition-colors md:size-8"
         aria-label="Скрыть"
       >
         <X className="w-4 h-4 text-muted-foreground" />

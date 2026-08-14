@@ -33,12 +33,13 @@ export function EditPage({
  };
 
  return (
-  <div className="p-8 max-w-2xl">
-   <div className="flex items-center gap-1 mb-8">
+  <div className="page-shell page-shell--narrow">
+   <div className="flex items-center gap-1 mb-6 sm:mb-8">
     <button
      type="button"
      onClick={handleBack}
-     className="text-foreground"
+     className="flex size-11 items-center justify-center rounded-lg text-foreground hover:bg-accent sm:-ml-3"
+     aria-label="Назад"
     >
      <ChevronLeft className="w-5 h-5" />
     </button>
@@ -49,7 +50,7 @@ export function EditPage({
     {children}
    </div>
 
-   <div className="flex items-center justify-between pt-4 border-t">
+   <div className="sticky bottom-0 -mx-4 flex items-center justify-between border-t bg-background/95 px-4 py-3 backdrop-blur sm:static sm:mx-0 sm:bg-transparent sm:px-0 sm:pt-4 sm:pb-0 sm:backdrop-blur-none">
     {onDelete ? (
      <DeleteButton onClick={onDelete} label={deleteLabel || 'Удалить'} />
     ) : (

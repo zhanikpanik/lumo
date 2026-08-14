@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Feather } from '@expo/vector-icons';
 import { SomIcon, PencilIcon, ExclamationIcon } from './Icons';
 import { theme } from '../theme/colors';
 import { Order } from '../types';
@@ -59,7 +60,7 @@ export const OrderCard: React.FC<Props> = ({ order, onPress, scale = 1 }) => {
     if (order.status === 'cancelled' && order.closeReason) {
       return (
         <View style={styles.heroRow}>
-          <ExclamationIcon size={22} color="#FF8A80" />
+          <ExclamationIcon size={22} color={theme.colors.warningSubtle} />
           <Text style={styles.cancelReason} numberOfLines={1}>{order.closeReason}</Text>
         </View>
       );
@@ -73,7 +74,7 @@ export const OrderCard: React.FC<Props> = ({ order, onPress, scale = 1 }) => {
           <YandexIcon width={18} height={18} />
         )}
         {order.source === 'glovo' && (
-          <Text style={{ fontSize: 16, color: 'rgba(255,255,255,0.85)' }}>🚚</Text>
+          <Feather name="truck" size={16} color={theme.colors.whiteAlpha85} />
         )}
         <Text style={order.isQuickCheck && !isTakeaway ? styles.heroLabelQuick : styles.heroLabel}>
           {order.isQuickCheck && !isTakeaway
@@ -94,7 +95,7 @@ export const OrderCard: React.FC<Props> = ({ order, onPress, scale = 1 }) => {
         {leftContent}
         <View style={styles.heroRight}>
           <Text style={styles.heroAmount}>{formatAmount(order.totalAmount)}</Text>
-          <SomIcon size={9} color="#fff" />
+          <SomIcon size={9} color={theme.colors.white} />
         </View>
       </View>
     );
@@ -181,10 +182,10 @@ export const OrderCard: React.FC<Props> = ({ order, onPress, scale = 1 }) => {
         {showIcons ? (
           <View style={styles.iconsRow}>
             {hasEdit && (
-              <PencilIcon size={16} color="#FFB74D" />
+              <PencilIcon size={16} color={theme.colors.warning} />
             )}
             {hasAlert && (
-              <ExclamationIcon size={16} color="#FF5252" />
+              <ExclamationIcon size={16} color={theme.colors.destructiveLight} />
             )}
           </View>
         ) : null}
@@ -214,7 +215,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   heroTableNum: {
-    color: '#fff',
+    color: theme.colors.white,
     fontSize: 28,
     fontFamily: theme.fonts.medium,
     lineHeight: 30,
@@ -230,12 +231,12 @@ const styles = StyleSheet.create({
     fontFamily: theme.fonts.regular,
   },
   heroLabelQuick: {
-    color: '#fff',
+    color: theme.colors.white,
     fontSize: 16,
     fontFamily: theme.fonts.medium,
   },
   heroAmount: {
-    color: '#fff',
+    color: theme.colors.white,
     fontSize: 16,
     fontFamily: theme.fonts.medium,
   },

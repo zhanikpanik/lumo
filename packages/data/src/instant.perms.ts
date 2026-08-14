@@ -46,6 +46,22 @@ const rules = {
       view: `auth.id != null && (auth.id in data.ref('authUser.id') || ${venueAdmins('venue')})`,
     },
   },
+  activationChallenges: {
+    allow: {
+      view: "false",
+      create: "false",
+      delete: "false",
+      update: "false",
+    },
+  },
+  activationChallengeClaims: {
+    allow: {
+      view: "false",
+      create: "false",
+      delete: "false",
+      update: "false",
+    },
+  },
   recipeItems: {
     allow: {
       view: venueMembers('dish.venue'),

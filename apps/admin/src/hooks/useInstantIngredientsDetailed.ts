@@ -3,6 +3,7 @@ import { getInstantClient } from '@/data/instant';
 import { useVenueId } from './useVenueId';
 import type { InstaQLParams } from '@instantdb/react';
 import type { AppSchema } from '@lumo/data';
+import { instantOne } from '@/lib/instantLink';
 
 export interface IngredientDishRef {
   id: string;
@@ -21,14 +22,15 @@ export interface IngredientListItem {
   warehouse_breakdown: { warehouse_id: string; warehouse_name: string; quantity: number }[];
 }
 
-function allInventoryMovementsQuery(venueId: string) {
+function allStockItemsQuery(venueId: string) {
   return {
-    inventoryMovements: {
+    stockItems: {
       $: {
-        where: { 'venue.id': venueId },
+        where: { venueId },
         limit: 9999,
       },
       product: {},
+      warehouse: {},
     },
   } satisfies InstaQLParams<AppSchema>;
 }
@@ -55,37 +57,46 @@ export function useInstantIngredientsDetailed() {
     },
   } satisfies InstaQLParams<AppSchema>);
 
-  const movementsResult = db.useQuery(allInventoryMovementsQuery(venueId));
+  const stockItemsResult = db.useQuery(allStockItemsQuery(venueId));
 
   const data = useMemo(() => {
     const products = ingredientsResult.data?.products ?? [];
-    const movements = movementsResult.data?.inventoryMovements ?? [];
-
+    const stockItems = stockItemsResult.data?.stockItems ?? [];
     const stockByProduct = new Map<string, number>();
-    for (const m of movements) {
-      const pid = m.product?.id;
-      if (!pid) continue;
-      stockByProduct.set(pid, (stockByProduct.get(pid) ?? 0) + (m.quantityDeltaMilli ?? 0));
+    const breakdownByProduct = new Map<string, IngredientListItem['warehouse_breakdown']>();
+
+    for (const stockItem of stockItems) {
+      const product = instantOne(stockItem.product);
+      const warehouse = instantOne(stockItem.warehouse);
+      if (!product) continue;
+      const quantity = (stockItem.quantityMilli ?? 0) / 1000;
+      stockByProduct.set(product.id, (stockByProduct.get(product.id) ?? 0) + quantity);
+      if (warehouse) {
+        const breakdown = breakdownByProduct.get(product.id) ?? [];
+        breakdown.push({
+          warehouse_id: warehouse.id,
+          warehouse_name: warehouse.name,
+          quantity,
+        });
+        breakdownByProduct.set(product.id, breakdown);
+      }
     }
 
-    return products.map(p => {
-      const stockMilli = stockByProduct.get(p.id) ?? 0;
-      return {
-        id: p.id,
-        name: p.name,
-        price: tyinToSom(p.costTiyin ?? 0),
-        stock_quantity: stockMilli / 1000,
-        unit: p.unit ?? '',
-        is_active: p.status === 'active',
-        workshop_id: null,
-        workshop_name: '',
-        warehouse_breakdown: [],
-      } satisfies IngredientListItem;
-    });
-  }, [ingredientsResult.data, movementsResult.data]);
+    return products.map(p => ({
+      id: p.id,
+      name: p.name,
+      price: tyinToSom(p.costTiyin ?? 0),
+      stock_quantity: stockByProduct.get(p.id) ?? 0,
+      unit: p.unit ?? '',
+      is_active: p.status === 'active',
+      workshop_id: null,
+      workshop_name: '',
+      warehouse_breakdown: breakdownByProduct.get(p.id) ?? [],
+    } satisfies IngredientListItem));
+  }, [ingredientsResult.data, stockItemsResult.data]);
 
-  const isLoading = ingredientsResult.isLoading || movementsResult.isLoading;
-  const error = ingredientsResult.error || movementsResult.error;
+  const isLoading = ingredientsResult.isLoading || stockItemsResult.isLoading;
+  const error = ingredientsResult.error || stockItemsResult.error;
 
   return { data, isLoading, error };
 }
@@ -114,7 +125,7 @@ export function useInstantIngredientUsageMap(): {
     const map: Record<string, IngredientDishRef[]> = {};
     for (const dish of result.data?.products ?? []) {
       for (const ri of dish.recipeItems ?? []) {
-        const ingId = ri.ingredient?.id;
+        const ingId = instantOne(ri.ingredient)?.id;
         if (!ingId) continue;
         if (!map[ingId]) map[ingId] = [];
         map[ingId].push({ id: dish.id, name: dish.name });

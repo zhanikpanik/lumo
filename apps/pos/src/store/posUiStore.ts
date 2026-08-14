@@ -15,6 +15,8 @@ interface PosUiState {
   // ── Navigation ────────────────────────────────────────
   currentOrderId: string | null;
   setCurrentOrderId: (id: string | null) => void;
+  isCreatingOrder: boolean;
+  setCreatingOrder: (creating: boolean) => void;
 
   // ── Selection ──────────────────────────────────────────
   selectedItemId: string | null;
@@ -50,6 +52,8 @@ export const usePosUiStore = create<PosUiState>((set, get) => ({
   // ── Initial state ─────────────────────────────────────
   currentOrderId: null,
   setCurrentOrderId: (id) => set({ currentOrderId: id }),
+  isCreatingOrder: false,
+  setCreatingOrder: (creating) => set({ isCreatingOrder: creating }),
   selectedItemId: null,
   selectedModifierId: null,
   modifierAction: null,

@@ -1,6 +1,7 @@
 import { getInstantClient } from '@/data/instant';
 import { adminWriteOffsQuery } from '@lumo/data';
 import { useVenueId } from '@/hooks/useVenueId';
+import { instantRecord } from '@/lib/instantLink';
 
 export interface WriteOffRow {
   id: string;
@@ -22,7 +23,7 @@ export function useInstantWriteOffsList() {
 
   const data: WriteOffRow[] = (result.data?.writeOffDocuments ?? []).map((w) => {
     const rec = w as Record<string, unknown>;
-    const wh = (rec.warehouse ?? {}) as Record<string, unknown>;
+    const wh = instantRecord(rec.warehouse) ?? {};
     const lines = (Array.isArray(rec.lines) ? rec.lines : []) as Record<string, unknown>[];
     return {
       id: w.id,
@@ -36,7 +37,7 @@ export function useInstantWriteOffsList() {
       workshop_id: null,
       items: lines.map((l) => ({
         id: String(l.id),
-        product_id: String(((l.product ?? {}) as Record<string, unknown>).id ?? null),
+        product_id: String(instantRecord(l.product)?.id ?? ''),
         name: String(l.name),
         quantity: Number(l.quantityMilli) / 1000,
         unit: String(l.unit),

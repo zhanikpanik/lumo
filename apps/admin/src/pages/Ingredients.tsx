@@ -135,43 +135,41 @@ export function Ingredients() {
   const showEmptyState = !ingredientsPending && !ingredientsErr && filtered.length === 0;
 
   return (
-    <div className="p-8">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold">Ингредиенты</h2>
-        <AddButton onClick={() => navigate('/menu/ingredients/add')} label="Добавить ингредиент" />
-      </div>
-
-      <div className="flex items-center gap-2 mb-4">
-        <SearchInput value={search} onChange={setSearch} placeholder="Быстрый поиск" className="w-56" />
-        <SegmentTabs
-          options={[
-            { value: 'all', label: 'Все' },
-            ...workshops.map((w) => ({ value: w.id, label: w.name })),
-          ]}
-          value={selectedWorkshop ?? 'all'}
-          onChange={(v) => setSelectedWorkshop(v === 'all' ? null : v)}
-        />
-      </div>
-
-      {showEmptyState ? (
-        <EmptyState
-          title={search ? 'Ничего не найдено' : 'Ингредиентов пока нет'}
-          hint={search ? 'Попробуйте изменить поисковый запрос' : 'Добавьте ингредиенты, чтобы начать составлять блюда и отслеживать остатки'}
-          action={!search ? { label: 'Добавить ингредиент', onClick: () => navigate('/menu/ingredients/add') } : undefined}
-        />
-      ) : (
-        <DataTable
-          data={filtered}
-          columns={columns}
-          dense
-          isLoading={ingredientsPending}
-          error={ingredientsErr ? (ingredientsErr instanceof Error ? ingredientsErr : new Error('Не удалось загрузить')) : null}
-          renderExpandedRow={renderExpanded}
-          expandedRows={expandedId}
-          onExpandedChange={handleExpand}
-          className="max-w-4xl"
-        />
-      )}
+    <div className="page-shell"><div className="flex items-center justify-between mb-6">
+      <h2 className="text-2xl font-bold">Ингредиенты</h2>
+      <AddButton onClick={() => navigate('/menu/ingredients/add')} label="Добавить ингредиент" />
     </div>
+    
+    <div className="flex items-center gap-2 mb-4">
+      <SearchInput value={search} onChange={setSearch} placeholder="Быстрый поиск" className="w-56" />
+      <SegmentTabs
+        options={[
+          { value: 'all', label: 'Все' },
+          ...workshops.map((w) => ({ value: w.id, label: w.name })),
+        ]}
+        value={selectedWorkshop ?? 'all'}
+        onChange={(v) => setSelectedWorkshop(v === 'all' ? null : v)}
+      />
+    </div>
+    
+    {showEmptyState ? (
+      <EmptyState
+        title={search ? 'Ничего не найдено' : 'Ингредиентов пока нет'}
+        hint={search ? 'Попробуйте изменить поисковый запрос' : 'Добавьте ингредиенты, чтобы начать составлять блюда и отслеживать остатки'}
+        action={!search ? { label: 'Добавить ингредиент', onClick: () => navigate('/menu/ingredients/add') } : undefined}
+      />
+    ) : (
+      <DataTable
+        data={filtered}
+        columns={columns}
+        dense
+        isLoading={ingredientsPending}
+        error={ingredientsErr ? (ingredientsErr instanceof Error ? ingredientsErr : new Error('Не удалось загрузить')) : null}
+        renderExpandedRow={renderExpanded}
+        expandedRows={expandedId}
+        onExpandedChange={handleExpand}
+        className="max-w-4xl"
+      />
+    )}</div>
   );
 }

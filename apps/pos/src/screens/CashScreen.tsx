@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, StatusBar, Text
 import { theme } from '../theme/colors';
 import { SomIcon, ChevronDownIcon, ChevronUpIcon } from '../components/Icons';
 import { Numpad } from '../components/Numpad';
-import { Feather } from '../components/Feather';
+import { Feather } from '@expo/vector-icons';
 import { useUserStore } from '../store/userStore';
 import { useInstantShift } from '../store/useInstantShift';
 import { createPosCashMovement } from '../data/posCommands';
