@@ -5,6 +5,7 @@ import { instantRecord } from '@/lib/instantLink';
 
 export interface WriteOffRow {
   id: string;
+  version: number;
   reason_summary: string;
   date: string;
   status: string;
@@ -27,6 +28,7 @@ export function useInstantWriteOffsList() {
     const lines = (Array.isArray(rec.lines) ? rec.lines : []) as Record<string, unknown>[];
     return {
       id: w.id,
+      version: w.version,
       reason_summary: w.reasonSummary,
       date: new Date(w.writeOffDate).toISOString(),
       status: w.status,
@@ -46,5 +48,5 @@ export function useInstantWriteOffsList() {
     };
   });
 
-  return { data, isLoading: result.isLoading };
+  return { data, isLoading: result.isLoading, error: result.error };
 }

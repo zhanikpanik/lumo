@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { Fragment, useState, useRef, useEffect, useMemo } from 'react';
 import { AlertTriangle, Info, ShieldAlert } from 'lucide-react';
 import { type ColumnDef } from '@tanstack/react-table';
 import { DataTable } from '@/components/ui/DataTable';
@@ -108,7 +108,12 @@ function CheckExpandedContent({
  if (detail.error) return <p className="py-4 text-sm text-destructive">Не удалось загрузить состав чека</p>;
 
  const c: Check = { ...check, ...detail };
- const subtotalVal = c.items.reduce((sum, item) => sum + item.qty * item.price, 0);
+ const subtotalVal = c.items.reduce(
+  (sum, item) => sum + item.qty * (
+   item.price + item.modifiers.reduce((modifierSum, modifier) => modifierSum + modifier.price, 0)
+  ),
+  0,
+ );
 
  return (
  <>
@@ -122,16 +127,26 @@ function CheckExpandedContent({
  <div className="min-w-0">Позиция</div><div className="text-right">Цена</div><div className="text-right whitespace-nowrap">Сумма</div><div className="text-right whitespace-nowrap">Маржа</div>
  </div>
  {c.items.map((item, idx) => (
- <div key={idx} className={`${CHECK_ITEMS_TABLE_GRID} py-0.5 text-sm`}>
- <div className="min-w-0 flex items-baseline gap-1" title={checkItemPositionTitle(item.qty, item.name)}>
- <span className="whitespace-nowrap shrink-0">{item.qty}×</span><span className="min-w-0 block truncate">{item.name}</span>
- </div>
- <div className="text-right whitespace-nowrap">{formatMoney(item.price)}</div>
- <div className="text-right whitespace-nowrap">{formatMoney(item.qty * item.price)}</div>
- <div className="text-right whitespace-nowrap text-success">
- {item.unitCost === null ? <span className="text-sm">—</span> : formatMoney(item.qty * (item.price - item.unitCost))}
- </div>
- </div>
+  <Fragment key={`${item.productId ?? item.name}-${idx}`}>
+   <div className={`${CHECK_ITEMS_TABLE_GRID} py-0.5 text-sm`}>
+    <div className="min-w-0 flex items-baseline gap-1" title={checkItemPositionTitle(item.qty, item.name)}>
+     <span className="whitespace-nowrap shrink-0">{item.qty}×</span><span className="min-w-0 block truncate">{item.name}</span>
+    </div>
+    <div className="text-right whitespace-nowrap">{formatMoney(item.price)}</div>
+    <div className="text-right whitespace-nowrap">{formatMoney(item.qty * item.price)}</div>
+    <div className="text-right whitespace-nowrap text-success">
+     {item.unitCost === null ? <span className="text-sm">—</span> : formatMoney(item.qty * (item.price - item.unitCost))}
+    </div>
+   </div>
+   {item.modifiers.map((modifier, modifierIndex) => (
+    <div key={`${modifier.name}-${modifierIndex}`} className={`${CHECK_ITEMS_TABLE_GRID} py-0.5 text-sm text-muted-foreground`}>
+     <div className="min-w-0 truncate pl-5" title={modifier.name}>↳ {modifier.name}</div>
+     <div className="text-right whitespace-nowrap">+{formatMoney(modifier.price)}</div>
+     <div className="text-right whitespace-nowrap">{formatMoney(item.qty * modifier.price)}</div>
+     <div className="text-right">—</div>
+    </div>
+   ))}
+  </Fragment>
  ))}
  <div className={`${CHECK_ITEMS_TABLE_GRID} pt-2 mt-1 border-t border-border text-sm`}>
  <div className="min-w-0">Итого</div><div /><div className="text-right whitespace-nowrap">{formatMoney(subtotalVal)}</div><div className="text-right whitespace-nowrap text-success">{formatCheckProfit(c)}</div>
@@ -199,11 +214,14 @@ export function Checks() {
 
  // Default to today
  const todayStr = useMemo(() => {
- const d = new Date();
- d.setHours(0, 0, 0, 0);
- return d.toISOString().split('T')[0];
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
  }, []);
  const [fromDate, setFromDate] = useState<string>(todayStr);
+ const [rangeMode, setRangeMode] = useState<'day' | 'since'>('day');
 
  useEffect(() => { if (editingId) inputRef.current?.select(); }, [editingId]);
 
@@ -211,14 +229,20 @@ export function Checks() {
  function commitEdit(id: string) { const val = parseFloat(editValue); if (!isNaN(val) && val >= 0) setPaidOverrides((prev) => ({ ...prev, [id]: val })); setEditingId(null); }
 
  const [page, setPage] = useState(0);
- const fromDateValue = fromDate ? new Date(fromDate) : undefined;
+ const dateBounds = useMemo(() => {
+  if (!fromDate) return { from: undefined, to: undefined };
+  const [year, month, day] = fromDate.split('-').map(Number);
+  const from = new Date(year, month - 1, day);
+  const to = rangeMode === 'day' ? new Date(year, month - 1, day + 1) : undefined;
+  return { from, to };
+ }, [fromDate, rangeMode]);
  const {
   data: checks = [],
   isLoading,
   isError,
   error: checksError,
   hasNextPage,
- } = useInstantChecks({ from: fromDateValue, page });
+ } = useInstantChecks({ from: dateBounds.from, to: dateBounds.to, page });
 
 
  // ── Analysis ──
@@ -392,7 +416,14 @@ export function Checks() {
    : undefined}
   filters={(
    <>
-    <DatePresetPicker value={fromDate} onChange={(value) => { setFromDate(value); setPage(0); }} />
+    <DatePresetPicker
+     value={fromDate}
+     onChange={(value, presetKey) => {
+      setFromDate(value);
+      setRangeMode(presetKey === 'week' || presetKey === 'all' ? 'since' : 'day');
+      setPage(0);
+     }}
+    />
     <select
      className="min-h-11 rounded-lg border bg-background px-3 text-base outline-none transition-colors focus:border-primary sm:text-sm"
      value={waiterFilter}

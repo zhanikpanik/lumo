@@ -15,7 +15,7 @@ beforeAll(async () => {
   employee = {
     employeeId: 'waiter-1', displayName: 'Айжан', role: 'waiter', status: 'active',
     pinSalt: '0123456789abcdef0123456789abcdef',
-    pinVerifier: await deriveEmployeePinVerifier('123456', '0123456789abcdef0123456789abcdef'),
+    pinVerifier: await deriveEmployeePinVerifier('1234', '0123456789abcdef0123456789abcdef'),
     credentialsVersion: 1,
     expiresAt: '2026-09-11T10:00:00.000Z',
   };

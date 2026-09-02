@@ -1,7 +1,8 @@
 import type { DashboardPeriod } from './useDashboardNewData';
-import type { Metric, WarehouseThreat, ChronologyEvent, MigrationCard, Alert, AlertUrgency, AlertUrgencyGroups, Trend, YesterdaySummary, TopDish, YesterdayShift } from '@/types/dashboard';
+import type { Metric, WarehouseThreat, ChronologyEvent, MigrationCard, Alert, AlertUrgencyGroups, YesterdaySummary, TopDish, YesterdayShift } from '@/types/dashboard';
 
 // Realistic Alto Coffee Bishkek mock data
+
 
 export interface MockDashboardData {
   metrics: Metric[];
@@ -25,11 +26,9 @@ export interface MockDashboardData {
   dailyChecks: number[];
   dailyAvgChecks: number[];
   dailyExpenses: number[];
+  dailyFoodCostPercents: number[];
 }
 
-function fmt(n: number): string {
-  return n.toLocaleString('ru-RU');
-}
 
 export function getMockData(period: DashboardPeriod): MockDashboardData {
   const isToday = period === 'today';
@@ -54,28 +53,19 @@ export function getMockData(period: DashboardPeriod): MockDashboardData {
     closed: true,
     revenue: 12850,
     checks: 43,
-    cashDifference: 0,
+    cashDifference: -1200,
     closedAt: new Date(Date.now() - 86400000).toISOString(),
   };
 
   const yesterday: YesterdaySummary | null = isToday
-    ? { revenue: 12850, checks: 43, shiftClosed: 'closed', cashDifference: 0, status: 'normal' }
+    ? { revenue: 12850, checks: 43, shiftClosed: 'closed', cashDifference: -1200, status: 'normal' }
     : null;
 
   const alerts: Alert[] = [
-    // URGENT
-    { id: 'no-active-shift', type: 'critical', message: 'Нет активной смены — касса не открыта', actionLabel: 'Открыть смену →', actionHref: '/cash-shifts', domain: 'cash', urgency: 'urgent' },
-    { id: 'shift-discrepancy-1', type: 'critical', message: 'Расхождение 1 200 сом (8% от выручки)', actionLabel: 'Проверить смену →', actionHref: '/cash-shifts', domain: 'cash', urgency: 'urgent' },
-    { id: 'expense-over-rev', type: 'critical', message: 'Расходы (34 500 с) превышают выручку (28 100 с)', actionLabel: 'Проверить расходы →', actionHref: '/transactions', domain: 'cash', urgency: 'urgent' },
-    // IMPORTANT
-    { id: 'stock', type: 'warning', message: 'Остатки: 1 в минусе, 2 на нуле, 3 на исходе', actionLabel: 'Исправить →', actionHref: '/warehouse', domain: 'warehouse', urgency: 'important' },
-    { id: 'stuck-orders-1', type: 'critical', message: '3 заказа висит больше 1 ч', actionLabel: 'Проверить →', actionHref: '/checks', domain: 'checks', urgency: 'important' },
-    { id: 'revenue-crash', type: 'warning', message: 'Выручка упала на 62% к прошлой неделе', actionLabel: 'Проверить чеки →', actionHref: '/checks', domain: 'checks', urgency: 'important' },
-    { id: 'anomaly-delivery', type: 'warning', message: 'Молоко 3.2%: 120 л (обычно 35 л)', actionLabel: 'Проверить →', actionHref: '/warehouse/operations?type=delivery', domain: 'warehouse', urgency: 'important' },
-    // BACKGROUND
-    { id: 'blank-expense-1', type: 'warning', message: '2 расхода без описания', actionLabel: 'Добавить описание →', actionHref: '/transactions', domain: 'cash', urgency: 'background' },
-    { id: 'stale-inventory', type: 'warning', message: 'Последняя инвентаризация 45 дн. назад', actionLabel: 'Начать →', actionHref: '/warehouse/inventory', domain: 'warehouse', urgency: 'background' },
-    { id: 'shift-long', type: 'info', message: 'Смена открыта 16 ч. Попросите кассира закрыть.', actionLabel: null, actionHref: null, domain: 'cash', urgency: 'background' },
+    { id: 'shift-discrepancy-1', type: 'critical', message: 'Расхождение наличных — 1 200 сом', detail: 'При закрытии не совпали ожидаемая и фактическая наличность.', actionLabel: 'Открыть смену', actionHref: '/cash-shifts', domain: 'cash', urgency: 'urgent' },
+    { id: 'stuck-orders-1', type: 'warning', message: 'Заказы открыты больше часа — 3', detail: 'Самый старый заказ открыт 1 ч 18 мин.', actionLabel: 'Проверить заказы', actionHref: '/checks', domain: 'checks', urgency: 'important' },
+    { id: 'stock', type: 'warning', message: 'Остатки требуют внимания — 6', detail: '1 позиция в минусе, 2 закончились, 3 ниже минимума.', actionLabel: 'Открыть склад', actionHref: '/warehouse/operations', domain: 'warehouse', urgency: 'important' },
+    { id: 'stale-inventory', type: 'warning', message: 'Инвентаризация просрочена', detail: 'Последний полный пересчёт был 45 дней назад.', actionLabel: 'Провести переучёт', actionHref: '/warehouse/inventory?create=true', domain: 'warehouse', urgency: 'background' },
   ];
 
   const alertUrgencyGroups: AlertUrgencyGroups = {
@@ -98,11 +88,13 @@ export function getMockData(period: DashboardPeriod): MockDashboardData {
     { productId: 'fresh-mint', name: 'Мята свежая', quantity: 0.2, unit: 'кг', remaining: '0.2 кг', daysLeft: 1, level: 'critical', affectedDishes: ['Мохито', 'Лимонад'], affectedDishCount: 2, warehouseName: 'Бар', negative: false, lastDelivery: null },
   ];
 
+
   const chronology: ChronologyEvent[] = [
     { id: 'e1', time: '14:32', actor: 'Айжан', action: 'Расход', detail: 'Проезд курьера: 500 сом', actionLabel: 'Касса', actionHref: '/transactions', type: 'expense' },
     { id: 'e2', time: '13:48', actor: 'Айжан', action: 'Поставка', detail: 'Арабика Sergio +15 кг', actionLabel: 'Склад', actionHref: '/warehouse/operations', type: 'delivery' },
     { id: 'e3', time: '12:55', actor: 'Айжан', action: 'Списание', detail: 'Молоко: 3 л, Сливки: 1 л', actionLabel: 'Склад', actionHref: '/warehouse/operations', type: 'write_off' },
     { id: 'e4', time: '11:45', actor: 'Айжан', action: 'Открыта · 5 ч', detail: null, actionLabel: null, actionHref: null, type: 'shift_open' },
+    { id: 'e5', time: '10:20', actor: 'Айбек', action: 'Заказ оплачен', detail: 'Чек №142 · 1 240 сом', actionLabel: 'Чек', actionHref: '/checks', type: 'order_paid' },
   ];
 
   const topDishes: TopDish[] = [
@@ -133,13 +125,14 @@ export function getMockData(period: DashboardPeriod): MockDashboardData {
     isTodayEmpty: false,
     weekRevenue: 275630,
     weekChecks: 154,
-    totalAlertCount: 4,
-    criticalCount: 2,
+    totalAlertCount: alerts.length,
+    criticalCount: alerts.filter((alert) => alert.type === 'critical').length,
     periodLabel: isToday ? 'сегодня' : isWeek ? 'за неделю' : 'за месяц',
     shiftStatus: { isOpen: true, openedAt: '10:30', hoursOpen: 5, cashier: 'Айжан' },
-    dailyRevenues: [10500, 12300, 9800, 14200, 11800, 13500, 12850],
-    dailyChecks: [35, 42, 31, 48, 38, 45, 43],
-    dailyAvgChecks: [300, 293, 316, 296, 311, 300, 299],
-    dailyExpenses: [4200, 5100, 3900, 5800, 4700, 5400, 5000],
+    dailyRevenues: [10500, 12300, 9800, 14200, 11800, 13500, revenue],
+    dailyChecks: [8, 7, 6, 9, 8, 7, checks],
+    dailyAvgChecks: [1312, 1757, 1633, 1578, 1475, 1928, avgCheck],
+    dailyExpenses: [420, 510, 390, 580, 470, 540, Math.round(revenue * 0.06)],
+    dailyFoodCostPercents: [29, 30, 31, 28, 30, 29, foodCostPercent],
   };
 }

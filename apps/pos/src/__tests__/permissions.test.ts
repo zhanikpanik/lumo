@@ -6,6 +6,7 @@ import {
   can,
   isAdmin,
   resolveShiftEntry,
+  resolveColdStartEntry,
   requiresOrderTakeover,
   type PermissionAction,
   type UserRole,
@@ -35,6 +36,16 @@ describe('can', () => {
   it('denies when role is null or undefined', () => {
     expect(can(null, 'openShift')).toBe(false);
     expect(can(undefined, 'openShift')).toBe(false);
+  });
+});
+
+describe('resolveColdStartEntry', () => {
+  it('requires PIN after a cold start even when the device is authenticated', () => {
+    expect(resolveColdStartEntry('authenticated')).toBe('Lock');
+  });
+
+  it('keeps unactivated devices on activation', () => {
+    expect(resolveColdStartEntry('activation-required')).toBe('Activation');
   });
 });
 

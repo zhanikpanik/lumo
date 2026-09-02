@@ -81,6 +81,10 @@ const _schema = i.schema({
       expiresAt: i.date().indexed(),
       updatedAt: i.date().indexed(),
     }),
+    employeePinSecrets: i.entity({
+      pin: i.string(),
+      updatedAt: i.date().indexed(),
+    }),
     categories: i.entity({
       venueId: i.string().indexed(),
       name: i.string(),
@@ -351,8 +355,12 @@ const _schema = i.schema({
       venueId: i.string().indexed(),
       name: i.string(),
       quantityMilli: i.number(),
+      orderedQuantityMilli: i.number().optional(),
+      receivedQuantityMilli: i.number().optional(),
       unit: i.string(),
       priceTiyin: i.number(),
+      orderedPriceTiyin: i.number().optional(),
+      receivedPriceTiyin: i.number().optional(),
     }),
 
     writeOffDocuments: i.entity({
@@ -457,6 +465,10 @@ const _schema = i.schema({
     employeePinCredential: {
       forward: { on: 'employeePinCredentials', has: 'one', label: 'employee', required: true },
       reverse: { on: 'employees', has: 'one', label: 'pinCredential' },
+    },
+    employeePinSecret: {
+      forward: { on: 'employeePinSecrets', has: 'one', label: 'employee', required: true },
+      reverse: { on: 'employees', has: 'one', label: 'pinSecret' },
     },
     categoryVenue: {
       forward: { on: 'categories', has: 'one', label: 'venue', required: true },

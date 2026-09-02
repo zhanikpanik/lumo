@@ -6,6 +6,7 @@ import { instantRecord } from '@/lib/instantLink';
 /** Legacy DeliveryRow for AllOperations mergeOps compatibility. */
 export interface DeliveryRow {
   id: string;
+  version: number;
   supplier: string;
   date: string;
   amount: number;
@@ -29,6 +30,7 @@ export function useInstantDeliveriesList() {
     const lines = (Array.isArray(rec.lines) ? rec.lines : []) as Record<string, unknown>[];
     return {
       id: d.id,
+      version: d.version,
       supplier: d.supplier,
       date: new Date(d.deliveryDate).toISOString(),
       amount: d.amountTiyin,
@@ -49,5 +51,5 @@ export function useInstantDeliveriesList() {
     };
   });
 
-  return { data, isLoading: result.isLoading };
+  return { data, isLoading: result.isLoading, error: result.error };
 }

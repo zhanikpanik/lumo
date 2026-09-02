@@ -33,6 +33,18 @@ function versionOf(entity, name) {
   return entity.version;
 }
 
+function expectedVersionOf(payload, entity, name) {
+  const expectedVersion = safeInteger(payload.expectedVersion, 'expectedVersion');
+  const currentVersion = versionOf(entity, name);
+  if (expectedVersion !== currentVersion) {
+    throw commandError(`${name} changed after it was opened`, 'resource_conflict', 409, {
+      expectedVersion,
+      currentVersion,
+    });
+  }
+  return currentVersion;
+}
+
 function claim(resourceType, resourceId, expectedVersion) {
   return { resourceType, resourceId, expectedVersion };
 }
@@ -181,6 +193,66 @@ function documentLineProductId(line) {
   return product.id;
 }
 
+function documentLinesWithProducts(lines) {
+  return lines.map((line) => ({ ...line, productId: documentLineProductId(line) }));
+}
+
+function requireMatchingLineSet(normalized, existing, name) {
+  const existingIds = new Set(existing.map((line) => line.productId));
+  if (
+    normalized.length !== existing.length
+    || normalized.some((line) => !existingIds.has(line.productId))
+  ) {
+    throw commandError(
+      `${name} corrections must include every existing document line`,
+      'document_lines_changed',
+      409,
+    );
+  }
+}
+
+function applyQuantityOverrides(value, documentLines, name) {
+  const existing = documentLinesWithProducts(documentLines);
+  if (value === undefined) return existing;
+  const normalized = uniqueProductLines(value, (line, index) => ({
+    productId: nonEmptyString(line?.productId, `lineQuantities[${index}].productId`),
+    quantityMilli: safeInteger(line?.quantityMilli, `lineQuantities[${index}].quantityMilli`),
+  }));
+  requireMatchingLineSet(normalized, existing, name);
+  const quantityByProduct = new Map(normalized.map((line) => [line.productId, line.quantityMilli]));
+  return existing.map((line) => ({ ...line, quantityMilli: quantityByProduct.get(line.productId) }));
+}
+
+function applyDeliveryReceipt(value, documentLines) {
+  const existing = documentLinesWithProducts(documentLines).map((line) => ({
+    ...line,
+    orderedQuantityMilli: Number.isSafeInteger(line.orderedQuantityMilli)
+      ? line.orderedQuantityMilli
+      : safeInteger(line.quantityMilli, 'delivery line quantity'),
+    orderedPriceTiyin: Number.isSafeInteger(line.orderedPriceTiyin)
+      ? line.orderedPriceTiyin
+      : safeInteger(line.priceTiyin, 'delivery line price'),
+  }));
+  if (value === undefined) {
+    return existing.map((line) => ({
+      ...line,
+      quantityMilli: line.orderedQuantityMilli,
+      priceTiyin: line.orderedPriceTiyin,
+    }));
+  }
+  const normalized = uniqueProductLines(value, (line, index) => ({
+    productId: nonEmptyString(line?.productId, `receivedLines[${index}].productId`),
+    quantityMilli: safeInteger(line?.receivedQuantityMilli, `receivedLines[${index}].receivedQuantityMilli`),
+    priceTiyin: safeInteger(line?.receivedPriceTiyin, `receivedLines[${index}].receivedPriceTiyin`),
+  }));
+  requireMatchingLineSet(normalized, existing, 'Delivery');
+  const receivedByProduct = new Map(normalized.map((line) => [line.productId, line]));
+  return existing.map((line) => {
+    const received = receivedByProduct.get(line.productId);
+    return { ...line, quantityMilli: received.quantityMilli, priceTiyin: received.priceTiyin };
+  });
+}
+
 function documentWarehouseId(document, relation = 'warehouse') {
   const warehouse = linked(document[relation]);
   if (!warehouse?.id) throw commandError('Document is missing its warehouse', 'invalid_document', 409);
@@ -222,7 +294,10 @@ async function createDelivery(db, adminUserId, operationId, venueId, payload) {
         })
         .link({ venue: venueId, warehouse: warehouseId }),
       ...lines.map((line) => db.tx.deliveryLines[stableLineId('delivery', documentId, line.productId)]
-        .update({ venueId, name: line.name, quantityMilli: line.quantityMilli, unit: line.unit, priceTiyin: line.priceTiyin })
+        .update({
+          venueId, name: line.name, quantityMilli: line.quantityMilli, orderedQuantityMilli: line.quantityMilli,
+          unit: line.unit, priceTiyin: line.priceTiyin, orderedPriceTiyin: line.priceTiyin,
+        })
         .link({ document: documentId, product: line.productId })),
     ],
     result: { deliveryId: documentId },
@@ -248,7 +323,10 @@ async function updateDelivery(db, adminUserId, operationId, venueId, payload) {
     lineSteps = [
       ...lineDeletionSteps(db, 'deliveryLines', document.lines, desiredIds),
       ...lines.map((line) => db.tx.deliveryLines[stableLineId('delivery', documentId, line.productId)]
-        .update({ venueId, name: line.name, quantityMilli: line.quantityMilli, unit: line.unit, priceTiyin: line.priceTiyin })
+        .update({
+          venueId, name: line.name, quantityMilli: line.quantityMilli, orderedQuantityMilli: line.quantityMilli,
+          unit: line.unit, priceTiyin: line.priceTiyin, orderedPriceTiyin: line.priceTiyin,
+        })
         .link({ document: documentId, product: line.productId })),
     ];
   }
@@ -261,13 +339,27 @@ async function updateDelivery(db, adminUserId, operationId, venueId, payload) {
 
 async function transitionDelivery(db, adminUserId, operationId, venueId, payload, action) {
   const documentId = nonEmptyString(payload.documentId, 'documentId');
-  const document = requireVenueEntity(await entityById(db, 'deliveryDocuments', documentId, { warehouse: {}, lines: { product: {} } }), venueId, 'Delivery');
+  const document = requireVenueEntity(
+    await entityById(db, 'deliveryDocuments', documentId, { warehouse: {}, lines: { product: {} } }),
+    venueId,
+    'Delivery',
+  );
   const receiving = action === 'receive';
   ensureDocumentStatus(document, receiving ? ['draft', 'in_transit'] : ['draft', 'in_transit', 'received'], 'Delivery');
+  const documentVersion = receiving
+    ? expectedVersionOf(payload, document, 'Delivery')
+    : versionOf(document, 'Delivery');
   const warehouseId = documentWarehouseId(document);
-  const lines = document.lines.map((line) => ({ ...line, productId: documentLineProductId(line) }));
+  const lines = receiving
+    ? applyDeliveryReceipt(payload.receivedLines, document.lines)
+    : documentLinesWithProducts(document.lines);
   const changes = receiving || document.status === 'received'
-    ? lines.map((line) => ({ warehouseId, productId: line.productId, unit: line.unit, delta: (receiving ? 1 : -1) * line.quantityMilli }))
+    ? lines.map((line) => ({
+      warehouseId,
+      productId: line.productId,
+      unit: line.unit,
+      delta: (receiving ? 1 : -1) * line.quantityMilli,
+    }))
     : [];
   const stocks = await loadStocks(db, changes);
   const now = new Date().toISOString();
@@ -282,9 +374,31 @@ async function transitionDelivery(db, adminUserId, operationId, venueId, payload
       reason: `${action}_delivery`, now, documentId,
     });
   });
+  const amountTiyin = lines.reduce(
+    (sum, line) => sum + Math.round((line.quantityMilli * line.priceTiyin) / 1000),
+    0,
+  );
+  const lineSteps = receiving
+    ? lines.map((line) => db.tx.deliveryLines[line.id].update({
+      quantityMilli: line.quantityMilli,
+      orderedQuantityMilli: line.orderedQuantityMilli,
+      receivedQuantityMilli: line.quantityMilli,
+      priceTiyin: line.priceTiyin,
+      orderedPriceTiyin: line.orderedPriceTiyin,
+      receivedPriceTiyin: line.priceTiyin,
+    }))
+    : [];
   return commandContext(db, adminUserId, operationId, venueId, `${action}-delivery`, payload, async () => ({
-    claims: [claim('delivery-document', documentId, document.version), ...stockClaims],
-    steps: [db.tx.deliveryDocuments[documentId].update({ status: receiving ? 'received' : 'cancelled', version: document.version + 1 }), ...stockSteps],
+    claims: [claim('delivery-document', documentId, documentVersion), ...stockClaims],
+    steps: [
+      db.tx.deliveryDocuments[documentId].update({
+        status: receiving ? 'received' : 'cancelled',
+        version: documentVersion + 1,
+        ...(receiving ? { amountTiyin } : {}),
+      }),
+      ...lineSteps,
+      ...stockSteps,
+    ],
     result: { deliveryId: documentId, status: receiving ? 'received' : 'cancelled' },
   }));
 }
@@ -345,13 +459,27 @@ async function updateWriteOff(db, adminUserId, operationId, venueId, payload) {
 
 async function transitionWriteOff(db, adminUserId, operationId, venueId, payload, action) {
   const documentId = nonEmptyString(payload.documentId, 'documentId');
-  const document = requireVenueEntity(await entityById(db, 'writeOffDocuments', documentId, { warehouse: {}, lines: { product: {} } }), venueId, 'Write-off');
+  const document = requireVenueEntity(
+    await entityById(db, 'writeOffDocuments', documentId, { warehouse: {}, lines: { product: {} } }),
+    venueId,
+    'Write-off',
+  );
   const posting = action === 'post';
   ensureDocumentStatus(document, posting ? ['draft'] : ['draft', 'posted'], 'Write-off');
+  const documentVersion = posting
+    ? expectedVersionOf(payload, document, 'Write-off')
+    : versionOf(document, 'Write-off');
   const warehouseId = documentWarehouseId(document);
-  const lines = document.lines.map((line) => ({ ...line, productId: documentLineProductId(line) }));
+  const lines = posting
+    ? applyQuantityOverrides(payload.lineQuantities, document.lines, 'Write-off')
+    : documentLinesWithProducts(document.lines);
   const changes = posting || document.status === 'posted'
-    ? lines.map((line) => ({ warehouseId, productId: line.productId, unit: line.unit, delta: (posting ? -1 : 1) * line.quantityMilli }))
+    ? lines.map((line) => ({
+      warehouseId,
+      productId: line.productId,
+      unit: line.unit,
+      delta: (posting ? -1 : 1) * line.quantityMilli,
+    }))
     : [];
   const stocks = await loadStocks(db, changes);
   const now = new Date().toISOString();
@@ -366,9 +494,19 @@ async function transitionWriteOff(db, adminUserId, operationId, venueId, payload
       reason: `${action}_write_off`, now, documentId,
     });
   });
+  const lineSteps = posting
+    ? lines.map((line) => db.tx.writeOffLines[line.id].update({ quantityMilli: line.quantityMilli }))
+    : [];
   return commandContext(db, adminUserId, operationId, venueId, `${action}-write-off`, payload, async () => ({
-    claims: [claim('write-off-document', documentId, document.version), ...stockClaims],
-    steps: [db.tx.writeOffDocuments[documentId].update({ status: posting ? 'posted' : 'cancelled', version: document.version + 1 }), ...stockSteps],
+    claims: [claim('write-off-document', documentId, documentVersion), ...stockClaims],
+    steps: [
+      db.tx.writeOffDocuments[documentId].update({
+        status: posting ? 'posted' : 'cancelled',
+        version: documentVersion + 1,
+      }),
+      ...lineSteps,
+      ...stockSteps,
+    ],
     result: { writeOffId: documentId, status: posting ? 'posted' : 'cancelled' },
   }));
 }
@@ -432,16 +570,39 @@ async function updateTransfer(db, adminUserId, operationId, venueId, payload) {
 
 async function transitionTransfer(db, adminUserId, operationId, venueId, payload, action) {
   const documentId = nonEmptyString(payload.documentId, 'documentId');
-  const document = requireVenueEntity(await entityById(db, 'transferDocuments', documentId, { fromWarehouse: {}, toWarehouse: {}, lines: { product: {} } }), venueId, 'Transfer');
+  const document = requireVenueEntity(
+    await entityById(db, 'transferDocuments', documentId, {
+      fromWarehouse: {},
+      toWarehouse: {},
+      lines: { product: {} },
+    }),
+    venueId,
+    'Transfer',
+  );
   const posting = action === 'post';
   ensureDocumentStatus(document, posting ? ['draft'] : ['draft', 'posted'], 'Transfer');
+  const documentVersion = posting
+    ? expectedVersionOf(payload, document, 'Transfer')
+    : versionOf(document, 'Transfer');
   const fromWarehouseId = documentWarehouseId(document, 'fromWarehouse');
   const toWarehouseId = documentWarehouseId(document, 'toWarehouse');
-  const lines = document.lines.map((line) => ({ ...line, productId: documentLineProductId(line) }));
+  const lines = posting
+    ? applyQuantityOverrides(payload.lineQuantities, document.lines, 'Transfer')
+    : documentLinesWithProducts(document.lines);
   const changes = posting || document.status === 'posted'
     ? lines.flatMap((line) => [
-      { warehouseId: fromWarehouseId, productId: line.productId, unit: line.unit, delta: (posting ? -1 : 1) * line.quantityMilli },
-      { warehouseId: toWarehouseId, productId: line.productId, unit: line.unit, delta: (posting ? 1 : -1) * line.quantityMilli },
+      {
+        warehouseId: fromWarehouseId,
+        productId: line.productId,
+        unit: line.unit,
+        delta: (posting ? -1 : 1) * line.quantityMilli,
+      },
+      {
+        warehouseId: toWarehouseId,
+        productId: line.productId,
+        unit: line.unit,
+        delta: (posting ? 1 : -1) * line.quantityMilli,
+      },
     ])
     : [];
   const stocks = await loadStocks(db, changes);
@@ -457,9 +618,19 @@ async function transitionTransfer(db, adminUserId, operationId, venueId, payload
       reason: `${action}_transfer`, now, documentId,
     });
   });
+  const lineSteps = posting
+    ? lines.map((line) => db.tx.transferLines[line.id].update({ quantityMilli: line.quantityMilli }))
+    : [];
   return commandContext(db, adminUserId, operationId, venueId, `${action}-transfer`, payload, async () => ({
-    claims: [claim('transfer-document', documentId, document.version), ...stockClaims],
-    steps: [db.tx.transferDocuments[documentId].update({ status: posting ? 'posted' : 'cancelled', version: document.version + 1 }), ...stockSteps],
+    claims: [claim('transfer-document', documentId, documentVersion), ...stockClaims],
+    steps: [
+      db.tx.transferDocuments[documentId].update({
+        status: posting ? 'posted' : 'cancelled',
+        version: documentVersion + 1,
+      }),
+      ...lineSteps,
+      ...stockSteps,
+    ],
     result: { transferId: documentId, status: posting ? 'posted' : 'cancelled' },
   }));
 }

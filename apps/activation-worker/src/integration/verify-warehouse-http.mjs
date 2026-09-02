@@ -202,19 +202,88 @@ try {
   assert.equal(deliveryAfterReplacement.deliveryDocuments[0]?.lines.length, 1, 'removed delivery lines must be deleted');
 
   const receiveRace = await Promise.all([
-    command('receive-delivery', `receive-a-${runId}`, { documentId: deliveryId }),
-    command('receive-delivery', `receive-b-${runId}`, { documentId: deliveryId }),
+    command('receive-delivery', `receive-a-${runId}`, { documentId: deliveryId, expectedVersion: 1 }),
+    command('receive-delivery', `receive-b-${runId}`, { documentId: deliveryId, expectedVersion: 1 }),
   ]);
   assert.equal(receiveRace.filter((result) => result.status === 200).length, 1);
   assert.equal(receiveRace.filter((result) => result.status === 409).length, 1);
   assert.equal((await stockQuantity(sourceWarehouseId, productAId)).quantityMilli, 10_000);
+
+  const correctedDelivery = await command('create-delivery', `corrected-delivery-${runId}`, {
+    warehouseId: sourceWarehouseId, supplier: 'Corrected supplier', deliveryDate: now,
+    source: 'manual', lines: [
+      { productId: productBId, name: 'Warehouse B', quantityMilli: 5_000, unit: 'g', priceTiyin: 200 },
+    ],
+  });
+  assert.equal(correctedDelivery.status, 200, JSON.stringify(correctedDelivery.body));
+  const correctedReceive = await command('receive-delivery', `corrected-receive-${runId}`, {
+    documentId: correctedDelivery.body.deliveryId,
+    expectedVersion: 0,
+    receivedLines: [{
+      productId: productBId,
+      receivedQuantityMilli: 3_000,
+      receivedPriceTiyin: 200,
+    }],
+  });
+  assert.equal(correctedReceive.status, 200, JSON.stringify(correctedReceive.body));
+  const correctedState = await db.query({
+    deliveryDocuments: {
+      $: { where: { id: correctedDelivery.body.deliveryId }, limit: 1 },
+      lines: {},
+    },
+  });
+  assert.equal(correctedState.deliveryDocuments[0].amountTiyin, 600);
+  assert.equal(correctedState.deliveryDocuments[0].lines[0].orderedQuantityMilli, 5_000);
+  assert.equal(correctedState.deliveryDocuments[0].lines[0].receivedQuantityMilli, 3_000);
+  assert.equal((await stockQuantity(sourceWarehouseId, productBId)).quantityMilli, 3_000);
+
+  const correctedTransfer = await command('create-transfer', `corrected-transfer-${runId}`, {
+    fromWarehouseId: sourceWarehouseId,
+    toWarehouseId: destinationWarehouseId,
+    transferDate: now,
+    lines: [{ productId: productBId, name: 'Warehouse B', quantityMilli: 2_000, unit: 'g' }],
+  });
+  assert.equal(correctedTransfer.status, 200, JSON.stringify(correctedTransfer.body));
+  const correctedTransferPost = await command('post-transfer', `corrected-transfer-post-${runId}`, {
+    documentId: correctedTransfer.body.transferId,
+    expectedVersion: 0,
+    lineQuantities: [{ productId: productBId, quantityMilli: 1_000 }],
+  });
+  assert.equal(correctedTransferPost.status, 200, JSON.stringify(correctedTransferPost.body));
+  assert.equal((await stockQuantity(sourceWarehouseId, productBId)).quantityMilli, 2_000);
+  assert.equal((await stockQuantity(destinationWarehouseId, productBId)).quantityMilli, 1_000);
+
+  const correctedWriteOff = await command('create-write-off', `corrected-write-off-${runId}`, {
+    warehouseId: sourceWarehouseId,
+    reasonSummary: 'Correction fixture',
+    writeOffDate: now,
+    createdByName: 'Fixture admin',
+    lines: [{
+      productId: productBId,
+      name: 'Warehouse B',
+      quantityMilli: 1_500,
+      unit: 'g',
+      reason: 'Fixture',
+    }],
+  });
+  assert.equal(correctedWriteOff.status, 200, JSON.stringify(correctedWriteOff.body));
+  const correctedWriteOffPost = await command('post-write-off', `corrected-write-off-post-${runId}`, {
+    documentId: correctedWriteOff.body.writeOffId,
+    expectedVersion: 0,
+    lineQuantities: [{ productId: productBId, quantityMilli: 500 }],
+  });
+  assert.equal(correctedWriteOffPost.status, 200, JSON.stringify(correctedWriteOffPost.body));
+  assert.equal((await stockQuantity(sourceWarehouseId, productBId)).quantityMilli, 1_500);
 
   const createdTransfer = await command('create-transfer', `create-transfer-${runId}`, {
     fromWarehouseId: sourceWarehouseId, toWarehouseId: destinationWarehouseId, transferDate: now,
     lines: [{ productId: productAId, name: 'Warehouse A', quantityMilli: 4_000, unit: 'g' }],
   });
   assert.equal(createdTransfer.status, 200, JSON.stringify(createdTransfer.body));
-  const postedTransfer = await command('post-transfer', `post-transfer-${runId}`, { documentId: createdTransfer.body.transferId });
+  const postedTransfer = await command('post-transfer', `post-transfer-${runId}`, {
+    documentId: createdTransfer.body.transferId,
+    expectedVersion: 0,
+  });
   assert.equal(postedTransfer.status, 200, JSON.stringify(postedTransfer.body));
   assert.equal((await stockQuantity(sourceWarehouseId, productAId)).quantityMilli, 6_000);
   assert.equal((await stockQuantity(destinationWarehouseId, productAId)).quantityMilli, 4_000);
@@ -228,14 +297,14 @@ try {
     return { operationId: `stock-race-receive-${suffix}-${runId}`, documentId: created.body.deliveryId };
   }));
   const stockRace = await Promise.all(deliveryCommands.map(({ operationId, documentId }) =>
-    command('receive-delivery', operationId, { documentId })));
+    command('receive-delivery', operationId, { documentId, expectedVersion: 0 })));
   assert.equal(stockRace.filter((result) => result.status === 200).length, 1);
   assert.equal(stockRace.filter((result) => result.status === 409).length, 1);
   assert.equal((await stockQuantity(sourceWarehouseId, productAId)).quantityMilli, 7_000);
   const loserIndex = stockRace.findIndex((result) => result.status === 409);
   const conflictRetry = await command(
     'receive-delivery', deliveryCommands[loserIndex].operationId,
-    { documentId: deliveryCommands[loserIndex].documentId },
+    { documentId: deliveryCommands[loserIndex].documentId, expectedVersion: 0 },
   );
   assert.equal(conflictRetry.status, 200, JSON.stringify(conflictRetry.body));
   assert.equal((await stockQuantity(sourceWarehouseId, productAId)).quantityMilli, 8_000);
@@ -256,7 +325,10 @@ try {
     lines: [{ productId: productAId, name: 'Warehouse A', quantityMilli: 1_000, unit: 'g', priceTiyin: 100 }],
   });
   assert.equal(staleDelivery.status, 200, JSON.stringify(staleDelivery.body));
-  const staleReceive = await command('receive-delivery', `stale-receive-${runId}`, { documentId: staleDelivery.body.deliveryId });
+  const staleReceive = await command('receive-delivery', `stale-receive-${runId}`, {
+    documentId: staleDelivery.body.deliveryId,
+    expectedVersion: 0,
+  });
   assert.equal(staleReceive.status, 200, JSON.stringify(staleReceive.body));
   const stalePost = await command('post-inventory', `stale-post-${runId}`, { sessionId: inventoryId });
   assert.equal(stalePost.status, 409, JSON.stringify(stalePost.body));
@@ -265,7 +337,7 @@ try {
   assert.equal(await ledgerQuantity(sourceWarehouseId, productAId), 9_000);
   assert.equal(await ledgerQuantity(destinationWarehouseId, productAId), 4_000);
 
-  console.log('Verified atomic warehouse line replacement, receive conflicts, retry, transfer balances, and stale inventory rejection.');
+  console.log('Verified corrected receipt quantities, atomic line replacement, receive conflicts, retry, transfer balances, and stale inventory rejection.');
 } finally {
   if (server.listening) {
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));

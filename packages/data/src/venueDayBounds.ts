@@ -75,6 +75,18 @@ export function venueSameDayLastWeek(timeZone: string, refDate?: Date): DayBound
 }
 
 /**
+ * Returns last week's same weekday from local midnight through the same
+ * local wall-clock time. Used for fair in-progress day comparisons.
+ */
+export function venueSameElapsedLastWeek(timeZone: string, refDate?: Date): DayBounds {
+  const now = refDate ?? new Date();
+  const local = new TZDate(now, timeZone);
+  const lastWeek = subDays(local, 7);
+  const start = startOfDay(lastWeek);
+  return { start: start.toISOString(), end: lastWeek.toISOString() };
+}
+
+/**
  * Returns the bounds for `startOfDay` of `daysAgo` ago through today's end.
  * Useful for "last N days" queries.
  *

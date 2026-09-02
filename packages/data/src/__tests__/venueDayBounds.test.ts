@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { venueDay, venueToday, venueYesterday, venueSameDayLastWeek, venueLastNDays } from '../venueDayBounds.js';
+import {
+  venueDay,
+  venueToday,
+  venueYesterday,
+  venueSameDayLastWeek,
+  venueSameElapsedLastWeek,
+  venueLastNDays,
+} from '../venueDayBounds.js';
 
 // Bishkek = UTC+6. Fixed reference dates for determinism.
 // 2026-08-05T15:00:00Z = 2026-08-05T21:00:00+06:00 (same day in Bishkek)
@@ -62,6 +69,15 @@ test('same day last week = exactly 7 days before today', () => {
 
   const diff = new Date(today.start).getTime() - new Date(lastWeek.start).getTime();
   assert.equal(diff, 7 * 24 * 60 * 60 * 1000);
+});
+
+test('same elapsed window last week stops at the same local time', () => {
+  const bounds = venueSameElapsedLastWeek('Asia/Bishkek', AUG_5_15UTC);
+
+  assert.deepEqual(bounds, {
+    start: '2026-07-29T00:00:00.000+06:00',
+    end: '2026-07-29T21:00:00.000+06:00',
+  });
 });
 
 // ── venueLastNDays ────────────────────────────────────────

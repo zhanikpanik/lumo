@@ -51,26 +51,6 @@ export function useInstantUpdateTransfer() {
   return { update, loading };
 }
 
-export function useInstantPostTransfer() {
-  const venueId = useVenueId();
-  const [loading, setLoading] = useState(false);
-
-  const post = useCallback(
-    async (transferId: string, _snapshot: TransferSnapshot) => {
-      setLoading(true);
-      try {
-        await executeWarehouseCommand(
-          'post-transfer', crypto.randomUUID(), venueId, { documentId: transferId },
-        );
-      } finally {
-        setLoading(false);
-      }
-    },
-    [venueId],
-  );
-
-  return { post, loading };
-}
 
 export function useInstantCancelTransfer() {
   const venueId = useVenueId();

@@ -28,6 +28,7 @@ export const ItemActionsMenu: React.FC<ItemActionsMenuProps> = ({ items }) => {
   const selectedItemId = usePosUiStore(s => s.selectedItemId);
   const activeAction = usePosUiStore(s => s.activeAction);
   const setActiveAction = usePosUiStore(s => s.setActiveAction);
+  const startDraft = usePosUiStore(s => s.startDraft);
 
   const selectedItem = items.find(i => i.id === selectedItemId);
   if (!selectedItem) return null;
@@ -72,6 +73,9 @@ export const ItemActionsMenu: React.FC<ItemActionsMenuProps> = ({ items }) => {
 
               const handlePress = () => {
                 if (isDisabled) return;
+                if (cell.action === 'quantity') {
+                  startDraft(selectedItem);
+                }
                 setActiveAction(cell.action);
               };
 

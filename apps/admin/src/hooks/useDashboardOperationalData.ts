@@ -14,11 +14,11 @@ import { useVenueId } from './useVenueId';
 import {
   venueToday,
   venueYesterday,
-  venueSameDayLastWeek,
+  venueSameElapsedLastWeek,
   adminDashboardActiveOrdersQuery,
   adminDashboardActiveShiftQuery,
   adminDashboardCashMovementsQuery,
-  adminDashboardInventoryPageQuery,
+  adminDashboardInventoryStateQuery,
   adminDashboardLastWeekSameDayOrdersQuery,
   adminDashboardOrderEventsQuery,
   adminDashboardThresholdIngredientsQuery,
@@ -26,14 +26,15 @@ import {
   adminDashboardYesterdayShiftQuery,
   adminDashboardYesterdayStuckOrdersQuery,
 } from '@lumo/data';
+import { instantOne } from '@/lib/instantLink';
 import type {
   DashboardOperationalData,
   TodayKPI,
   ShiftStatus,
   ActiveOrdersStatus,
   StockAlert,
-  Alert,
-  AlertUrgencyGroups,
+  OverviewSituation,
+  InventoryFreshness,
   ChronologyEvent,
   YesterdayShift,
 } from '@/types/dashboard';
@@ -41,8 +42,10 @@ import type {
 // ═══ Constants ══════════════════════════════════════════════════
 
 const CHRONOLOGY_LIMIT = 20;
-const INVENTORY_PAGE_SIZE = 500;
 const STUCK_THRESHOLD_MINUTES = 60;
+const INVENTORY_STALE_DAYS = 7;
+const INVENTORY_BLOCKED_DAYS = 14;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 // ═══ Selectors (pure, no React, no InstantDB) ══════════════════
 
@@ -50,42 +53,114 @@ function tiyinToDisplaySom(t: number): number {
   return Math.round(t / 100);
 }
 
+type InstantLink<T> = T | T[] | null | undefined;
+type InstantDate = string | number;
+
+interface SelectorPayment {
+  foodCostTiyin?: number;
+}
+
+interface SelectorOrder {
+  id: string;
+  status: string;
+  totalAmountTiyin?: number;
+  openedAt: InstantDate;
+  payments?: SelectorPayment[];
+}
+
+interface SelectorCashMovement {
+  id: string;
+  movementType: string;
+  amountTiyin: number;
+  occurredAt: InstantDate;
+}
+
+interface SelectorEmployee {
+  displayName?: string;
+}
+
+interface SelectorShift {
+  openedAt?: InstantDate;
+  closedAt?: InstantDate;
+  cashDifferenceAtClose?: number;
+  openedBy?: InstantLink<SelectorEmployee>;
+}
+
+interface SelectorOrderEvent {
+  id: string;
+  occurredAt: InstantDate;
+  action: string;
+  actorEmployee?: InstantLink<SelectorEmployee>;
+}
+
+
+interface SelectorWarehouse {
+  id: string;
+  name: string;
+}
+
+interface SelectorProductLink {
+  id: string;
+}
+
+interface SelectorStockItem {
+  quantityMilli: number;
+  product?: InstantLink<SelectorProductLink>;
+}
+
+interface SelectorInventorySession {
+  status: string;
+  conductedAt: InstantDate;
+  warehouse?: InstantLink<SelectorWarehouse>;
+}
+
+interface SelectorIngredient {
+  id: string;
+  name: string;
+  unit?: string;
+  lowStockThresholdMilli?: number;
+}
+
 interface SelectorInput {
-  todayOrders: any[];
-  activeOrders: any[];
-  todayCashMovements: any[];
-  todayOrderEvents: any[];
-  activeShift: any | null;
-  yesterdayShift: any | null;
-  yesterdayStuckOrders: any[];
-  lastWeekSameDayOrders: any[];
-  inventoryMovements: any[];
-  ingredients: any[];
+  todayOrders: SelectorOrder[];
+  activeOrders: SelectorOrder[];
+  todayCashMovements: SelectorCashMovement[];
+  todayOrderEvents: SelectorOrderEvent[];
+  activeShift: SelectorShift | null;
+  yesterdayShift: SelectorShift | null;
+  yesterdayStuckOrders: SelectorOrder[];
+  lastWeekSameDayOrders: SelectorOrder[];
+  warehouses: SelectorWarehouse[];
+  stockItems: SelectorStockItem[];
+  inventorySessions: SelectorInventorySession[];
+  inventoryUnavailable: boolean;
+  ingredients: SelectorIngredient[];
   now: Date;
   venueTimeZone: string;
 }
 
 function selectTodayKPI(input: SelectorInput): TodayKPI | null {
-  const paid = input.todayOrders.filter((o: any) => o.status === 'paid');
-  const revenueTiyin = paid.reduce((s: number, o: any) => s + (Number(o.totalAmountTiyin) || 0), 0);
+  const paid = input.todayOrders.filter((order) => order.status === 'paid');
+  const revenueTiyin = paid.reduce((sum, order) => sum + (Number(order.totalAmountTiyin) || 0), 0);
   const paidOrderCount = paid.length;
   const averageCheckTiyin = paidOrderCount > 0 ? Math.round(revenueTiyin / paidOrderCount) : 0;
 
   const expenses = input.todayCashMovements
-    .filter((m: any) => m.movementType === 'float_out' || m.movementType === 'expense')
-    .reduce((s: number, m: any) => s + (Number(m.amountTiyin) || 0), 0);
+    .filter((movement) => movement.movementType === 'float_out' || movement.movementType === 'expense')
+    .reduce((sum, movement) => sum + (Number(movement.amountTiyin) || 0), 0);
 
   // Food cost from payment snapshots
   const foodCostTiyin = paid.reduce(
-    (s: number, o: any) => s + (o.payments ?? []).reduce((ps: number, p: any) => ps + (Number(p.foodCostTiyin) || 0), 0),
+    (sum, order) => sum + (order.payments ?? [])
+      .reduce((paymentSum, payment) => paymentSum + (Number(payment.foodCostTiyin) || 0), 0),
     0,
   );
 
   const foodCostPercent = revenueTiyin > 0 ? Math.round((foodCostTiyin / revenueTiyin) * 100) : null;
 
   // Trend vs same day last week
-  const lastWeekRevenue = (input.lastWeekSameDayOrders ?? []).reduce(
-    (s: number, o: any) => s + (Number(o.totalAmountTiyin) || 0), 0,
+  const lastWeekRevenue = input.lastWeekSameDayOrders.reduce(
+    (sum, order) => sum + (Number(order.totalAmountTiyin) || 0), 0,
   );
   const lastWeekChecks = (input.lastWeekSameDayOrders ?? []).length;
   const revenueTrendPercent = lastWeekRevenue > 0
@@ -111,170 +186,373 @@ function selectShiftStatus(input: SelectorInput): ShiftStatus {
     return { isOpen: false, openedAt: null, hoursOpen: 0, cashier: null };
   }
   const hoursOpen = s.openedAt
-    ? (input.now.getTime() - new Date(s.openedAt as string).getTime()) / (1000 * 60 * 60)
+    ? (input.now.getTime() - new Date(s.openedAt).getTime()) / (1000 * 60 * 60)
     : 0;
   return {
     isOpen: true,
-    openedAt: s.openedAt as string | null,
+    openedAt: s.openedAt == null ? null : new Date(s.openedAt).toISOString(),
     hoursOpen,
-    cashier: s.openedBy?.displayName ?? null,
+    cashier: instantOne(s.openedBy)?.displayName ?? null,
   };
 }
 
 function selectActiveOrders(input: SelectorInput): ActiveOrdersStatus {
-  const sixtyMinAgo = new Date(input.now.getTime() - STUCK_THRESHOLD_MINUTES * 60 * 1000).toISOString();
-  const stuck = input.activeOrders.filter((o: any) => (o.openedAt as string) < sixtyMinAgo);
+  const sixtyMinAgo = input.now.getTime() - STUCK_THRESHOLD_MINUTES * 60 * 1000;
+  const stuck = input.activeOrders.filter((order) => new Date(order.openedAt).getTime() < sixtyMinAgo);
   return {
     count: input.activeOrders.length,
     stuckOlderThan60Min: stuck.length,
   };
 }
 
+
 function selectYesterdayShift(input: SelectorInput): YesterdayShift | null {
   const s = input.yesterdayShift;
   if (!s) return null;
   const isClosed = s.closedAt != null;
   const diff = Number(s.cashDifferenceAtClose) || 0;
-  const yesterdayPaid = input.todayOrders.filter((o: any) => {
-    // This is approximate — we'd need a separate query for yesterday's paid orders
-    // For now, yesterday shift status comes from the shift itself
-    return false;
-  });
   return {
     closed: isClosed,
     revenue: null, // Would need yesterday's orders query
     checks: null,
     cashDifference: isClosed ? diff : null,
-    closedAt: s.closedAt as string | null,
+    closedAt: s.closedAt == null ? null : new Date(s.closedAt).toISOString(),
   };
 }
 
-function selectAlerts(input: SelectorInput): Alert[] {
-  const alerts: Alert[] = [];
-  const paid = input.todayOrders.filter((o: any) => o.status === 'paid');
-  const todayRevenue = paid.reduce((s: number, o: any) => s + (Number(o.totalAmountTiyin) || 0), 0);
+function selectSituations(
+  input: SelectorInput,
+  freshness: InventoryFreshness,
+  stockAlerts: StockAlert[],
+): OverviewSituation[] {
+  const situations: OverviewSituation[] = [];
+  const paid = input.todayOrders.filter((order) => order.status === 'paid');
+  const todayRevenue = paid.reduce(
+    (sum, order) => sum + (Number(order.totalAmountTiyin) || 0),
+    0,
+  );
   const todayExpense = input.todayCashMovements
-    .filter((m: any) => m.movementType === 'float_out' || m.movementType === 'expense')
-    .reduce((s: number, m: any) => s + (Number(m.amountTiyin) || 0), 0);
+    .filter((movement) => movement.movementType === 'float_out' || movement.movementType === 'expense')
+    .reduce((sum, movement) => sum + (Number(movement.amountTiyin) || 0), 0);
 
-  // No active shift
   if (!input.activeShift) {
-    alerts.push({
-      id: 'no-active-shift', type: 'critical',
-      message: 'Нет активной смены — касса не открыта',
-      actionLabel: 'Открыть смену →', actionHref: '/cash-shifts',
-      domain: 'cash', urgency: 'urgent',
+    situations.push({
+      id: 'no-active-shift',
+      class: 'blocked',
+      domain: 'cash',
+      title: 'Касса не открыта',
+      impact: 'Заказы нельзя корректно провести через активную смену.',
+      evidence: 'Активная кассовая смена не найдена.',
+      priorityReason: 'Работа заблокирована',
+      confidence: 'verified',
+      actionLabel: 'Проверить смену',
+      actionHref: '/cash-shifts',
     });
   }
 
-  // Yesterday shift not closed
   if (input.yesterdayShift && !input.yesterdayShift.closedAt) {
-    alerts.push({
-      id: 'yesterday-shift-open', type: 'critical',
-      message: 'Вчерашняя смена не закрыта',
-      actionLabel: 'Закрыть смену →', actionHref: '/cash-shifts',
-      domain: 'cash', urgency: 'urgent',
+    situations.push({
+      id: 'yesterday-shift-open',
+      class: 'blocked',
+      domain: 'cash',
+      title: 'Вчерашняя смена не закрыта',
+      impact: 'Кассовый итог и расхождение за вчера остаются неподтверждёнными.',
+      evidence: 'У смены отсутствует время закрытия.',
+      priorityReason: 'Нарушена целостность прошлого дня',
+      confidence: 'verified',
+      actionLabel: 'Закрыть смену',
+      actionHref: '/cash-shifts',
     });
   }
 
-  // Stuck orders > 60 min
   const active = selectActiveOrders(input);
   if (active.stuckOlderThan60Min > 0) {
-    alerts.push({
-      id: 'stuck-orders', type: active.stuckOlderThan60Min > 5 ? 'critical' : 'warning',
-      message: `${active.stuckOlderThan60Min} заказ${active.stuckOlderThan60Min === 1 ? '' : active.stuckOlderThan60Min < 5 ? 'а' : 'ов'} висит больше 1 ч`,
-      actionLabel: 'Проверить →', actionHref: '/checks',
-      domain: 'checks', urgency: 'important',
+    situations.push({
+      id: 'stuck-orders',
+      class: 'probable_loss',
+      domain: 'orders',
+      title: `Зависшие заказы — ${active.stuckOlderThan60Min}`,
+      impact: 'Заказы могут быть забыты, задвоены или остаться неоплаченными.',
+      evidence: `${active.stuckOlderThan60Min} заказов открыты больше одного часа.`,
+      priorityReason: 'Потеря вероятна',
+      confidence: 'verified',
+      actionLabel: 'Проверить заказы',
+      actionHref: '/checks',
     });
   }
 
-  // Yesterday stuck orders
-  const yestStuck = input.yesterdayStuckOrders.length;
-  if (yestStuck > 0) {
-    alerts.push({
-      id: 'yesterday-stuck', type: 'critical',
-      message: `${yestStuck} незакрытых заказ${yestStuck === 1 ? '' : yestStuck < 5 ? 'а' : 'ов'} со вчера`,
-      actionLabel: 'Проверить →', actionHref: '/checks',
-      domain: 'checks', urgency: 'urgent',
+  const yesterdayStuckCount = input.yesterdayStuckOrders.length;
+  if (yesterdayStuckCount > 0) {
+    situations.push({
+      id: 'yesterday-stuck-orders',
+      class: 'blocked',
+      domain: 'orders',
+      title: `Незакрытые заказы со вчера — ${yesterdayStuckCount}`,
+      impact: 'Итоги вчерашнего дня и текущие активные заказы искажены.',
+      evidence: `${yesterdayStuckCount} заказов пережили границу суток.`,
+      priorityReason: 'Нарушена целостность прошлого дня',
+      confidence: 'verified',
+      actionLabel: 'Проверить заказы',
+      actionHref: '/checks',
     });
   }
 
-  // Expenses > revenue
   if (todayRevenue > 0 && todayExpense > todayRevenue) {
-    alerts.push({
-      id: 'expense-over-revenue', type: 'critical',
-      message: `Расходы превышают выручку`,
-      actionLabel: 'Проверить расходы →', actionHref: '/transactions',
-      domain: 'cash', urgency: 'urgent',
+    situations.push({
+      id: 'expense-over-revenue',
+      class: 'probable_loss',
+      domain: 'cash',
+      title: 'Расходы превысили выручку',
+      impact: 'Текущий денежный результат дня отрицательный до учёта других затрат.',
+      evidence: 'Кассовые расходы за сегодня больше оплаченной выручки.',
+      priorityReason: 'Финансовая потеря уже возникла',
+      confidence: 'verified',
+      actionLabel: 'Проверить расходы',
+      actionHref: '/transactions',
     });
   }
 
-  // Revenue crash vs last week
-  const lastWeekRevenue = (input.lastWeekSameDayOrders ?? []).reduce(
-    (s: number, o: any) => s + (Number(o.totalAmountTiyin) || 0), 0,
+  const lastWeekRevenue = input.lastWeekSameDayOrders.reduce(
+    (sum, order) => sum + (Number(order.totalAmountTiyin) || 0),
+    0,
   );
-  if (lastWeekRevenue > 500000 && todayRevenue < lastWeekRevenue * 0.5) {
-    alerts.push({
-      id: 'revenue-crash', type: 'warning',
-      message: `Выручка упала на ${Math.round((1 - todayRevenue / lastWeekRevenue) * 100)}% к прошлой неделе`,
-      actionLabel: 'Проверить чеки →', actionHref: '/checks',
-      domain: 'checks', urgency: 'important',
+  if (lastWeekRevenue > 500_000 && todayRevenue < lastWeekRevenue * 0.5) {
+    situations.push({
+      id: 'revenue-crash',
+      class: 'probable_loss',
+      domain: 'sales',
+      title: `Выручка ниже на ${Math.round((1 - todayRevenue / lastWeekRevenue) * 100)}%`,
+      impact: 'Текущий темп продаж заметно отстаёт от сопоставимого дня.',
+      evidence: 'Сравнение выполнено с тем же временем того же дня прошлой недели.',
+      priorityReason: 'Потеря вероятна',
+      confidence: 'estimated',
+      actionLabel: 'Открыть аналитику',
+      actionHref: '/analytics?tab=sales',
     });
   }
 
-  // Today empty
-  if (input.todayOrders.length === 0 && input.activeShift) {
-    alerts.push({
-      id: 'today-empty', type: 'warning',
-      message: 'Сегодня нет заказов. Проверьте, открыта ли касса.',
-      actionLabel: null, actionHref: null,
-      domain: 'checks', urgency: 'important',
+  if (freshness.status === 'unavailable') {
+    situations.push({
+      id: 'inventory-unavailable',
+      class: 'degrading',
+      domain: 'data_quality',
+      title: 'Данные склада недоступны',
+      impact: 'Остатки и фудкост нельзя проверить.',
+      evidence: 'Не удалось загрузить текущий снимок склада.',
+      priorityReason: 'Контроль данных потерян',
+      confidence: 'stale',
+      actionLabel: 'Открыть склад',
+      actionHref: '/warehouse/operations',
     });
+  } else if (freshness.status === 'missing' || freshness.status === 'stale') {
+    const affected = freshness.affectedWarehouseNames.slice(0, 3).join(', ');
+    const age = freshness.ageDays == null ? null : `${freshness.ageDays} дн.`;
+    const blocksInventoryControl = freshness.status === 'missing'
+      || (freshness.ageDays ?? 0) >= INVENTORY_BLOCKED_DAYS;
+    situations.push({
+      id: 'inventory-stale',
+      class: blocksInventoryControl ? 'blocked' : 'degrading',
+      domain: 'data_quality',
+      title: freshness.status === 'missing'
+        ? 'Нет актуальной инвентаризации'
+        : 'Инвентаризация просрочена',
+      impact: 'Остатки и фудкост нельзя считать достоверными.',
+      evidence: [
+        age ? `Самая старая граница: ${age}` : null,
+        affected ? `Требуют проверки: ${affected}` : null,
+      ].filter(Boolean).join(' · ') || 'Проведённая инвентаризация не найдена.',
+      priorityReason: blocksInventoryControl ? 'Контроль склада заблокирован' : 'Процесс деградирует',
+      confidence: 'verified',
+      actionLabel: 'Провести переучёт',
+      actionHref: '/warehouse/inventory?create=true',
+    });
+  } else {
+    const negative = stockAlerts.filter((alert) => alert.level === 'negative');
+    const zero = stockAlerts.filter((alert) => alert.level === 'zero');
+    const low = stockAlerts.filter((alert) => alert.level === 'low');
+    const evidence = (alerts: StockAlert[]) => alerts
+      .slice(0, 3)
+      .map((alert) => {
+        const quantity = (alert.balanceMilli / 1000).toLocaleString('ru-RU', {
+          maximumFractionDigits: 1,
+        });
+        return `${alert.name}: ${quantity} ${alert.unit}`;
+      })
+      .join(' · ');
+
+    if (negative.length > 0) {
+      situations.push({
+        id: 'inventory-negative',
+        class: 'blocked',
+        domain: 'inventory',
+        title: `Отрицательные остатки — ${negative.length}`,
+        impact: 'Складские показатели и списания искажены.',
+        evidence: evidence(negative),
+        priorityReason: 'Работа со складом заблокирована',
+        confidence: 'verified',
+        actionLabel: 'Провести переучёт',
+        actionHref: '/warehouse/inventory?create=true',
+      });
+    }
+
+    if (zero.length > 0) {
+      situations.push({
+        id: 'inventory-zero',
+        class: 'probable_loss',
+        domain: 'inventory',
+        title: `Закончились ингредиенты — ${zero.length}`,
+        impact: 'Продажи связанных позиций могут остановиться.',
+        evidence: evidence(zero),
+        priorityReason: 'Потеря продаж вероятна',
+        confidence: 'verified',
+        actionLabel: 'Открыть склад',
+        actionHref: '/warehouse/operations',
+      });
+    }
+
+    if (low.length > 0) {
+      situations.push({
+        id: 'inventory-low',
+        class: 'probable_loss',
+        domain: 'inventory',
+        title: `Ниже минимального остатка — ${low.length}`,
+        impact: 'Запас может закончиться до следующей поставки.',
+        evidence: evidence(low),
+        priorityReason: 'Требуется пополнение',
+        confidence: 'verified',
+        actionLabel: 'Открыть склад',
+        actionHref: '/warehouse/operations',
+      });
+    }
   }
 
-  return alerts;
+  const classOrder = { blocked: 0, probable_loss: 1, degrading: 2 } as const;
+  const ruleOrder: Record<string, number> = {
+    'yesterday-stuck-orders': 0,
+    'yesterday-shift-open': 1,
+    'no-active-shift': 2,
+    'inventory-negative': 3,
+    'inventory-zero': 10,
+    'expense-over-revenue': 11,
+    'stuck-orders': 12,
+    'revenue-crash': 13,
+    'inventory-low': 14,
+    'inventory-stale': 20,
+    'inventory-unavailable': 21,
+  };
+
+  return situations.sort((a, b) =>
+    classOrder[a.class] - classOrder[b.class]
+    || (ruleOrder[a.id] ?? 99) - (ruleOrder[b.id] ?? 99)
+    || a.id.localeCompare(b.id),
+  );
+}
+
+function selectInventoryFreshness(input: SelectorInput): InventoryFreshness {
+  if (input.inventoryUnavailable) {
+    return {
+      status: 'unavailable',
+      lastCountedAt: null,
+      ageDays: null,
+      warehouseCount: input.warehouses.length,
+      currentWarehouseCount: 0,
+      affectedWarehouseNames: [],
+    };
+  }
+
+  const warehouses = new Map(
+    input.warehouses.map((warehouse) => [warehouse.id, warehouse.name]),
+  );
+  if (warehouses.size === 0) {
+    return {
+      status: 'missing',
+      lastCountedAt: null,
+      ageDays: null,
+      warehouseCount: 0,
+      currentWarehouseCount: 0,
+      affectedWarehouseNames: [],
+    };
+  }
+
+  const latestByWarehouse = new Map<string, number>();
+  for (const session of input.inventorySessions) {
+    if (!['posted', 'Проведено'].includes(session.status)) continue;
+    const warehouseId = instantOne(session.warehouse)?.id;
+    const timestamp = new Date(session.conductedAt).getTime();
+    if (!warehouseId || !Number.isFinite(timestamp)) continue;
+    const current = latestByWarehouse.get(warehouseId);
+    if (current == null || timestamp > current) latestByWarehouse.set(warehouseId, timestamp);
+  }
+
+  const staleCutoff = input.now.getTime() - INVENTORY_STALE_DAYS * DAY_MS;
+  const missingNames: string[] = [];
+  const staleNames: string[] = [];
+  const countedTimes: number[] = [];
+  let currentWarehouseCount = 0;
+
+  for (const [warehouseId, warehouseName] of warehouses) {
+    const countedAt = latestByWarehouse.get(warehouseId);
+    if (countedAt == null) {
+      missingNames.push(warehouseName || 'Без названия');
+      continue;
+    }
+    countedTimes.push(countedAt);
+    if (countedAt < staleCutoff) staleNames.push(warehouseName || 'Без названия');
+    else currentWarehouseCount += 1;
+  }
+
+  const oldestCountedAt = countedTimes.length > 0 ? Math.min(...countedTimes) : null;
+  const status: InventoryFreshness['status'] = missingNames.length > 0
+    ? 'missing'
+    : staleNames.length > 0
+      ? 'stale'
+      : 'current';
+
+  return {
+    status,
+    lastCountedAt: oldestCountedAt == null ? null : new Date(oldestCountedAt).toISOString(),
+    ageDays: oldestCountedAt == null
+      ? null
+      : Math.max(0, Math.floor((input.now.getTime() - oldestCountedAt) / DAY_MS)),
+    warehouseCount: warehouses.size,
+    currentWarehouseCount,
+    affectedWarehouseNames: [...missingNames, ...staleNames],
+  };
 }
 
 function selectStockAlerts(input: SelectorInput): StockAlert[] {
   const balanceByProduct = new Map<string, number>();
-  for (const m of input.inventoryMovements) {
-    const pid = m.product?.id;
-    if (!pid) continue;
-    balanceByProduct.set(pid, (balanceByProduct.get(pid) ?? 0) + (m.quantityDeltaMilli ?? 0));
+  for (const stockItem of input.stockItems) {
+    const productId = instantOne(stockItem.product)?.id;
+    if (!productId) continue;
+    balanceByProduct.set(
+      productId,
+      (balanceByProduct.get(productId) ?? 0) + (Number(stockItem.quantityMilli) || 0),
+    );
   }
 
   const alerts: StockAlert[] = [];
-  for (const ing of input.ingredients) {
-    const balance = balanceByProduct.get(ing.id) ?? 0;
-    const threshold = ing.lowStockThresholdMilli ?? 0;
+  for (const ingredient of input.ingredients) {
+    const balance = balanceByProduct.get(ingredient.id) ?? 0;
+    const threshold = Number(ingredient.lowStockThresholdMilli) || 0;
+    const base = {
+      productId: ingredient.id,
+      name: ingredient.name,
+      balanceMilli: balance,
+      unit: ingredient.unit ?? '',
+    };
 
-    if (balance < 0) {
-      alerts.push({
-        productId: ing.id,
-        name: ing.name,
-        balanceMilli: balance,
-        unit: ing.unit ?? '',
-        level: 'negative',
-      });
-    } else if (balance === 0) {
-      alerts.push({
-        productId: ing.id,
-        name: ing.name,
-        balanceMilli: 0,
-        unit: ing.unit ?? '',
-        level: 'zero',
-      });
-    } else if (threshold > 0 && balance < threshold) {
-      alerts.push({
-        productId: ing.id,
-        name: ing.name,
-        balanceMilli: balance,
-        unit: ing.unit ?? '',
-        level: 'low',
-      });
-    }
+    if (balance < 0) alerts.push({ ...base, level: 'negative' });
+    else if (balance === 0) alerts.push({ ...base, level: 'zero' });
+    else if (threshold > 0 && balance < threshold) alerts.push({ ...base, level: 'low' });
   }
-  return alerts;
+
+  const levelOrder = { negative: 0, zero: 1, low: 2 } as const;
+  return alerts.sort((a, b) =>
+    levelOrder[a.level] - levelOrder[b.level]
+    || a.balanceMilli - b.balanceMilli
+    || a.name.localeCompare(b.name, 'ru'),
+  );
 }
 
 function selectChronology(input: SelectorInput): ChronologyEvent[] {
@@ -284,7 +562,7 @@ function selectChronology(input: SelectorInput): ChronologyEvent[] {
   if (input.activeShift?.openedAt) {
     events.push({
       id: 'shift-open',
-      time: new Date(input.activeShift.openedAt as string).toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
+      time: new Date(input.activeShift.openedAt).toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
       actor: 'Смена',
       action: 'Открыта',
       detail: null,
@@ -294,11 +572,11 @@ function selectChronology(input: SelectorInput): ChronologyEvent[] {
 
   // Order events
   for (const ev of input.todayOrderEvents ?? []) {
-    const t = new Date(ev.occurredAt as string);
+    const t = new Date(ev.occurredAt);
     events.push({
       id: `ev-${ev.id}`,
       time: t.toLocaleString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
-      actor: ev.actorEmployee?.displayName ?? '—',
+      actor: instantOne(ev.actorEmployee)?.displayName ?? '—',
       action: ev.action === 'paid' ? 'Оплата' : ev.action,
       detail: null,
       type: ev.action === 'paid' ? 'order_paid' : 'order_new',
@@ -307,7 +585,7 @@ function selectChronology(input: SelectorInput): ChronologyEvent[] {
 
   // Cash movements
   for (const cm of input.todayCashMovements ?? []) {
-    const t = new Date(cm.occurredAt as string);
+    const t = new Date(cm.occurredAt);
     const amount = tiyinToDisplaySom(Number(cm.amountTiyin) || 0);
     events.push({
       id: `cm-${cm.id}`,
@@ -352,7 +630,7 @@ export function useDashboardOperationalData(): {
 
   const todayBounds = useMemo(() => venueToday(timeZone, now), [timeZone, now]);
   const yesterdayBounds = useMemo(() => venueYesterday(timeZone, now), [timeZone, now]);
-  const lastWeekBounds = useMemo(() => venueSameDayLastWeek(timeZone, now), [timeZone, now]);
+  const lastWeekBounds = useMemo(() => venueSameElapsedLastWeek(timeZone, now), [timeZone, now]);
 
   // Bounded queries
   const todayOrdersResult = db.useQuery(
@@ -375,8 +653,8 @@ export function useDashboardOperationalData(): {
   const orderEventsResult = db.useQuery(
     adminDashboardOrderEventsQuery(venueId, todayBounds.start, todayBounds.end, CHRONOLOGY_LIMIT),
   );
-  const inventoryResult = db.useQuery(
-    adminDashboardInventoryPageQuery(venueId, INVENTORY_PAGE_SIZE),
+  const inventoryStateResult = db.useQuery(
+    adminDashboardInventoryStateQuery(venueId),
   );
   const ingredientsResult = db.useQuery(
     adminDashboardThresholdIngredientsQuery(venueId),
@@ -392,17 +670,18 @@ export function useDashboardOperationalData(): {
     yesterdayStuckResult.isLoading ||
     lastWeekOrdersResult.isLoading ||
     orderEventsResult.isLoading ||
-    inventoryResult.isLoading ||
+    inventoryStateResult.isLoading ||
     ingredientsResult.isLoading;
 
-  const criticalError =
-    venueResult.error ||
-    todayOrdersResult.error ||
-    activeShiftResult.error;
-
-  const error = criticalError
-    ? new Error(criticalError.message ?? 'Dashboard data unavailable')
-    : null;
+  const criticalErrorMessage =
+    venueResult.error?.message ||
+    todayOrdersResult.error?.message ||
+    activeShiftResult.error?.message ||
+    null;
+  const error = useMemo(
+    () => criticalErrorMessage ? new Error(criticalErrorMessage) : null,
+    [criticalErrorMessage],
+  );
 
   const data = useMemo((): DashboardOperationalData | null => {
     if (isLoading || error) return null;
@@ -416,7 +695,10 @@ export function useDashboardOperationalData(): {
       yesterdayShift: yesterdayShiftResult.data?.shifts?.[0] ?? null,
       yesterdayStuckOrders: yesterdayStuckResult.data?.orders ?? [],
       lastWeekSameDayOrders: lastWeekOrdersResult.data?.orders ?? [],
-      inventoryMovements: inventoryResult.data?.inventoryMovements ?? [],
+      warehouses: inventoryStateResult.data?.warehouses ?? [],
+      stockItems: inventoryStateResult.data?.stockItems ?? [],
+      inventorySessions: inventoryStateResult.data?.inventorySessions ?? [],
+      inventoryUnavailable: Boolean(inventoryStateResult.error),
       ingredients: ingredientsResult.data?.products ?? [],
       now,
       venueTimeZone: timeZone,
@@ -426,25 +708,22 @@ export function useDashboardOperationalData(): {
     const shift = selectShiftStatus(selectorInput);
     const activeOrders = selectActiveOrders(selectorInput);
     const yesterdayShift = selectYesterdayShift(selectorInput);
-    const alerts = selectAlerts(selectorInput);
-    const stockAlerts = selectStockAlerts(selectorInput);
+    const inventoryFreshness = selectInventoryFreshness(selectorInput);
+    const stockAlerts = inventoryFreshness.status === 'current'
+      ? selectStockAlerts(selectorInput)
+      : [];
+    const situations = selectSituations(selectorInput, inventoryFreshness, stockAlerts);
     const chronology = selectChronology(selectorInput);
-
-    const alertUrgencyGroups: AlertUrgencyGroups = {
-      urgent: alerts.filter(a => a.urgency === 'urgent'),
-      important: alerts.filter(a => a.urgency === 'important'),
-      background: alerts.filter(a => a.urgency === 'background'),
-    };
 
     return {
       today,
       shift,
       activeOrders,
       yesterdayShift,
-      alerts,
-      alertUrgencyGroups,
+      situations,
       chronology,
       stockAlerts,
+      inventoryFreshness,
       isTodayEmpty: todayOrdersResult.data?.orders?.length === 0,
       computedAt: now.toISOString(),
     };
@@ -452,8 +731,8 @@ export function useDashboardOperationalData(): {
     isLoading, error, now, timeZone,
     todayOrdersResult.data, activeOrdersResult.data, cashMovementsResult.data,
     activeShiftResult.data, yesterdayShiftResult.data, yesterdayStuckResult.data,
-    lastWeekOrdersResult.data, orderEventsResult.data, inventoryResult.data,
-    ingredientsResult.data,
+    lastWeekOrdersResult.data, orderEventsResult.data, inventoryStateResult.data,
+    inventoryStateResult.error, ingredientsResult.data,
   ]);
 
   return { data, isLoading, error };

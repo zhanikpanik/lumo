@@ -1,16 +1,18 @@
 import { executeWarehouseCommand } from '@/data/warehouseCommands';
 import { useVenueId } from './useVenueId';
 import { useState, useCallback } from 'react';
+import type { ReceiveDeliveryInput } from '@lumo/data';
+
 
 export function useInstantReceiveDeliveryBridge() {
   const venueId = useVenueId();
   const [loading, setLoading] = useState(false);
 
   const mutate = useCallback(
-    async (deliveryId: string) => {
+    async (input: ReceiveDeliveryInput) => {
       setLoading(true);
       try {
-        await executeWarehouseCommand('receive-delivery', crypto.randomUUID(), venueId, { documentId: deliveryId });
+        await executeWarehouseCommand('receive-delivery', crypto.randomUUID(), venueId, input);
       } finally {
         setLoading(false);
       }

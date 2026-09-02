@@ -129,6 +129,27 @@ export function addPosOrderLine(input: AddPosOrderLineRequest): Promise<AddPosOr
   return postCommand<AddPosOrderLineResult>('/v1/pos/order-lines', input);
 }
 
+export interface UpdatePosOrderLineQuantityRequest {
+  operationId: string;
+  orderId: string;
+  orderItemId: string;
+  actorEmployeeId: string;
+  quantity: number;
+}
+
+export interface UpdatePosOrderLineQuantityResult {
+  orderItemId: string;
+  quantity: number;
+  newTotal: number;
+}
+
+/** Replaces an order line quantity and rescales its immutable stock snapshot atomically. */
+export function updatePosOrderLineQuantity(
+  input: UpdatePosOrderLineQuantityRequest,
+): Promise<UpdatePosOrderLineQuantityResult> {
+  return postCommand<UpdatePosOrderLineQuantityResult>('/v1/pos/order-lines/quantity', input);
+}
+
 export interface RemovePosOrderLineRequest {
   operationId: string;
   orderId: string;

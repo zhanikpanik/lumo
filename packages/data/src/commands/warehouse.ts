@@ -122,6 +122,18 @@ export interface CreateDeliveryInput {
 }
 
 
+export interface ReceiveDeliveryLineInput {
+  productId: string;
+  receivedQuantityMilli: number;
+  receivedPriceTiyin: number;
+}
+
+export interface ReceiveDeliveryInput {
+  documentId: string;
+  expectedVersion: number;
+  receivedLines?: ReceiveDeliveryLineInput[];
+}
+
 export interface UpdateDeliveryPatch {
   supplier?: string;
   deliveryDate?: string;
@@ -150,6 +162,17 @@ export interface CreateWriteOffInput {
 }
 
 
+export interface WarehouseLineQuantityInput {
+  productId: string;
+  quantityMilli: number;
+}
+
+export interface PostWriteOffInput {
+  documentId: string;
+  expectedVersion: number;
+  lineQuantities?: WarehouseLineQuantityInput[];
+}
+
 export interface UpdateWriteOffPatch {
   reasonSummary?: string;
   writeOffDate?: string;
@@ -173,6 +196,12 @@ export interface CreateTransferInput {
   lines: CreateTransferLineInput[];
 }
 
+
+export interface PostTransferInput {
+  documentId: string;
+  expectedVersion: number;
+  lineQuantities?: WarehouseLineQuantityInput[];
+}
 
 export interface UpdateTransferPatch {
   transferDate?: string;

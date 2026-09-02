@@ -17,6 +17,13 @@ interface PosUiState {
   setCurrentOrderId: (id: string | null) => void;
   isCreatingOrder: boolean;
   setCreatingOrder: (creating: boolean) => void;
+  pendingTableTransfer: {
+    orderId: string;
+    tableId: string;
+    tableNumber: string;
+    zoneName: string;
+  } | null;
+  setPendingTableTransfer: (transfer: PosUiState['pendingTableTransfer']) => void;
 
   // ── Selection ──────────────────────────────────────────
   selectedItemId: string | null;
@@ -54,6 +61,8 @@ export const usePosUiStore = create<PosUiState>((set, get) => ({
   setCurrentOrderId: (id) => set({ currentOrderId: id }),
   isCreatingOrder: false,
   setCreatingOrder: (creating) => set({ isCreatingOrder: creating }),
+  pendingTableTransfer: null,
+  setPendingTableTransfer: (pendingTableTransfer) => set({ pendingTableTransfer }),
   selectedItemId: null,
   selectedModifierId: null,
   modifierAction: null,

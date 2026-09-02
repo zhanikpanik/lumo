@@ -1,4 +1,13 @@
-export { addMoney, formatSom, som, tiyin, type Tiyin } from './money.js';
+export {
+  addMoney,
+  cashBalanceTiyin,
+  cashMovementDeltaTiyin,
+  formatSom,
+  som,
+  tiyin,
+  type CashLedgerMovement,
+  type Tiyin,
+} from './money.js';
 export { deterministicId, logicalId, TEST_VENUE_IDS, type LogicalId } from './ids.js';
 export { canonicalJson, CanonicalJsonError } from './canonical-json.js';
 export {
@@ -23,6 +32,7 @@ export {
 } from './snapshots.js';
 export { computeLineCostTiyin, unitConversionFactor } from './recipeCost.js';
 export { venueDay, venueLastNDays, venueSameDayLastWeek, venueToday, venueYesterday, type DayBounds } from './venueDayBounds.js';
+export { venueSameElapsedLastWeek } from './venueDayBounds.js';
 export { default as instantSchema, type AppSchema } from './instant.schema.js';
 export { DomainError, domainErrorFrom, guardActiveOrder, guardShiftState, type ErrorCode } from './errors.js';
 export type { CommandDatabase } from './commands/database.js';
@@ -71,6 +81,7 @@ export {
   adminDashboardActiveShiftQuery,
   adminDashboardCashMovementsQuery,
   adminDashboardInventoryPageQuery,
+  adminDashboardInventoryStateQuery,
   adminDashboardLastWeekSameDayOrdersQuery,
   adminDashboardOrderEventsQuery,
   adminDashboardThresholdIngredientsQuery,
@@ -100,7 +111,7 @@ export {
   adminInventorySessionDetailQuery,
   adminInventoryMovementsQuery,
 } from './warehouseQueries.js';
-export { openShift, closeShift } from './commands/shifts.js';
+export { openShift, closeShift, selectCurrentOpenShift, type ShiftState } from './commands/shifts.js';
 export { createOrder, addOrderLine, removeOrderLine, transferOrder, managerTakeoverOrder, cancelOrder } from './commands/orders.js';
 export type {
   AddOrderLineInput,
@@ -125,16 +136,21 @@ export type {
   CreateDeliveryInput,
   CreateDeliveryLineInput,
   UpdateDeliveryPatch,
+  ReceiveDeliveryInput,
+  ReceiveDeliveryLineInput,
   DeliverySnapshot,
   DeliveryLineSnapshot,
   CreateWriteOffInput,
   CreateWriteOffLineInput,
   UpdateWriteOffPatch,
+  PostWriteOffInput,
+  WarehouseLineQuantityInput,
   WriteOffSnapshot,
   WriteOffLineSnapshot,
   CreateTransferInput,
   CreateTransferLineInput,
   UpdateTransferPatch,
+  PostTransferInput,
   TransferSnapshot,
   TransferLineSnapshot,
   CreateInventorySessionInput,

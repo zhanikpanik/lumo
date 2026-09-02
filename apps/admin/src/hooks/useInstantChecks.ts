@@ -3,12 +3,18 @@ import { adminAllOrdersQuery, adminOrderDetailQuery } from '@lumo/data';
 import { useVenueId } from './useVenueId';
 import { instantOne } from '@/lib/instantLink';
 
+export interface CheckModifier {
+  name: string;
+  price: number;
+}
+
 export interface CheckItem {
   name: string;
   qty: number;
   price: number;
   productId: string | null;
   unitCost: number | null;
+  modifiers: CheckModifier[];
 }
 
 export interface OrderEvent {
@@ -50,12 +56,14 @@ function profitFromItems(items: CheckItem[]): { profit: number; incomplete: bool
   if (items.length === 0) return { profit: 0, incomplete: false };
   let profit = 0;
   let incomplete = false;
-  for (const i of items) {
-    if (i.unitCost === null) {
+  for (const item of items) {
+    if (item.unitCost === null) {
       incomplete = true;
       continue;
     }
-    profit += i.qty * (i.price - i.unitCost);
+    const modifierRevenue = item.modifiers.reduce((sum, modifier) => sum + modifier.price, 0);
+    if (item.modifiers.length > 0) incomplete = true;
+    profit += item.qty * (item.price + modifierRevenue - item.unitCost);
   }
   return { profit, incomplete };
 }
@@ -70,14 +78,16 @@ export const CHECKS_PAGE_SIZE = 50;
 
 export interface ChecksPageOptions {
   from?: Date;
+  to?: Date;
   page?: number;
 }
 
-export function useInstantChecks({ from, page = 0 }: ChecksPageOptions = {}) {
+export function useInstantChecks({ from, to, page = 0 }: ChecksPageOptions = {}) {
   const db = getInstantClient();
   const venueId = useVenueId();
   const result = db.useQuery(adminAllOrdersQuery(venueId, {
     from,
+    to,
     limit: CHECKS_PAGE_SIZE,
     offset: page * CHECKS_PAGE_SIZE,
   }));
@@ -108,7 +118,12 @@ export function useInstantChecks({ from, page = 0 }: ChecksPageOptions = {}) {
     eventsByOrder.set(order.id, events);
   }
 
-  const data: Check[] = (result.data?.orders ?? []).map(o => {
+  const boundedOrders = (result.data?.orders ?? []).filter((order) => {
+    const openedAt = new Date(order.openedAt).getTime();
+    return (!from || openedAt >= from.getTime()) && (!to || openedAt < to.getTime());
+  });
+
+  const data: Check[] = boundedOrders.map(o => {
     const payments = paymentsByOrder.get(o.id) ?? [];
     const paid = payments.reduce((sum, payment) => sum + tyinToSom(payment.amountTiyin), 0);
     const paymentMethod: 'cash' | 'card' | 'none' =
@@ -146,7 +161,7 @@ export function useInstantChecks({ from, page = 0 }: ChecksPageOptions = {}) {
     isLoading: result.isLoading,
     isError: Boolean(result.error),
     error: result.error,
-    hasNextPage: Boolean(result.pageInfo?.orders?.hasNextPage),
+    hasNextPage: data.length === CHECKS_PAGE_SIZE && Boolean(result.pageInfo?.orders?.hasNextPage),
   };
 }
 
@@ -163,6 +178,10 @@ export function useInstantCheckDetail(orderId: string) {
       price: tyinToSom(item.productPriceTiyin),
       productId: product?.id ?? null,
       unitCost: product?.costTiyin != null ? tyinToSom(product.costTiyin) : null,
+      modifiers: (item.modifiers ?? []).map(modifier => ({
+        name: modifier.modifierName,
+        price: tyinToSom(modifier.modifierPriceTiyin),
+      })),
     };
   });
   const events: OrderEvent[] = (order?.orderEvents ?? []).map(event => {

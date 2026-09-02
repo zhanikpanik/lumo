@@ -152,6 +152,13 @@ const directDeliveryId = deterministicId('permission-test', 'direct-delivery');
 const directWriteOffId = deterministicId('permission-test', 'direct-write-off');
 const directTransferId = deterministicId('permission-test', 'direct-transfer');
 const directInventoryId = deterministicId('permission-test', 'direct-inventory');
+const crossEmployeeId = deterministicId('permission-test', 'cross-employee');
+const directEmployeeId = deterministicId('permission-test', 'direct-employee');
+const inactiveEmployeeId = deterministicId('permission-test', 'inactive-employee');
+const inactivePinSecretId = deterministicId('permission-test', 'inactive-pin-secret');
+const crossPinSecretId = deterministicId('permission-test', 'cross-pin-secret');
+const directPinSecretId = deterministicId('permission-test', 'direct-pin-secret');
+const seededWaiterPinSecretId = deterministicId('employee-pin-secret', IDS.employeeWaiter);
 await admin.transact([
   admin.tx.organizations[crossOrgId].update({
     slug: 'permission-test-cross-org',
@@ -188,6 +195,42 @@ await admin.transact([
   admin.tx.warehouses[warehouseId]
     .update({ venueId: IDS.venue, name: 'Permission Warehouse', createdAt: now })
     .link({ venue: IDS.venue }),
+  admin.tx.employees[directEmployeeId]
+    .update({
+      venueId: IDS.venue,
+      displayName: 'Direct PIN Mutation Employee',
+      role: 'waiter',
+      status: 'active',
+      createdAt: now,
+      version: 0,
+    })
+    .link({ venue: IDS.venue }),
+  admin.tx.employees[inactiveEmployeeId]
+    .update({
+      venueId: IDS.venue,
+      displayName: 'Inactive PIN Employee',
+      role: 'waiter',
+      status: 'inactive',
+      createdAt: now,
+      version: 0,
+    })
+    .link({ venue: IDS.venue }),
+  admin.tx.employeePinSecrets[inactivePinSecretId]
+    .update({ pin: '1357', updatedAt: now })
+    .link({ employee: inactiveEmployeeId }),
+  admin.tx.employees[crossEmployeeId]
+    .update({
+      venueId: crossVenueId,
+      displayName: 'Cross Venue Employee',
+      role: 'waiter',
+      status: 'active',
+      createdAt: now,
+      version: 0,
+    })
+    .link({ venue: crossVenueId }),
+  admin.tx.employeePinSecrets[crossPinSecretId]
+    .update({ pin: '9876', updatedAt: now })
+    .link({ employee: crossEmployeeId }),
 ]);
 
 try {
@@ -218,6 +261,33 @@ try {
   });
   assert.equal(ownerVenue.venues.length, 1, 'active owner must read their venue');
   console.log('✓ allow: active owner membership');
+  const ownerPinData = await owner.query({
+    employees: { $: { where: { id: IDS.employeeWaiter }, limit: 1 }, pinSecret: {} },
+  });
+  assert.equal(ownerPinData.employees[0]?.pinSecret?.pin, '1234', 'venue owner must read active employee PIN');
+  const devicePinSecrets = await device.query({ employeePinSecrets: {} });
+  assert.equal(devicePinSecrets.employeePinSecrets.length, 0, 'POS device must not read plaintext PIN secrets');
+  const outsiderPinSecrets = await outsider.query({ employeePinSecrets: {} });
+  assert.equal(outsiderPinSecrets.employeePinSecrets.length, 0, 'unassigned identity must not read plaintext PIN secrets');
+  const crossPinSecrets = await owner.query({
+    employeePinSecrets: { $: { where: { id: crossPinSecretId }, limit: 1 } },
+  });
+  assert.equal(crossPinSecrets.employeePinSecrets.length, 0, 'venue owner must not read another venue PIN');
+  const inactivePinSecrets = await owner.query({
+    employeePinSecrets: { $: { where: { id: inactivePinSecretId }, limit: 1 } },
+  });
+  assert.equal(inactivePinSecrets.employeePinSecrets.length, 0, 'venue owner must not read an inactive employee PIN');
+  console.log('✓ PIN secret read scope: venue admins only');
+
+  await expectDenied('creating a PIN secret directly', () =>
+    owner.transact(owner.tx.employeePinSecrets[directPinSecretId]
+      .update({ pin: '1111', updatedAt: now })
+      .link({ employee: directEmployeeId })));
+  await expectDenied('updating a PIN secret directly', () =>
+    owner.transact(owner.tx.employeePinSecrets[seededWaiterPinSecretId].update({ pin: '1111' })));
+  await expectDenied('deleting a PIN secret directly', () =>
+    owner.transact(owner.tx.employeePinSecrets[seededWaiterPinSecretId].delete()));
+  console.log('✓ deny: direct PIN secret mutations');
 
   await expectDenied('creating stock directly', () =>
     owner.transact(owner.tx.stockItems[directStockId]
@@ -301,6 +371,11 @@ try {
   console.log('✓ deny: direct daily-stat mutation');
 } finally {
   await admin.transact([
+    admin.tx.employeePinSecrets[inactivePinSecretId].delete(),
+    admin.tx.employees[inactiveEmployeeId].delete(),
+    admin.tx.employeePinSecrets[crossPinSecretId].delete(),
+    admin.tx.employees[crossEmployeeId].delete(),
+    admin.tx.employees[directEmployeeId].delete(),
     admin.tx.warehouses[warehouseId].delete(),
     admin.tx.venueDailyStats[statsId].delete(),
     admin.tx.categories[crossCategoryId].delete(),

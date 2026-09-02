@@ -33,3 +33,36 @@ export function formatSom(amount: Tiyin): string {
   const fractional = String(magnitude % TIYIN_PER_SOM).padStart(2, '0');
   return `${sign}${whole}.${fractional}`;
 }
+
+export interface CashLedgerMovement {
+  movementType: string;
+  amountTiyin: number;
+}
+
+export function cashMovementDeltaTiyin({ movementType, amountTiyin }: CashLedgerMovement): number {
+  switch (movementType) {
+    case 'sale':
+    case 'cancel_refund':
+    case 'float_in':
+    case 'income':
+      return amountTiyin;
+    case 'refund':
+      return amountTiyin;
+    case 'collection':
+    case 'float_out':
+    case 'expense':
+      return -Math.abs(amountTiyin);
+    default:
+      return 0;
+  }
+}
+
+export function cashBalanceTiyin(
+  startingCashTiyin: number,
+  movements: readonly CashLedgerMovement[],
+): number {
+  return movements.reduce(
+    (balance, movement) => balance + cashMovementDeltaTiyin(movement),
+    startingCashTiyin,
+  );
+}

@@ -5,6 +5,7 @@ import { instantRecord } from '@/lib/instantLink';
 
 export interface TransferRow {
   id: string;
+  version: number;
   fromWarehouse: string;
   fromWarehouseId: string;
   toWarehouse: string;
@@ -31,6 +32,7 @@ export function useInstantTransfersList() {
     const lines = (Array.isArray(rec.lines) ? rec.lines : []) as Record<string, unknown>[];
     return {
       id: t.id,
+      version: t.version,
       fromWarehouse: fromName,
       fromWarehouseId: (fromWh.id as string) ?? '',
       toWarehouse: toName,
@@ -50,5 +52,5 @@ export function useInstantTransfersList() {
     };
   });
 
-  return { data, isLoading: result.isLoading };
+  return { data, isLoading: result.isLoading, error: result.error };
 }

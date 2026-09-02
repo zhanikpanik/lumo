@@ -1,16 +1,18 @@
 import { executeWarehouseCommand } from '@/data/warehouseCommands';
 import { useVenueId } from './useVenueId';
 import { useState, useCallback } from 'react';
+import type { PostTransferInput } from '@lumo/data';
+
 
 export function useInstantPostTransferBridge() {
   const venueId = useVenueId();
   const [loading, setLoading] = useState(false);
 
   const mutate = useCallback(
-    async (transferId: string) => {
+    async (input: PostTransferInput) => {
       setLoading(true);
       try {
-        await executeWarehouseCommand('post-transfer', crypto.randomUUID(), venueId, { documentId: transferId });
+        await executeWarehouseCommand('post-transfer', crypto.randomUUID(), venueId, input);
       } finally {
         setLoading(false);
       }

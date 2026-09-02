@@ -61,6 +61,12 @@ const orderListPreview = (o: Order) =>
     })
     .join(', ');
 
+function linkedEntityId(value: unknown): string {
+  const linked = Array.isArray(value) ? value[0] : value;
+  if (!linked || typeof linked !== 'object' || !('id' in linked)) return '';
+  return typeof linked.id === 'string' ? linked.id : '';
+}
+
 export const PaidCheckScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
   const db = getInstantClient();
   const venueId = getVenueId();
@@ -80,11 +86,26 @@ export const PaidCheckScreen: React.FC<{ navigation?: any }> = ({ navigation }) 
   const { data: refundData } = db.useQuery(refundQuery);
   const refundedOrderIds = React.useMemo(() => {
     if (!refundData) return new Set<string>();
-    const payments = refundData.payments as Array<Record<string, unknown>> ?? [];
-    const fromPayments = payments
-      .map((p) => ((p.order as Record<string, unknown>)?.id as string) ?? '')
-      .filter((id) => id.length > 0);
-    return new Set(fromPayments);
+    const payments = Array.isArray(refundData.payments) ? refundData.payments : [];
+    const candidateOrderIds = new Set(
+      payments.map((payment) => linkedEntityId(payment.order)).filter((id) => id.length > 0),
+    );
+    const latestRefundAction = new Map<string, { action: string; occurredAt: number }>();
+    const events = Array.isArray(refundData.orderEvents) ? refundData.orderEvents : [];
+    for (const event of events) {
+      const orderId = linkedEntityId(event.order);
+      const action = typeof event.action === 'string' ? event.action : '';
+      const occurredAt = new Date(event.occurredAt).getTime();
+      const current = latestRefundAction.get(orderId);
+      if (orderId && action && Number.isFinite(occurredAt) && (!current || occurredAt > current.occurredAt)) {
+        latestRefundAction.set(orderId, { action, occurredAt });
+      }
+    }
+    return new Set(
+      [...candidateOrderIds].filter((orderId) =>
+        latestRefundAction.get(orderId)?.action !== 'refund_cancelled'
+      ),
+    );
   }, [refundData]);
 
   // Closed orders for the current shift, including those that are currently

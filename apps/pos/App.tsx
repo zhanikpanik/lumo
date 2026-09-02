@@ -25,7 +25,7 @@ import { flushPendingPosCommands } from './src/data/posCommands';
 import { useUserStore } from './src/store/userStore';
 import { useInstantShift } from './src/store/useInstantShift';
 import { theme } from './src/theme/colors';
-import { resolveShiftEntry } from './src/utils/permissions';
+import { resolveColdStartEntry, resolveShiftEntry } from './src/utils/permissions';
 // Ignore specific warnings coming from react-native-web or navigation libraries
 LogBox.ignoreLogs([
   'props.pointerEvents is deprecated',
@@ -100,14 +100,6 @@ export default function App() {
     }
   }, [logout, shiftEntry]);
 
-  // ── Initial route ──────────────────────────────────────────────
-  const getInitialRoute = (): keyof RootStackParamList => {
-    if (!bootstrap) return 'Lock';
-    if (bootstrap.status === 'activation-required') return 'Activation';
-    if (!currentUser || shiftEntry === 'lock' || shiftEntry === 'loading') return 'Lock';
-    if (shiftEntry === 'open-shift') return 'OpenShift';
-    return 'Orders';
-  };
 
   // ── Render ─────────────────────────────────────────────────────
   if (!fontsLoaded && !fontError) return null;
@@ -118,19 +110,12 @@ export default function App() {
       </View>
     );
   }
-  if (bootstrap.status === 'authenticated' && currentUser && isShiftLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Проверка смены...</Text>
-      </View>
-    );
-  }
 
   return (
     <View style={{ flex: 1 }}>
       <NavigationContainer ref={navigationRef}>
       <Stack.Navigator
-        initialRouteName={getInitialRoute()}
+        initialRouteName={resolveColdStartEntry(bootstrap.status)}
         screenOptions={{ headerShown: false, animation: 'none' }}
       >
         <Stack.Screen name="Lock" component={LockRoute} />

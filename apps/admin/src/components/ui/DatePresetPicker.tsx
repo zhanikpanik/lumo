@@ -9,7 +9,7 @@ export interface DatePreset {
 
 interface DatePresetPickerProps {
   value: string;
-  onChange: (date: string) => void;
+  onChange: (date: string, presetKey?: string) => void;
   presets?: DatePreset[];
   showDateInput?: boolean;
   className?: string;
@@ -58,7 +58,7 @@ export function DatePresetPicker({ value, onChange, presets, showDateInput = tru
           <button
             key={preset.key}
             type="button"
-            onClick={() => onChange(preset.getDate())}
+            onClick={() => onChange(preset.getDate(), preset.key)}
             className={`px-3 py-1 rounded-md text-sm font-medium transition-all ${
               isPresetActive(preset)
                 ? 'bg-white text-foreground shadow-sm'

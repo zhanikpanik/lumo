@@ -1,7 +1,5 @@
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, subWeeks, subMonths } from 'date-fns';
-import { ru } from 'date-fns/locale';
-import { cn } from '@/lib/utils';
 import { DatePicker } from '@/components/shadcn/date-picker';
 import { SegmentTabs } from '@/components/ui/SegmentTabs';
 
@@ -49,30 +47,30 @@ const PRESETS: { key: Preset; label: string }[] = [
 ];
 
 export function PeriodPicker({ start, end, onChange }: PeriodPickerProps) {
-  const [activePreset, setActivePreset] = useState<Preset>('this_month');
+  const activePreset = PRESETS.find(({ key }) => {
+    const preset = computePreset(key);
+    return preset.start === start && preset.end === end;
+  })?.key ?? null;
 
   const handlePreset = useCallback((preset: Preset) => {
-    setActivePreset(preset);
-    const { start: s, end: e } = computePreset(preset);
-    onChange(s, e);
+    const { start: nextStart, end: nextEnd } = computePreset(preset);
+    onChange(nextStart, nextEnd);
   }, [onChange]);
 
-  const handleCustomStart = useCallback((val: string) => {
-    setActivePreset(null as unknown as Preset);
-    onChange(val, end);
+  const handleCustomStart = useCallback((value: string) => {
+    onChange(value, end);
   }, [end, onChange]);
 
-  const handleCustomEnd = useCallback((val: string) => {
-    setActivePreset(null as unknown as Preset);
-    onChange(start, val);
+  const handleCustomEnd = useCallback((value: string) => {
+    onChange(start, value);
   }, [start, onChange]);
 
   return (
     <div className="flex items-center gap-3 flex-wrap">
       <SegmentTabs
         options={PRESETS.map((p) => ({ value: p.key, label: p.label }))}
-        value={activePreset ?? ('' as Preset)}
-        onChange={(v) => handlePreset(v as Preset)}
+        value={activePreset}
+        onChange={handlePreset}
       />
 
       <span className="text-muted-foreground text-sm mx-1">или</span>

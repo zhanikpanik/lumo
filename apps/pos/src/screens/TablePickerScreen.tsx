@@ -16,7 +16,7 @@ export const TablePickerScreen: React.FC<{ navigation?: any; route?: any }> = ({
   const mode: 'new' | 'transfer' = route?.params?.mode || 'transfer';
 
   // ── UI state ─────────────────────────────────────────
-  const { currentOrderId, setCurrentOrderId, setCreatingOrder } = usePosUiStore();
+  const { currentOrderId, setCurrentOrderId, setCreatingOrder, setPendingTableTransfer } = usePosUiStore();
 
   // ── InstantDB data ───────────────────────────────────
   const { zones } = useInstantVenue();
@@ -65,19 +65,40 @@ export const TablePickerScreen: React.FC<{ navigation?: any; route?: any }> = ({
       Alert.alert('Ошибка', 'Нет текущего заказа');
       return;
     }
-    try {
-      if (!currentUser) throw new Error('Пользователь не выбран');
-      await updatePosOrder({
-        operationId: `move-order-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        orderId: currentOrderId,
-        actorEmployeeId: currentUser.id,
-        updates: { tableId: table.id },
-      });
-      navigation?.goBack();
-    } catch (e: unknown) {
+    const occupyingOrder = orders.find(
+      (order) => order.id !== currentOrderId
+        && order.tableId === table.id
+        && (order.status === 'active' || order.status === 'alert'),
+    );
+    if (occupyingOrder) {
+      Alert.alert('Стол занят', `На столе ${table.number} уже открыт заказ`);
+      return;
+    }
+    if (!currentUser) {
+      Alert.alert('Ошибка', 'Пользователь не выбран');
+      return;
+    }
+    const transfer = {
+      orderId: currentOrderId,
+      tableId: table.id,
+      tableNumber: table.number,
+      zoneName: zone?.name ?? '',
+    };
+    setPendingTableTransfer(transfer);
+    navigation?.goBack();
+    void updatePosOrder({
+      operationId: `move-order-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      orderId: currentOrderId,
+      actorEmployeeId: currentUser.id,
+      updates: { tableId: table.id },
+    }).catch((e: unknown) => {
+      const pending = usePosUiStore.getState().pendingTableTransfer;
+      if (pending?.orderId === transfer.orderId && pending.tableId === transfer.tableId) {
+        usePosUiStore.getState().setPendingTableTransfer(null);
+      }
       const msg = e instanceof Error ? e.message : 'Не удалось перенести заказ';
       Alert.alert('Ошибка', msg);
-    }
+    });
   };
 
   return (

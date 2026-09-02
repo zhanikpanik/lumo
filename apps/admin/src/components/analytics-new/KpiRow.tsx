@@ -6,8 +6,13 @@ function fmtSom(n: number): string {
   return n.toLocaleString('ru-RU');
 }
 
+function relativeDelta(current: number, previous: number): number | null {
+  return previous === 0 ? null : Math.round(((current - previous) / previous) * 100);
+}
+
 interface Props {
   data: AnalyticsData | null;
+  comparisonData?: AnalyticsData | null;
   isPending: boolean;
   error: Error | null;
 }
@@ -19,9 +24,11 @@ interface KpiItem {
   value: number;
   format: ItemFormat;
   sparkline: number[] | null;
+  comparison: number | null;
+  comparisonUnit: '%' | 'п.п.';
 }
 
-export function KpiRow({ data, isPending, error }: Props) {
+export function KpiRow({ data, comparisonData, isPending, error }: Props) {
   // ── Skeleton ──
   if (isPending) {
     return (
@@ -73,17 +80,62 @@ export function KpiRow({ data, isPending, error }: Props) {
   const marginPct = totalRevenue > 0 ? Math.round((totalMargin / totalRevenue) * 100) : 0;
   const avgCheck = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
 
+  const previousRevenue = comparisonData?.dailyStats.reduce((sum, day) => sum + day.revenue, 0) ?? 0;
+  const previousCost = comparisonData?.dailyStats.reduce((sum, day) => sum + day.cost, 0) ?? 0;
+  const previousOrders = comparisonData?.dailyStats.reduce((sum, day) => sum + day.orderCount, 0) ?? 0;
+  const previousMargin = previousRevenue - previousCost;
+  const previousMarginPct = previousRevenue > 0
+    ? Math.round((previousMargin / previousRevenue) * 100)
+    : null;
+  const previousAvgCheck = previousOrders > 0 ? Math.round(previousRevenue / previousOrders) : 0;
+  const canCompare = previousOrders >= 5;
+
   const revenueSparkline = data.dailyStats.map((d) => d.revenue);
   const ordersSparkline = data.dailyStats.map((d) => d.orderCount);
   const marginSparkline = data.dailyStats.map((d) => d.margin);
   const checkSparkline = data.dailyStats.map((d) => d.avgCheck);
 
   const items: KpiItem[] = [
-    { label: 'Выручка', value: totalRevenue, format: 'som', sparkline: revenueSparkline },
-    { label: 'Маржа', value: marginPct, format: 'percent', sparkline: null },
-    { label: 'Средний чек', value: avgCheck, format: 'som', sparkline: checkSparkline },
-    { label: 'Заказов', value: totalOrders, format: 'count', sparkline: ordersSparkline },
-    { label: 'Прибыль', value: totalMargin, format: 'som', sparkline: marginSparkline },
+    {
+      label: 'Выручка',
+      value: totalRevenue,
+      format: 'som',
+      sparkline: revenueSparkline,
+      comparison: canCompare ? relativeDelta(totalRevenue, previousRevenue) : null,
+      comparisonUnit: '%',
+    },
+    {
+      label: 'Маржа',
+      value: marginPct,
+      format: 'percent',
+      sparkline: null,
+      comparison: canCompare && previousMarginPct != null ? marginPct - previousMarginPct : null,
+      comparisonUnit: 'п.п.',
+    },
+    {
+      label: 'Средний чек',
+      value: avgCheck,
+      format: 'som',
+      sparkline: checkSparkline,
+      comparison: canCompare ? relativeDelta(avgCheck, previousAvgCheck) : null,
+      comparisonUnit: '%',
+    },
+    {
+      label: 'Заказов',
+      value: totalOrders,
+      format: 'count',
+      sparkline: ordersSparkline,
+      comparison: canCompare ? relativeDelta(totalOrders, previousOrders) : null,
+      comparisonUnit: '%',
+    },
+    {
+      label: 'Маржа, сом',
+      value: totalMargin,
+      format: 'som',
+      sparkline: marginSparkline,
+      comparison: canCompare ? relativeDelta(totalMargin, previousMargin) : null,
+      comparisonUnit: '%',
+    },
   ];
 
   const hasSparkline = (sp: number[] | null): sp is number[] =>
@@ -97,7 +149,7 @@ export function KpiRow({ data, isPending, error }: Props) {
           <div className="flex items-baseline gap-1">
             <span
               className={`text-2xl font-bold truncate ${
-                item.label === 'Прибыль' && totalMargin < 0 ? 'text-destructive' : 'text-foreground'
+                item.label === 'Маржа, сом' && totalMargin < 0 ? 'text-destructive' : 'text-foreground'
               }`}
             >
               {item.format === 'percent'
@@ -108,6 +160,14 @@ export function KpiRow({ data, isPending, error }: Props) {
               <SomIcon className="w-[1em] h-[1em] shrink-0 text-foreground" />
             )}
           </div>
+          {item.comparison != null && (
+            <p className={item.comparison >= 0 ? 'mt-1 text-xs text-success' : 'mt-1 text-xs text-destructive'}>
+              {item.comparison > 0 ? '+' : ''}{item.comparison}{item.comparisonUnit} к пред. периоду
+            </p>
+          )}
+          {comparisonData && !canCompare && (
+            <p className="mt-1 text-xs text-muted-foreground">Нет сопоставимой базы</p>
+          )}
           {hasSparkline(item.sparkline) && (
             <Sparkline data={item.sparkline} className="text-primary/30 mt-1" />
           )}

@@ -16,7 +16,7 @@ import {
   rebuildVenueAnalytics,
   runDetachedProjection,
 } from './analytics-projector.mjs';
-import { cancelRefund, closeShift, openShift, parseOrderLineSnapshot, payOrder, refundOrder } from '@lumo/data';
+import { cancelRefund, cashBalanceTiyin, closeShift, computeLineCostTiyin, openShift, parseOrderLineSnapshot, payOrder, refundOrder, selectCurrentOpenShift } from '@lumo/data';
 
 const { INSTANT_APP_ID: appId, INSTANT_ADMIN_TOKEN: adminToken, PORT = '3000' } = process.env;
 if (!appId || !adminToken) {
@@ -205,7 +205,21 @@ async function createPosOrder(request, response, origin) {
   const preflight = {
     shifts: { $: { where: { id: shiftId }, limit: 1 }, venue: {} },
     employees: { $: { where: { id: actorEmployeeId }, limit: 1 }, venue: {} },
-    ...(tableId ? { tables: { $: { where: { id: tableId }, limit: 1 }, venue: {}, zone: {} } } : {}),
+    ...(tableId ? {
+      tables: { $: { where: { id: tableId }, limit: 1 }, venue: {}, zone: {} },
+      targetTableOrders: {
+        $: {
+          where: {
+            'table.id': tableId,
+            'shift.status': 'open',
+            status: { $in: ['active', 'alert'] },
+          },
+          limit: 2,
+        },
+        table: {},
+        shift: {},
+      },
+    } : {}),
   };
 
   const result = await runInstantCommand(
@@ -228,7 +242,7 @@ async function createPosOrder(request, response, origin) {
       let table;
       if (tableId) {
         table = entityForVenue(references.tables, tableId, device.venueId, 'Table');
-        if (table.status !== 'free') throw commandError('Table is not available', 409);
+        if (references.targetTableOrders.length > 0) throw commandError('Table is not available', 409);
       }
 
       const now = new Date().toISOString();
@@ -462,6 +476,124 @@ async function addPosOrderLine(request, response, origin) {
   return send(response, 201, result, origin);
 }
 
+async function updatePosOrderLineQuantity(request, response, origin) {
+  const device = await authorizeDevice(request);
+  const body = await readJson(request);
+  const operationId = nonEmptyString(body.operationId, 'operationId');
+  const orderId = nonEmptyString(body.orderId, 'orderId');
+  const orderItemId = nonEmptyString(body.orderItemId, 'orderItemId');
+  const actorEmployeeId = nonEmptyString(body.actorEmployeeId, 'actorEmployeeId');
+  if (!Number.isSafeInteger(body.quantity) || body.quantity < 1) {
+    throw commandError('quantity must be a positive integer');
+  }
+
+  const result = await runInstantCommand(
+    {
+      db,
+      operationId,
+      venueId: device.venueId,
+      kind: 'update-order-line-quantity',
+      payload: body,
+      deviceId: device.id,
+      actorEmployeeId,
+      preflight: {
+        orders: { $: { where: { id: orderId }, limit: 1 }, venue: {} },
+        orderItems: {
+          $: { where: { id: orderItemId }, limit: 1 },
+          order: { venue: {} },
+          modifiers: {},
+        },
+        employees: { $: { where: { id: actorEmployeeId }, limit: 1 }, venue: {} },
+      },
+    },
+    async (_command, references) => {
+      const order = entityForVenue(references.orders, orderId, device.venueId, 'Order');
+      if (order.status !== 'active') throw commandError('Order is not active', 409);
+      const employee = entityForVenue(references.employees, actorEmployeeId, device.venueId, 'Employee');
+      if (employee.status !== 'active') throw commandError('Active employee is required', 403);
+      const orderItem = references.orderItems.find(
+        (candidate) => candidate.id === orderItemId && linkedId(candidate.order) === orderId,
+      );
+      const itemOrder = Array.isArray(orderItem?.order) ? orderItem.order[0] : orderItem?.order;
+      if (!orderItem || linkedId(itemOrder?.venue) !== device.venueId) {
+        throw commandError('Order line does not belong to this order', 403);
+      }
+      if (!Number.isSafeInteger(orderItem.quantity) || orderItem.quantity < 1) {
+        throw commandError('Order line quantity is invalid', 409);
+      }
+      if (orderItem.quantity === body.quantity) {
+        return { claims: [], steps: [], result: { orderItemId, quantity: body.quantity, newTotal: order.totalAmountTiyin } };
+      }
+
+      let snapshot;
+      let rawSnapshot;
+      try {
+        snapshot = parseOrderLineSnapshot(orderItem.consumptionSnapshotJson);
+        rawSnapshot = JSON.parse(orderItem.consumptionSnapshotJson);
+      } catch {
+        throw commandError('Order line snapshot is invalid', 409);
+      }
+      const consumption = snapshot.consumption.map((line) => {
+        if (line.quantityMilli % orderItem.quantity !== 0) {
+          throw commandError('Order line snapshot cannot be rescaled', 409);
+        }
+        const quantityMilli = (line.quantityMilli / orderItem.quantity) * body.quantity;
+        if (!Number.isSafeInteger(quantityMilli) || quantityMilli <= 0) {
+          throw commandError('Recipe quantity is invalid', 409);
+        }
+        const costTiyin = computeLineCostTiyin(
+          quantityMilli,
+          line.unit,
+          line.ingredientUnit,
+          line.unitCostTiyin,
+        );
+        return { ...line, quantityMilli, costTiyin };
+      });
+
+      const modifierAmount = (orderItem.modifiers ?? []).reduce(
+        (sum, modifier) => sum + modifier.modifierPriceTiyin,
+        0,
+      );
+      const unitAmount = orderItem.productPriceTiyin + modifierAmount;
+      const currentLineAmount = unitAmount * orderItem.quantity;
+      const nextLineAmount = unitAmount * body.quantity;
+      const newTotal = order.totalAmountTiyin - currentLineAmount + nextLineAmount;
+      if (!Number.isSafeInteger(newTotal) || newTotal < 0) {
+        throw commandError('Order total is invalid', 409);
+      }
+
+      const now = new Date().toISOString();
+      const eventId = deterministicUuid('order-event-item-quantity-changed', `${device.venueId}:${operationId}`);
+      const orderVersion = resourceVersion(order, 'Order');
+      return {
+        claims: [claim('order', order, 'Order')],
+        steps: [
+          db.tx.orderItems[orderItemId].update({
+            quantity: body.quantity,
+            consumptionSnapshotJson: JSON.stringify({ ...rawSnapshot, consumption }),
+          }),
+          db.tx.orders[orderId].update({ totalAmountTiyin: newTotal, version: orderVersion + 1 }),
+          db.tx.orderEvents[eventId]
+            .update({
+              venueId: device.venueId,
+              operationId: `${operationId}:item-quantity-changed`,
+              action: 'item_quantity_changed',
+              occurredAt: now,
+              metadata: {
+                orderItemId,
+                previousQuantity: orderItem.quantity,
+                quantity: body.quantity,
+              },
+            })
+            .link({ order: orderId, venue: device.venueId, actorEmployee: actorEmployeeId, device: device.id }),
+        ],
+        result: { orderItemId, quantity: body.quantity, newTotal },
+      };
+    },
+  );
+  return send(response, 200, result, origin);
+}
+
 async function removePosOrderLine(request, response, origin) {
   const device = await authorizeDevice(request);
   const body = await readJson(request);
@@ -621,7 +753,21 @@ async function updatePosOrder(request, response, origin) {
       const references = await db.query({
         orders: { $: { where: { id: orderId }, limit: 1 }, venue: {} },
         employees: { $: { where: { id: { $in: employeeIds } }, limit: employeeIds.length }, venue: {} },
-        ...(tableId ? { tables: { $: { where: { id: tableId }, limit: 1 }, venue: {}, zone: {} } } : {}),
+        ...(tableId ? {
+          tables: { $: { where: { id: tableId }, limit: 1 }, venue: {}, zone: {} },
+          targetTableOrders: {
+            $: {
+              where: {
+                'table.id': tableId,
+                'shift.status': 'open',
+                status: { $in: ['active', 'alert'] },
+              },
+              limit: 2,
+            },
+            table: {},
+            shift: {},
+          },
+        } : {}),
       });
       const order = entityForVenue(references.orders, orderId, device.venueId, 'Order');
       if (order.status !== 'active') throw commandError('Order is not active', 409);
@@ -632,7 +778,9 @@ async function updatePosOrder(request, response, origin) {
         if (owner.status !== 'active') throw commandError('New order owner must be active', 409);
       }
       const table = tableId === undefined ? undefined : entityForVenue(references.tables, tableId, device.venueId, 'Table');
-      if (table && table.status !== 'free') throw commandError('Table is not available', 409);
+      if (table && references.targetTableOrders.some((candidate) => candidate.id !== orderId)) {
+        throw commandError('Table is not available', 409);
+      }
 
       const orderVersion = resourceVersion(order, 'Order');
       const tableVersion = table ? resourceVersion(table, 'Table') : undefined;
@@ -775,7 +923,9 @@ async function openPosShift(request, response, origin) {
       if (employee.status !== 'active') throw commandError('Active employee is required', 403);
       const venue = references.venues[0];
       if (!venue) throw commandError('Device venue was not found', 403);
-      const currentShift = references.shifts.find((shift) => linkedId(shift.venue) === device.venueId && shift.status === 'open') ?? null;
+      const currentShift = selectCurrentOpenShift(
+        references.shifts.filter((shift) => linkedId(shift.venue) === device.venueId),
+      );
       const captured = await captureCommand((commandDb) => openShift(commandDb, {
         operationId, venueId: device.venueId, deviceId: device.id, actorEmployeeId,
         startingCashTiyin: body.startingCashTiyin, clientTimestamp: new Date().toISOString(),
@@ -851,10 +1001,17 @@ async function createCashMovement(request, response, origin) {
     },
     async () => {
       const shifts = await db.query({
-        shifts: { $: { where: { id: shiftId }, limit: 1 }, venue: {} },
+        shifts: { $: { where: { id: shiftId }, limit: 1 }, venue: {}, cashMovements: {} },
       });
       const shift = entityForVenue(shifts.shifts, shiftId, device.venueId, 'Shift');
       if (shift.status !== 'open') throw commandError('Open shift is required', 409);
+      if (shift.closedAt != null) throw commandError('Open shift is required', 409);
+      if (
+        body.movementType !== 'float_in'
+        && body.amountTiyin > cashBalanceTiyin(shift.startingCashTiyin ?? 0, shift.cashMovements ?? [])
+      ) {
+        throw commandError('Insufficient cash available', 409);
+      }
       const id = deterministicUuid('cash-movement', `${device.venueId}:${operationId}`);
       const now = new Date().toISOString();
       const shiftVersion = resourceVersion(shift, 'Shift');
@@ -1501,6 +1658,9 @@ export const server = createServer(async (request, response) => {
     }
     if (request.method === 'POST' && url.pathname === '/v1/pos/orders/cancel') {
       return await cancelPosOrder(request, response, origin);
+    }
+    if (request.method === 'POST' && url.pathname === '/v1/pos/order-lines/quantity') {
+      return await updatePosOrderLineQuantity(request, response, origin);
     }
     if (request.method === 'POST' && url.pathname === '/v1/pos/order-lines/remove') {
       return await removePosOrderLine(request, response, origin);

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Clock, Play, ArrowDownRight, Truck, Trash2, type LucideIcon } from 'lucide-react';
+import { Play, ArrowDownRight, Truck, Trash2, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { ChronologyEvent, ChronologyEventType } from '@/types/dashboard';
 
@@ -27,10 +27,10 @@ export function ChronologyFeed({ events, title = 'События' }: ChronologyF
 
   return (
     <div>
-      <h2 className="text-sm font-medium text-foreground mb-3">{title}</h2>
+      <h2 className="mb-2 text-sm font-medium text-foreground">{title}</h2>
 
-      <div>
-        {events.map((event, i) => {
+      <div className="space-y-2">
+        {events.map((event) => {
           const eventMeta = event.type ? eventIcons[event.type] : null;
           const EventIcon = eventMeta?.Icon;
 

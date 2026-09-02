@@ -272,6 +272,14 @@ const rules = {
       update: "false",
     },
   },
+  employeePinSecrets: {
+    allow: {
+      view: `${venueAdmins('employee.venue')} && 'active' in data.ref('employee.status')`,
+      create: "false",
+      delete: "false",
+      update: "false",
+    },
+  },
 
   warehouses: {
     allow: {

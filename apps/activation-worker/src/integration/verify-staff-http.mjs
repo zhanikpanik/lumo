@@ -45,6 +45,8 @@ await db.transact([
 
 const credentialFor = (employee) =>
   Array.isArray(employee.pinCredential) ? employee.pinCredential[0] : employee.pinCredential;
+const secretFor = (employee) =>
+  Array.isArray(employee.pinSecret) ? employee.pinSecret[0] : employee.pinSecret;
 
 const externalBaseUrl = process.env.STAFF_HTTP_BASE_URL?.replace(/\/$/, '');
 const server = externalBaseUrl ? null : (await import('../server.mjs')).server;
@@ -85,6 +87,7 @@ async function cleanup() {
     commandClaims: { $: { where: { venueId } } },
     commandOperations: { $: { where: { venueId } } },
     employeePinCredentials: { $: { where: { 'employee.venue.id': venueId } }, employee: {} },
+    employeePinSecrets: { $: { where: { 'employee.venue.id': venueId } }, employee: {} },
     employees: { $: { where: { venueId } } },
     cashMovements: { $: { where: { venueId } } },
     shifts: { $: { where: { venueId } } },
@@ -97,6 +100,7 @@ async function cleanup() {
       ...scoped.commandClaims.map((row) => db.tx.commandClaims[row.id].delete()),
       ...scoped.commandOperations.map((row) => db.tx.commandOperations[row.id].delete()),
       ...scoped.employeePinCredentials.map((row) => db.tx.employeePinCredentials[row.id].delete()),
+      ...scoped.employeePinSecrets.map((row) => db.tx.employeePinSecrets[row.id].delete()),
       ...scoped.employees.map((row) => db.tx.employees[row.id].delete()),
     ]).catch(() => {});
   }
@@ -115,46 +119,55 @@ try {
   await waitForServer();
   const createOperationId = `create-employee-${runId}`;
   const created = await staffCommand('create-employee', createOperationId, {
-    displayName: 'Credential Fixture', email: null, role: 'waiter', pin: '123456',
+    displayName: 'Credential Fixture', email: null, role: 'waiter', pin: '1234',
   });
   assert.equal(created.status, 200, JSON.stringify(created.body));
   assert.equal(created.body.credentialsVersion, 1);
   const replay = await staffCommand('create-employee', createOperationId, {
-    displayName: 'Credential Fixture', email: null, role: 'waiter', pin: '123456',
+    displayName: 'Credential Fixture', email: null, role: 'waiter', pin: '1234',
   });
   assert.deepEqual(replay, created, 'credential creation replay must return the committed result');
 
   const credentialData = await db.query({
-    employees: { $: { where: { id: created.body.employeeId }, limit: 1 }, pinCredential: {} },
+    employees: { $: { where: { id: created.body.employeeId }, limit: 1 }, pinCredential: {}, pinSecret: {} },
   });
   const employee = credentialData.employees[0];
   assert.ok(employee);
   assert.equal(Object.hasOwn(employee, 'pin'), false, 'employee rows must not contain plaintext PIN');
-  assert.equal(await verifyEmployeePin(credentialFor(employee), '123456'), true);
+  assert.equal(await verifyEmployeePin(credentialFor(employee), '1234'), true);
+  assert.equal(secretFor(employee)?.pin, '1234', 'trusted create must save the admin-visible PIN');
 
   const deviceClient = db.asUser({ email: deviceEmail });
   const visibleToDevice = await deviceClient.query({
-    employees: { $: { where: { id: employee.id }, limit: 1 }, pinCredential: {} },
+    employees: { $: { where: { id: employee.id }, limit: 1 }, pinCredential: {}, pinSecret: {} },
   });
   assert.equal(credentialFor(visibleToDevice.employees[0]).credentialsVersion, 1);
+  assert.equal(secretFor(visibleToDevice.employees[0]), undefined, 'POS devices must not read plaintext PIN secrets');
 
   const ownerClient = db.asUser({ email: ownerEmail });
   const hiddenCredentials = await ownerClient.query({ employeePinCredentials: {} });
   assert.equal(hiddenCredentials.employeePinCredentials.length, 0, 'admin clients must not read PIN verifiers');
+  const visibleSecrets = await ownerClient.query({
+    employees: { $: { where: { id: employee.id }, limit: 1 }, pinSecret: {} },
+  });
+  assert.equal(secretFor(visibleSecrets.employees[0])?.pin, '1234', 'venue admins must read plaintext PIN secrets');
   const anonymousClient = db.asUser({ guest: true });
   const anonymousCredentials = await anonymousClient.query({ employeePinCredentials: {} });
+  const anonymousSecrets = await anonymousClient.query({ employeePinSecrets: {} });
+  assert.equal(anonymousSecrets.employeePinSecrets.length, 0, 'anonymous clients must not read plaintext PIN secrets');
   assert.equal(anonymousCredentials.employeePinCredentials.length, 0, 'anonymous clients must not read PIN verifiers');
 
   const reset = await staffCommand('reset-employee-pin', `reset-pin-${runId}`, {
-    employeeId: employee.id, pin: '654321',
+    employeeId: employee.id, pin: '6543',
   });
   assert.equal(reset.status, 200, JSON.stringify(reset.body));
   assert.equal(reset.body.credentialsVersion, 2);
   const resetData = await db.query({
-    employees: { $: { where: { id: employee.id }, limit: 1 }, pinCredential: {} },
+    employees: { $: { where: { id: employee.id }, limit: 1 }, pinCredential: {}, pinSecret: {} },
   });
-  assert.equal(await verifyEmployeePin(credentialFor(resetData.employees[0]), '123456'), false);
-  assert.equal(await verifyEmployeePin(credentialFor(resetData.employees[0]), '654321'), true);
+  assert.equal(await verifyEmployeePin(credentialFor(resetData.employees[0]), '1234'), false);
+  assert.equal(await verifyEmployeePin(credentialFor(resetData.employees[0]), '6543'), true);
+  assert.equal(secretFor(resetData.employees[0])?.pin, '6543', 'trusted reset must update the admin-visible PIN');
 
   const updated = await staffCommand('update-employee', `update-employee-${runId}`, {
     employeeId: employee.id,
@@ -216,19 +229,19 @@ try {
   assert.equal(adminState.cashMovements.length, 0);
 
   const duplicatePin = await staffCommand('create-employee', `duplicate-pin-${runId}`, {
-    displayName: 'Duplicate PIN', email: null, role: 'cashier', pin: '654321',
+    displayName: 'Duplicate PIN', email: null, role: 'cashier', pin: '6543',
   });
   assert.equal(duplicatePin.status, 409, JSON.stringify(duplicatePin.body));
   assert.equal(duplicatePin.body.code, 'pin_in_use');
 
   const pinAsBearer = await fetch(`${baseUrl}/v1/admin/staff-commands`, {
     method: 'POST',
-    headers: { authorization: 'Bearer 654321', 'content-type': 'application/json' },
+    headers: { authorization: 'Bearer 6543', 'content-type': 'application/json' },
     body: JSON.stringify({
       kind: 'reset-employee-pin',
       operationId: `pin-as-bearer-${runId}`,
       venueId,
-      payload: { employeeId: employee.id, pin: '111111' },
+      payload: { employeeId: employee.id, pin: '1111' },
     }),
   });
   assert.equal(pinAsBearer.status, 401, 'a PIN must never authorize a server mutation');
@@ -251,12 +264,13 @@ try {
   assert.equal(deactivated.status, 200, JSON.stringify(deactivated.body));
   assert.equal(deactivated.body.credentialsVersion, 3);
   const deactivatedData = await db.query({
-    employees: { $: { where: { id: employee.id }, limit: 1 }, pinCredential: {} },
+    employees: { $: { where: { id: employee.id }, limit: 1 }, pinCredential: {}, pinSecret: {} },
   });
   assert.equal(deactivatedData.employees[0].status, 'inactive');
-  assert.equal(await verifyEmployeePin(credentialFor(deactivatedData.employees[0]), '654321'), false);
+  assert.equal(await verifyEmployeePin(credentialFor(deactivatedData.employees[0]), '6543'), false);
+  assert.equal(secretFor(deactivatedData.employees[0]), null, 'deactivation must remove the plaintext PIN secret');
 
-  console.log('Verified trusted PIN create/reset/deactivate, verifier privacy, versioning, replay, uniqueness, and offline attempt audit.');
+  console.log('Verified trusted PIN create/reset/deactivate, admin reveal, device verifier-only access, versioning, replay, uniqueness, and offline attempt audit.');
 } finally {
   if (server?.listening) {
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));

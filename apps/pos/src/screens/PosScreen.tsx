@@ -42,12 +42,28 @@ const calcTotal = (items: OrderItem[]): number =>
     return sum + (item.product.price + modTotal) * item.quantity;
   }, 0);
 
-export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
+const modifierConfigurationKey = (item: OrderItem): string =>
+  item.modifiers
+    .map((modifier) => `${modifier.sourceModifierId ?? modifier.id.replace(/_\d+$/, '')}:${modifier.price}`)
+    .sort()
+    .join('|');
+
+export const orderItemConfigurationKey = (item: OrderItem): string =>
+  `${item.product.id}\u0000${item.comment?.trim() ?? ''}\u0000${modifierConfigurationKey(item)}`;
+
+interface PosNavigation {
+  navigate: (screen: string, params?: Record<string, unknown>) => void;
+  replace: (screen: string) => void;
+}
+
+export const PosScreen: React.FC<{ navigation?: PosNavigation }> = ({ navigation }) => {
   // ── UI state (from posUiStore) ────────────────────────
   const {
     currentOrderId,
     isCreatingOrder,
     setCreatingOrder,
+    pendingTableTransfer,
+    setPendingTableTransfer,
     selectedItemId, selectedModifierId, modifierAction,
     activeAction, draftItem,
     selectItem, selectModifier, cancelDraft,
@@ -55,7 +71,7 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
   } = usePosUiStore();
 
   // ── InstantDB data ────────────────────────────────────
-  const { venueType } = useInstantVenue();
+  const { venueType, employees } = useInstantVenue();
   const currentUser = useUserStore((state) => state.currentUser);
   const { openShift: currentShift } = useInstantShift(currentUser?.id);
   const shiftId = currentShift?.id;
@@ -72,12 +88,28 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
   const itemsRef = useRef(items);
   itemsRef.current = items;
   const [pendingItems, setPendingItems] = useState<Array<OrderItem & { committedItemId?: string }>>([]);
-  const pendingItemIds = useMemo(() => new Set(pendingItems.map((item) => item.id)), [pendingItems]);
-  const displayItems = useMemo(() => [...items, ...pendingItems], [items, pendingItems]);
-  const hasPendingItems = pendingItems.length > 0;
+  const [pendingQuantities, setPendingQuantities] = useState<Record<string, number>>({});
+  const pendingQuantitiesRef = useRef(pendingQuantities);
+  pendingQuantitiesRef.current = pendingQuantities;
+  const recentItemTargetsRef = useRef(new Map<string, { id: string; quantity: number }>());
+  const itemMutationQueuesRef = useRef(new Map<string, Promise<void>>());
+  const pendingItemIds = useMemo(
+    () => new Set([...pendingItems.map((item) => item.id), ...Object.keys(pendingQuantities)]),
+    [pendingItems, pendingQuantities],
+  );
+  const displayItems = useMemo(
+    () => [
+      ...items.map((item) => pendingQuantities[item.id] === undefined
+        ? item
+        : { ...item, quantity: pendingQuantities[item.id] }),
+      ...pendingItems,
+    ],
+    [items, pendingItems, pendingQuantities],
+  );
+  const hasPendingItems = pendingItems.length > 0 || Object.keys(pendingQuantities).length > 0;
 
   // ── InstantDB write commands ──────────────────────────
-  const { addItem, removeItem, deleteCurrentOrder, updateMeta } =
+  const { addItem, updateItemQuantity, removeItem, deleteCurrentOrder, updateMeta } =
     useInstantOrderEditor({
       orderId: currentOrderId ?? null,
       actorEmployeeId: currentUser?.id ?? 'unknown',
@@ -108,16 +140,45 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
   const [selectedOrderAction, setSelectedOrderAction] = useState<OrderActionType>(null);
   const backPendingRef = useRef(false);
   const [notificationVisible, setNotificationVisible] = useState(false);
+  const [pendingOrderMeta, setPendingOrderMeta] = useState<{
+    guestCount?: number;
+    ownerEmployeeId?: string;
+    waiter?: string;
+    comment?: string;
+  }>({});
+  const metadataQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const displayOrder = useMemo(() => {
+    if (!currentOrder) return null;
+    const tablePatch = pendingTableTransfer?.orderId === currentOrder.id
+      ? {
+          tableId: pendingTableTransfer.tableId,
+          tableNumber: pendingTableTransfer.tableNumber,
+          zone: pendingTableTransfer.zoneName,
+          isQuickCheck: false,
+        }
+      : {};
+    return { ...currentOrder, ...pendingOrderMeta, ...tablePatch };
+  }, [currentOrder, pendingOrderMeta, pendingTableTransfer]);
 
   // ── Effects ───────────────────────────────────────────
 
   const isLocked = useMemo(
-    () => requiresOrderTakeover(currentUser, currentOrder, isTakeaway),
-    [currentUser, currentOrder, isTakeaway],
+    () => requiresOrderTakeover(currentUser, displayOrder, isTakeaway),
+    [currentUser, displayOrder, isTakeaway],
   );
   useEffect(() => {
     if (isCreatingOrder && currentOrder) setCreatingOrder(false);
   }, [currentOrder, isCreatingOrder, setCreatingOrder]);
+
+  useEffect(() => {
+    if (
+      currentOrder
+      && pendingTableTransfer?.orderId === currentOrder.id
+      && pendingTableTransfer.tableId === currentOrder.tableId
+    ) {
+      setPendingTableTransfer(null);
+    }
+  }, [currentOrder, pendingTableTransfer, setPendingTableTransfer]);
 
 
   useEffect(() => {
@@ -130,28 +191,112 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
   }, [items]);
 
   useEffect(() => {
+    setPendingQuantities((current) => {
+      const entries = Object.entries(current).filter(([itemId, quantity]) =>
+        !items.some((item) => item.id === itemId && item.quantity === quantity),
+      );
+      return entries.length === Object.keys(current).length ? current : Object.fromEntries(entries);
+    });
+  }, [items]);
+
+  useEffect(() => {
     setPendingItems([]);
+    setPendingQuantities({});
+    pendingQuantitiesRef.current = {};
+    recentItemTargetsRef.current.clear();
+    itemMutationQueuesRef.current.clear();
+    setPendingOrderMeta({});
+    metadataQueueRef.current = Promise.resolve();
   }, [currentOrderId]);
+
+  useEffect(() => {
+    if (!currentOrder) return;
+    setPendingOrderMeta((current) => {
+      const next = { ...current };
+      if (next.guestCount === currentOrder.guestCount) delete next.guestCount;
+      if (next.ownerEmployeeId === currentOrder.ownerEmployeeId) {
+        delete next.ownerEmployeeId;
+        delete next.waiter;
+      }
+      if (next.comment === currentOrder.comment) delete next.comment;
+      return next;
+    });
+  }, [currentOrder]);
 
   // ── Handlers ──────────────────────────────────────────
 
-  const submitItem = useCallback((item: OrderItem) => {
+  const submitItem = useCallback(async (item: OrderItem): Promise<string> => {
     const pendingId = `pending-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     setPendingItems((current) => [...current, { ...item, id: pendingId }]);
-    void addItem(item)
-      .then((result) => {
-        if (!result) throw new Error('Заказ ещё не готов');
-        setPendingItems((current) => itemsRef.current.some((item) => item.id === result.orderItemId)
-          ? current.filter((pending) => pending.id !== pendingId)
-          : current.map((pending) =>
-            pending.id === pendingId ? { ...pending, committedItemId: result.orderItemId } : pending
-          ));
-      })
-      .catch((error: unknown) => {
-        setPendingItems((current) => current.filter((pending) => pending.id !== pendingId));
-        Alert.alert('Не удалось добавить блюдо', error instanceof Error ? error.message : 'Повторите попытку');
-      });
+    try {
+      const result = await addItem(item);
+      if (!result) throw new Error('Заказ ещё не готов');
+      setPendingItems((current) => itemsRef.current.some((currentItem) => currentItem.id === result.orderItemId)
+        ? current.filter((pending) => pending.id !== pendingId)
+        : current.map((pending) =>
+          pending.id === pendingId ? { ...pending, committedItemId: result.orderItemId } : pending
+        ));
+      return result.orderItemId;
+    } catch (error: unknown) {
+      setPendingItems((current) => current.filter((pending) => pending.id !== pendingId));
+      Alert.alert('Не удалось добавить блюдо', error instanceof Error ? error.message : 'Повторите попытку');
+      throw error;
+    }
   }, [addItem]);
+
+  const queueItem = useCallback((item: OrderItem) => {
+    const key = orderItemConfigurationKey(item);
+    const previous = itemMutationQueuesRef.current.get(key) ?? Promise.resolve();
+    const queued = previous.catch(() => undefined).then(async () => {
+      const currentItem = itemsRef.current.find(
+        (candidate) => orderItemConfigurationKey(candidate) === key,
+      );
+      const recentTarget = recentItemTargetsRef.current.get(key);
+      const targetId = currentItem?.id ?? recentTarget?.id;
+      if (!targetId) {
+        const id = await submitItem(item);
+        recentItemTargetsRef.current.set(key, { id, quantity: item.quantity });
+        return;
+      }
+
+      const currentQuantity = pendingQuantitiesRef.current[targetId]
+        ?? currentItem?.quantity
+        ?? recentTarget?.quantity
+        ?? 0;
+      const nextQuantity = currentQuantity + item.quantity;
+      recentItemTargetsRef.current.set(key, { id: targetId, quantity: nextQuantity });
+      pendingQuantitiesRef.current = {
+        ...pendingQuantitiesRef.current,
+        [targetId]: nextQuantity,
+      };
+      setPendingQuantities(pendingQuantitiesRef.current);
+      setPendingItems((current) => current.map((pending) =>
+        pending.committedItemId === targetId ? { ...pending, quantity: nextQuantity } : pending
+      ));
+
+      try {
+        await updateItemQuantity(targetId, nextQuantity);
+      } catch (error: unknown) {
+        const { [targetId]: _failedQuantity, ...remainingQuantities } = pendingQuantitiesRef.current;
+        pendingQuantitiesRef.current = remainingQuantities;
+        setPendingQuantities(remainingQuantities);
+        recentItemTargetsRef.current.set(key, { id: targetId, quantity: currentQuantity });
+        setPendingItems((current) => current.map((pending) =>
+          pending.committedItemId === targetId ? { ...pending, quantity: currentQuantity } : pending
+        ));
+        Alert.alert('Не удалось изменить количество', error instanceof Error ? error.message : 'Повторите попытку');
+        throw error;
+      }
+    });
+    let settled: Promise<void>;
+    settled = queued.finally(() => {
+      if (itemMutationQueuesRef.current.get(key) === settled) {
+        itemMutationQueuesRef.current.delete(key);
+      }
+    });
+    itemMutationQueuesRef.current.set(key, settled);
+    void settled.catch(() => undefined);
+  }, [submitItem, updateItemQuantity]);
 
   const handleAddProduct = useCallback((product: Product) => {
     if (product.hasModifiers) {
@@ -164,43 +309,97 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
       };
       startDraft(draftItem);
     } else {
-      // Show the line immediately; the authoritative command reconciles it.
-      submitItem({
+      // Serialize identical additions so repeated taps increment one line.
+      queueItem({
         id: `item-${Date.now()}`,
         product,
         quantity: 1,
         modifiers: [],
       });
     }
-  }, [startDraft, submitItem]);
+  }, [queueItem, startDraft]);
+  const queueOrderMeta = useCallback((
+    updates: Record<string, unknown>,
+    optimistic: typeof pendingOrderMeta,
+  ) => {
+    setPendingOrderMeta((current) => ({ ...current, ...optimistic }));
+    const request = metadataQueueRef.current.then(() => updateMeta(updates));
+    metadataQueueRef.current = request.then(() => undefined, () => undefined);
+    void request.catch((error: unknown) => {
+      setPendingOrderMeta((current) => {
+        const next = { ...current };
+        for (const [key, value] of Object.entries(optimistic)) {
+          if (next[key as keyof typeof next] === value) delete next[key as keyof typeof next];
+        }
+        return next;
+      });
+      Alert.alert('Не удалось обновить заказ', error instanceof Error ? error.message : 'Повторите попытку');
+    });
+  }, [updateMeta]);
+
+  const handleWaiterChange = useCallback((employeeId: string) => {
+    const waiter = employees.find((employee) => employee.id === employeeId);
+    if (!waiter) return;
+    queueOrderMeta(
+      { employeeId },
+      { ownerEmployeeId: employeeId, waiter: waiter.name },
+    );
+    setOrderActionsMode(false);
+    setSelectedOrderAction(null);
+  }, [employees, queueOrderMeta]);
+
+  const handleGuestCountChange = useCallback((guestCount: number) => {
+    queueOrderMeta({ guestCount }, { guestCount });
+  }, [queueOrderMeta]);
+
 
   const handleCommitDraft = useCallback(() => {
-    const committed = usePosUiStore.getState().commitDraft();
-    if (committed && currentOrderId) {
-      submitItem(committed);
+    const state = usePosUiStore.getState();
+    const draft = state.draftItem;
+    if (!draft || !currentOrderId) return;
+    const existingItem = itemsRef.current.find((item) => item.id === draft.id);
+    const committed = state.commitDraft();
+    if (!committed) return;
+    if (!existingItem) {
+      queueItem(committed);
+      return;
     }
-  }, [currentOrderId, submitItem]);
 
-  const handleBack = useCallback(async () => {
+    setPendingQuantities((current) => ({ ...current, [committed.id]: committed.quantity }));
+    void updateItemQuantity(committed.id, committed.quantity).catch((error: unknown) => {
+      setPendingQuantities((current) => {
+        const next = { ...current };
+        delete next[committed.id];
+        return next;
+      });
+      Alert.alert('Не удалось изменить количество', error instanceof Error ? error.message : 'Повторите попытку');
+    });
+  }, [currentOrderId, queueItem, updateItemQuantity]);
+
+  const handleBack = useCallback(() => {
     if (backPendingRef.current) return;
     backPendingRef.current = true;
 
-    const comment = currentOrder?.comment?.trim() || '';
+    const comment = displayOrder?.comment?.trim() || '';
     const empty = displayItems.length === 0 && !comment;
     cancelDraft();
-
-    try {
-      if (empty && currentOrderId) {
-        await deleteCurrentOrder(currentOrderId);
-        usePosUiStore.getState().setCurrentOrderId(null);
-      }
-      navigation?.navigate('Orders');
-    } catch (error) {
-      console.error('cancel empty order failed:', error);
-    } finally {
-      backPendingRef.current = false;
+    const targetOrderId = currentOrderId;
+    if (empty && targetOrderId) {
+      usePosUiStore.getState().setCurrentOrderId(null);
     }
-  }, [currentOrder, displayItems, currentOrderId, deleteCurrentOrder, cancelDraft, navigation]);
+    navigation?.navigate('Orders');
+    backPendingRef.current = false;
+
+    if (empty && targetOrderId) {
+      void deleteCurrentOrder(targetOrderId).catch((error: unknown) => {
+        if (error instanceof Error && error.message === 'Order is not active') return;
+        Alert.alert(
+          'Не удалось отменить пустой заказ',
+          error instanceof Error ? error.message : 'Повторите попытку',
+        );
+      });
+    }
+  }, [displayOrder, displayItems, currentOrderId, deleteCurrentOrder, cancelDraft, navigation]);
 
   const handleSearchOpen = () => { setSearchMode(true); setSearchQuery(''); };
   const handleSearchClose = () => { setSearchMode(false); setSearchQuery(''); };
@@ -232,6 +431,22 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
     setSelectedOrderAction(null);
   };
 
+  const handleDeleteCurrentOrder = useCallback(() => {
+    if (!currentOrderId) return;
+    const targetOrderId = currentOrderId;
+    usePosUiStore.getState().setCurrentOrderId(null);
+    setOrderActionsMode(false);
+    setSelectedOrderAction(null);
+    navigation?.replace('Orders');
+    void deleteCurrentOrder(targetOrderId).catch((error: unknown) => {
+      if (error instanceof Error && error.message === 'Order is not active') return;
+      Alert.alert(
+        'Не удалось отменить заказ',
+        error instanceof Error ? error.message : 'Повторите попытку',
+      );
+    });
+  }, [currentOrderId, deleteCurrentOrder, navigation]);
+
   const handlePrecheck = async () => {
     if (isEmpty || hasPendingItems || !currentOrderId) return;
     const adapter = getPrintAdapter();
@@ -243,8 +458,8 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
     }));
     await adapter.print({
       ticketId: `precheck-${currentOrderId}-${Date.now()}`,
-      orderNumber: currentOrder?.number ?? currentOrderId.slice(0, 6),
-      table: currentOrder?.tableNumber ?? '',
+      orderNumber: displayOrder?.number ?? currentOrderId.slice(0, 6),
+      table: displayOrder?.tableNumber ?? '',
       snapshot: { kind: 'initial', lines },
       attempt: 1,
       createdAt: new Date().toISOString(),
@@ -279,7 +494,7 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
           onSearchClose={handleSearchClose}
           onNotificationPress={() => setNotificationVisible(true)}
           hideRight={orderActionsMode && !!selectedOrderAction}
-          currentOrder={currentOrder}
+          currentOrder={displayOrder}
         />
 
         {isLocked ? (
@@ -295,7 +510,7 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
                 <OrderPanel
                   items={displayItems}
                   pendingItemIds={pendingItemIds}
-                  currentOrder={currentOrder}
+                  currentOrder={displayOrder}
                   onCommentPress={() => setCommentVisible(true)}
                 />
               </View>
@@ -305,7 +520,7 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.paymentBtn, (isEmpty || hasPendingItems) && styles.btnDisabled]}
-                  onPress={() => navigation?.navigate('Payment')}
+                  onPress={() => navigation?.navigate('Payment', { totalAmountTiyin: total })}
                   disabled={isEmpty || hasPendingItems}
                 >
                   <Text style={styles.paymentLabel}>Оплата</Text>
@@ -330,7 +545,7 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
                 <OrderPanel
                   items={displayItems}
                   pendingItemIds={pendingItemIds}
-                  currentOrder={currentOrder}
+                  currentOrder={displayOrder}
                   onCommentPress={() => setCommentVisible(true)}
                 />
               </View>
@@ -340,7 +555,7 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.paymentBtn, isItemSelected && styles.paymentBtnSecondary, (isEmpty || hasPendingItems) && styles.btnDisabled]}
-                  onPress={() => navigation?.navigate('Payment')}
+                  onPress={() => navigation?.navigate('Payment', { totalAmountTiyin: total })}
                   disabled={isEmpty || hasPendingItems}
                 >
                   <Text style={styles.paymentLabel}>Оплата</Text>
@@ -355,7 +570,7 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
             <View style={styles.midCol}>
               <View style={styles.colContent}>
                 {orderActionsMode ? (
-                  <OrderActionsMenu selectedAction={selectedOrderAction} onSelect={handleOrderActionSelect} currentOrder={currentOrder} />
+                  <OrderActionsMenu selectedAction={selectedOrderAction} onSelect={handleOrderActionSelect} currentOrder={displayOrder} />
                 ) : isModifierSelected ? (
                   <ModifierActionsMenu />
                 ) : isItemSelected ? (
@@ -383,9 +598,9 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
             <View style={styles.rightCol}>
               <View style={styles.colContent}>
                 {orderActionsMode ? (
-                  selectedOrderAction === 'waiter' ? <WaiterPickerPanel onChangeWaiter={(id) => updateMeta({ employeeId: id })} /> :
-                  selectedOrderAction === 'guests' ? <GuestCounterPanel guestCount={currentOrder?.guestCount ?? 1} onChangeGuestCount={(count) => updateMeta({ guestCount: count })} /> :
-                  selectedOrderAction === 'delete' ? <DeleteOptions items={items} mode="order" orderNumber={currentOrder?.number} onDone={closeOrderActions} onDeleteOrder={deleteCurrentOrder} /> :
+                  selectedOrderAction === 'waiter' ? <WaiterPickerPanel onChangeWaiter={handleWaiterChange} /> :
+                  selectedOrderAction === 'guests' ? <GuestCounterPanel guestCount={displayOrder?.guestCount ?? 1} onChangeGuestCount={handleGuestCountChange} /> :
+                  selectedOrderAction === 'delete' ? <DeleteOptions items={items} mode="order" orderNumber={displayOrder?.number} onDone={closeOrderActions} onDeleteOrder={handleDeleteCurrentOrder} /> :
                   <ProductGrid items={displayItems} products={products} categories={categories} onAddItem={handleAddProduct} />
                 ) : isModifierSelected && modifierAction === 'delete' ? (
                   <DeleteOptions items={items} onDone={() => selectModifier(null)} />
@@ -434,7 +649,7 @@ export const PosScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
           </View>
         )}
       </View>
-      <CommentModal visible={commentVisible} onClose={() => setCommentVisible(false)} comment={currentOrder?.comment} onSaveComment={(comment) => updateMeta({ comment })} />
+      <CommentModal visible={commentVisible} onClose={() => setCommentVisible(false)} comment={displayOrder?.comment} onSaveComment={(comment) => queueOrderMeta({ comment }, { comment })} />
       <NotificationModal visible={notificationVisible} onClose={() => setNotificationVisible(false)} />
     </SafeAreaView>
   );

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { EMPLOYEE_PIN_LENGTH } from '@lumo/data';
 import { useInstantStaff, type StaffMember } from '@/hooks/useInstantStaff';
 import { useInstantCreateEmployee, useInstantUpdateEmployee, useInstantDeleteEmployee } from '@/hooks/useInstantStaffMutations';
 import { DeleteButton } from '@/components/ui/DeleteButton';
@@ -8,7 +9,10 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { AddButton } from '@/components/ui/ActionButtons';
 
-const generatePin = () => String(crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000).padStart(6, '0');
+const PIN_PATTERN = new RegExp(`^\\d{${EMPLOYEE_PIN_LENGTH}}$`);
+const generatePin = () => String(
+ crypto.getRandomValues(new Uint32Array(1))[0] % (10 ** EMPLOYEE_PIN_LENGTH),
+).padStart(EMPLOYEE_PIN_LENGTH, '0');
 
 const ROLES: { value: StaffMember['role']; label: string }[] = [
  { value: 'owner', label: 'Владелец' },
@@ -31,6 +35,23 @@ function formatDate(dateStr: string | null): string {
  const d = new Date(dateStr);
  return d.toLocaleDateString('ru', { day: 'numeric', month: 'long', year: 'numeric' }) +
   ' ' + d.toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' });
+}
+
+function PinReveal({ pin, isActive }: { pin: string | null; isActive: boolean }) {
+ if (!isActive) return <span aria-label="PIN недоступен для неактивного сотрудника">—</span>;
+ if (!pin) return <span className="text-xs text-muted-foreground" title="Сбросьте PIN, чтобы сохранить его для просмотра">Нет данных</span>;
+
+ return (
+  <span
+   className="group/pin inline-grid min-w-16 cursor-default rounded px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+   tabIndex={0}
+   aria-label="PIN скрыт. Наведите курсор или установите фокус, чтобы показать"
+   title="Наведите курсор, чтобы показать PIN"
+  >
+   <span className="col-start-1 row-start-1 group-hover/pin:invisible group-focus/pin:invisible" aria-hidden="true">{'•'.repeat(EMPLOYEE_PIN_LENGTH)}</span>
+   <span className="invisible col-start-1 row-start-1 group-hover/pin:visible group-focus/pin:visible">{pin}</span>
+  </span>
+ );
 }
 
 export function Staff() {
@@ -66,8 +87,8 @@ export function Staff() {
 
  async function handleAdd() {
   if (!newStaff.name.trim()) return;
-  if (!/^\d{6}$/.test(newStaff.pin)) {
-   toast.error('PIN должен содержать 6 цифр');
+  if (!PIN_PATTERN.test(newStaff.pin)) {
+   toast.error(`PIN должен содержать ${EMPLOYEE_PIN_LENGTH} цифры`);
    return;
   }
 
@@ -93,8 +114,8 @@ export function Staff() {
 
  async function handleSaveEdit() {
   if (!editingId || !editData.name?.trim()) return;
-  if (editData.pin && !/^\d{6}$/.test(editData.pin)) {
-   toast.error('Новый PIN должен содержать 6 цифр');
+  if (editData.pin && !PIN_PATTERN.test(editData.pin)) {
+   toast.error(`Новый PIN должен содержать ${EMPLOYEE_PIN_LENGTH} цифры`);
    return;
   }
 
@@ -124,7 +145,7 @@ export function Staff() {
   
   {/* Search + role filter */}
   <div className="flex items-center gap-2 mb-4">
-   <SearchInput value={search} onChange={setSearch} placeholder="Поиск по имени, эл. почте, PIN" className="w-56" />
+   <SearchInput value={search} onChange={setSearch} placeholder="Поиск по имени или эл. почте" className="w-56" />
    <div className="inline-flex rounded-lg bg-[#F2F2F7] p-0.5 shadow-[inset_0_1px_2px_rgba(0,0,0,0.04)]">
     <button
      onClick={() => setRoleFilter(null)}
@@ -173,9 +194,9 @@ export function Staff() {
      <input
       className="w-full px-3 py-2 border border-border rounded-lg text-sm bg-background font-mono"
       value={newStaff.pin}
-      onChange={(e) => setNewStaff(p => ({ ...p, pin: e.target.value.replace(/\D/g, '').slice(0, 6) }))}
-      placeholder="6 цифр"
-      maxLength={6}
+      onChange={(e) => setNewStaff(p => ({ ...p, pin: e.target.value.replace(/\D/g, '').slice(0, EMPLOYEE_PIN_LENGTH) }))}
+      placeholder={`${EMPLOYEE_PIN_LENGTH} цифры`}
+      maxLength={EMPLOYEE_PIN_LENGTH}
       inputMode="numeric"
       autoComplete="new-password"
      />
@@ -233,7 +254,7 @@ export function Staff() {
          <input className="w-full px-2 py-1 border rounded text-sm bg-background" value={editData.email || ''} onChange={(e) => setEditData((d) => ({ ...d, email: e.target.value }))} placeholder="Эл. почта" />
         </td>
         <td className="py-1.5 text-center">
-         <input type="password" className="w-full max-w-[7rem] px-2 py-1 border rounded text-sm bg-background font-mono text-center" value={editData.pin || ''} onChange={(e) => setEditData((d) => ({ ...d, pin: e.target.value.replace(/\D/g, '').slice(0, 6) }))} placeholder="Новый PIN" maxLength={6} inputMode="numeric" autoComplete="new-password" />
+         <input type="password" className="w-full max-w-[7rem] px-2 py-1 border rounded text-sm bg-background font-mono text-center" value={editData.pin || ''} onChange={(e) => setEditData((d) => ({ ...d, pin: e.target.value.replace(/\D/g, '').slice(0, EMPLOYEE_PIN_LENGTH) }))} placeholder="Новый PIN" maxLength={EMPLOYEE_PIN_LENGTH} inputMode="numeric" autoComplete="new-password" />
         </td>
         <td className="py-1.5" />
         <td className="py-1.5">
@@ -249,8 +270,8 @@ export function Staff() {
         <td className="py-1.5 text-sm truncate">{member.name}</td>
         <td className="py-1.5 text-sm whitespace-nowrap">{ROLE_LABELS[member.role] ?? member.role}</td>
         <td className="py-1.5 text-sm truncate">{member.email || '—'}</td>
-        <td className="py-1.5 text-center font-mono text-sm" aria-label="PIN скрыт">
-         ••••••
+        <td className="py-1.5 text-center font-mono text-sm">
+         <PinReveal pin={member.pin} isActive={member.is_active} />
         </td>
         <td className="py-1.5 text-center text-sm tabular-nums whitespace-nowrap">{formatDate(member.last_session_at)}</td>
         <td className="py-1.5 opacity-40 group-hover:opacity-100 transition-opacity">

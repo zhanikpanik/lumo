@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { getInstantClient, getVenueId } from '../data/instant';
+import { cashBalanceTiyin, selectCurrentOpenShift } from '@lumo/data';
 interface InstantShift {
   id: string;
   openedAt: Date;
@@ -74,7 +75,10 @@ export function useInstantShift(employeeId?: string, isAuthenticated = true): In
       : null,
   );
 
-  const openShift = (data?.shifts?.[0] as ShiftQueryRow | undefined) ?? null;
+  const openShift = useMemo(
+    () => selectCurrentOpenShift((data?.shifts as ShiftQueryRow[] | undefined) ?? []),
+    [data?.shifts],
+  );
 
   const payments: InstantShiftPayment[] = useMemo(() => {
     if (!openShift?.payments) return [];
@@ -123,7 +127,7 @@ export function useInstantShift(employeeId?: string, isAuthenticated = true): In
     }
 
     const startingCash = openShift?.startingCashTiyin ?? 0;
-    const expectedCashTiyin = startingCash + cashTotalTiyin - cashCollectionsTiyin + cashFloatInTiyin - cashFloatOutTiyin;
+    const expectedCashTiyin = cashBalanceTiyin(startingCash, cashMovements);
 
     return {
       totalOrders,

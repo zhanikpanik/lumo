@@ -11,7 +11,7 @@ import { theme } from '../theme/colors';
 import { Numpad } from '../components/Numpad';
 import { useUserStore } from '../store/userStore';
 import { can } from '../utils/permissions';
-import { openPosShift } from '../data/posCommands';
+import { openPosShift, PosCommandError } from '../data/posCommands';
 import { useInstantShift } from '../store/useInstantShift';
 
 interface Props {
@@ -54,6 +54,10 @@ export function InstantOpenShiftScreen({ navigation }: Props) {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error('openShift failed:', e);
+      if (e instanceof PosCommandError && e.code === 'resource_conflict') {
+        setError('Состояние смены изменилось. Повторите попытку.');
+        return;
+      }
       // Race condition: another device opened shift between our check and write.
       // useInstantShift will detect it reactively — just navigate.
       if (msg.includes('already open') || msg.includes('unique') || msg.includes('duplicate')) {

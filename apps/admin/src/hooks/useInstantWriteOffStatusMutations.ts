@@ -1,16 +1,18 @@
 import { executeWarehouseCommand } from '@/data/warehouseCommands';
 import { useVenueId } from './useVenueId';
 import { useState, useCallback } from 'react';
+import type { PostWriteOffInput } from '@lumo/data';
+
 
 export function useInstantPostWriteOffBridge() {
   const venueId = useVenueId();
   const [loading, setLoading] = useState(false);
 
   const mutate = useCallback(
-    async (writeOffId: string) => {
+    async (input: PostWriteOffInput) => {
       setLoading(true);
       try {
-        await executeWarehouseCommand('post-write-off', crypto.randomUUID(), venueId, { documentId: writeOffId });
+        await executeWarehouseCommand('post-write-off', crypto.randomUUID(), venueId, input);
       } finally {
         setLoading(false);
       }

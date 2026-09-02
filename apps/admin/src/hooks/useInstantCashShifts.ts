@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import type { InstaQLParams } from '@instantdb/react';
 import { getInstantClient } from '@/data/instant';
 import { useVenueId } from './useVenueId';
-import { adminAllShiftsQuery, type AppSchema } from '@lumo/data';
+import { adminAllShiftsQuery, cashBalanceTiyin, type AppSchema } from '@lumo/data';
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -22,7 +22,16 @@ export interface CashShift {
   cashierName: string;
 }
 
-export type TransactionType = 'expense' | 'income' | 'collection' | 'other';
+export type TransactionType =
+  | 'sale'
+  | 'refund'
+  | 'cancel_refund'
+  | 'float_in'
+  | 'float_out'
+  | 'income'
+  | 'expense'
+  | 'collection'
+  | 'other';
 
 export interface CashTransaction {
   id: string;
@@ -58,7 +67,11 @@ function formatShiftTime(iso: string): string {
 }
 
 function parseMovementType(mt: string): TransactionType {
-  if (mt === 'income' || mt === 'expense' || mt === 'collection') return mt as TransactionType;
+  if (
+    mt === 'sale' || mt === 'refund' || mt === 'cancel_refund'
+    || mt === 'float_in' || mt === 'float_out'
+    || mt === 'income' || mt === 'expense' || mt === 'collection'
+  ) return mt;
   return 'other';
 }
 
@@ -105,27 +118,15 @@ export function useInstantCashShifts({ from, page = 0 }: CashShiftsPageOptions =
     return shifts.map(s => {
       const movements = movementsByShift.get(s.id) ?? [];
 
-      // Aggregate by type
       let collection = 0;
-      let netCashDelta = 0;
-
-      for (const m of movements) {
-        const typ = parseMovementType(m.movementType);
-        const amtSom = tyinToSom(m.amountTiyin ?? 0);
-
-        if (typ === 'collection') {
-          collection += amtSom;
-          netCashDelta -= amtSom;
-        } else if (typ === 'income') {
-          netCashDelta += amtSom;
-        } else if (typ === 'expense') {
-          netCashDelta -= amtSom;
+      for (const movement of movements) {
+        if (movement.movementType === 'collection') {
+          collection += tyinToSom(movement.amountTiyin ?? 0);
         }
       }
 
       const startBalance = tyinToSom(s.startingCashTiyin ?? 0);
-      // cash_total from payments not available — use 0 for now
-      const expectedCash = startBalance + netCashDelta;
+      const expectedCash = tyinToSom(cashBalanceTiyin(s.startingCashTiyin ?? 0, movements));
       const countedCash = s.countedCashTiyin != null ? tyinToSom(s.countedCashTiyin) : null;
       const isClosed = s.status === 'closed';
       const difference = isClosed && countedCash != null ? countedCash - expectedCash : null;

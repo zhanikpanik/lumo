@@ -30,6 +30,8 @@ export interface Alert {
   id: string;
   type: AlertType;
   message: string;
+  /** Краткое подтверждение или влияние проблемы */
+  detail?: string;
   /** Текст на кнопке действия (если null — алерт только информационный) */
   actionLabel: string | null;
   /** Куда ведёт кнопка */
@@ -246,6 +248,33 @@ export interface StockAlert {
   level: 'negative' | 'zero' | 'low';
 }
 
+export type OverviewSituationClass = 'blocked' | 'probable_loss' | 'degrading';
+export type OverviewSituationDomain = 'cash' | 'orders' | 'inventory' | 'sales' | 'data_quality';
+export type OverviewSituationConfidence = 'verified' | 'estimated' | 'stale';
+
+/** Детерминированная проблема с одним следующим действием. */
+export interface OverviewSituation {
+  id: string;
+  class: OverviewSituationClass;
+  domain: OverviewSituationDomain;
+  title: string;
+  impact: string;
+  evidence: string;
+  priorityReason: string;
+  confidence: OverviewSituationConfidence;
+  actionLabel: string;
+  actionHref: string;
+}
+
+export interface InventoryFreshness {
+  status: 'current' | 'stale' | 'missing' | 'unavailable';
+  lastCountedAt: string | null;
+  ageDays: number | null;
+  warehouseCount: number;
+  currentWarehouseCount: number;
+  affectedWarehouseNames: string[];
+}
+
 /**
  * Операционный дашборд — только «сейчас» и «сегодня».
  * Никаких недельных/месячных/исторических полей.
@@ -259,14 +288,14 @@ export interface DashboardOperationalData {
   activeOrders: ActiveOrdersStatus;
   /** Вчерашняя смена. null если вчера не было смены. */
   yesterdayShift: YesterdayShift | null;
-  /** Операционные алерты. */
-  alerts: Alert[];
-  /** Алерты, сгруппированные по срочности. */
-  alertUrgencyGroups: AlertUrgencyGroups;
+  /** Ситуации, отсортированные по операционному приоритету. */
+  situations: OverviewSituation[];
   /** Лента событий за сегодня. */
   chronology: ChronologyEvent[];
-  /** Проблемные остатки: отрицательные, нулевые, ниже порога. */
+  /** Проблемные остатки из актуального stockItems snapshot. */
   stockAlerts: StockAlert[];
+  /** Достоверность складских выводов. */
+  inventoryFreshness: InventoryFreshness;
   /** Сегодня не было ни одного заказа. */
   isTodayEmpty: boolean;
   /** Когда данные были вычислены (UTC ISO). */

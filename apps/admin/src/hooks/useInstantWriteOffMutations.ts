@@ -51,26 +51,6 @@ export function useInstantUpdateWriteOff() {
   return { update, loading };
 }
 
-export function useInstantPostWriteOff() {
-  const venueId = useVenueId();
-  const [loading, setLoading] = useState(false);
-
-  const post = useCallback(
-    async (writeOffId: string, _snapshot: WriteOffSnapshot) => {
-      setLoading(true);
-      try {
-        await executeWarehouseCommand(
-          'post-write-off', crypto.randomUUID(), venueId, { documentId: writeOffId },
-        );
-      } finally {
-        setLoading(false);
-      }
-    },
-    [venueId],
-  );
-
-  return { post, loading };
-}
 
 export function useInstantCancelWriteOff() {
   const venueId = useVenueId();

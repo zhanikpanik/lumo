@@ -51,26 +51,6 @@ export function useInstantUpdateDelivery() {
   return { update, loading };
 }
 
-export function useInstantReceiveDelivery() {
-  const venueId = useVenueId();
-  const [loading, setLoading] = useState(false);
-
-  const receive = useCallback(
-    async (deliveryId: string, _snapshot: DeliverySnapshot) => {
-      setLoading(true);
-      try {
-        await executeWarehouseCommand(
-          'receive-delivery', crypto.randomUUID(), venueId, { documentId: deliveryId },
-        );
-      } finally {
-        setLoading(false);
-      }
-    },
-    [venueId],
-  );
-
-  return { receive, loading };
-}
 
 export function useInstantCancelDelivery() {
   const venueId = useVenueId();

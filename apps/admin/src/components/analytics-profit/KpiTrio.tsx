@@ -30,9 +30,9 @@ function splhHealth(val: number | null): Health {
   return 'bad';
 }
 
-function ebitHealth(val: number | null): Health {
-  if (val === null) return 'bad';
-  return val >= 0 ? 'good' : 'bad';
+function resultHealth(value: number | null): Health {
+  if (value === null) return 'bad';
+  return value >= 0 ? 'good' : 'bad';
 }
 
 const HEALTH_DOT: Record<Health, string> = {
@@ -153,11 +153,10 @@ export function KpiTrio({ rows, isPending, error }: Props) {
     .map((r) => r.splh)
     .filter((v): v is number => v !== null);
 
-  // EBIT
-  const ebH = ebitHealth(today.ebit);
-  const ebitSparkline = sparklineRows
-    .map((r) => r.ebit)
-    .filter((v): v is number => v !== null);
+  const resultH = resultHealth(today.resultBeforePayroll);
+  const resultSparkline = sparklineRows
+    .map((row) => row.resultBeforePayroll)
+    .filter((value): value is number => value !== null);
 
   const pcSub = pcHealth === 'good'
     ? 'В норме (58–64%)'
@@ -171,7 +170,7 @@ export function KpiTrio({ rows, isPending, error }: Props) {
       ? 'Ниже нормы — проверь расписание'
       : 'Слишком много людей или мало продаж';
 
-  const ebitSub = ebH === 'good'
+  const resultSub = resultH === 'good'
     ? 'День окупился'
     : 'День в минусе';
 
@@ -193,10 +192,10 @@ export function KpiTrio({ rows, isPending, error }: Props) {
       />
       <KpiCard
         label="Итог дня"
-        value={today.ebit !== null ? `${fmtSomSigned(today.ebit)} сом` : '—'}
-        sub={ebitSub}
-        sparkline={ebitSparkline}
-        health={ebH}
+        value={today.resultBeforePayroll !== null ? `${fmtSomSigned(today.resultBeforePayroll)} сом` : '—'}
+        sub={resultSub}
+        sparkline={resultSparkline}
+        health={resultH}
       />
     </div>
   );

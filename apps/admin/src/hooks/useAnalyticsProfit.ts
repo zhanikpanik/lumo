@@ -1,6 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import type { InstaQLParams } from '@instantdb/react';
-import { adminDashboardPeriodPaidOrdersQuery, type AppSchema } from '@lumo/data';
+import {
+  adminDashboardPeriodCashMovementsQuery,
+  adminDashboardPeriodPaidOrdersQuery,
+  type AppSchema,
+} from '@lumo/data';
 import { getInstantClient } from '@/data/instant';
 import { instantOne } from '@/lib/instantLink';
 import { useVenueId } from './useVenueId';
@@ -11,11 +15,12 @@ export interface DailyProfitRow {
   revenue: number;
   theoreticalCogs: number;
   actualCogs: number | null;
+  operatingExpenses: number;
   laborHours: number;
   laborCost: number;
   primeCostPct: number | null;
   splh: number | null;
-  ebit: number | null;
+  resultBeforePayroll: number | null;
 }
 
 export interface HourlySplhCell {
@@ -32,19 +37,26 @@ export interface ProfitData {
   periodLabel: string;
   hourlyRate: number;
   dailyFixedCost: number;
+  revenue: number;
+  theoreticalCogs: number;
+  actualCogs: number | null;
+  actualCogsStatus: 'complete' | 'missing_boundaries' | 'invalid';
+  actualCogsMissingWarehouses: string[];
+  actualCogsBoundaryStart: string | null;
+  actualCogsBoundaryEnd: string | null;
+  operatingExpenses: number;
+  resultBeforePayroll: number;
+  resultUsesActualCogs: boolean;
+  laborIncluded: false;
 }
 
 const DAY_LABELS = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
 const MONTH_LABELS = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
 
-function dateKey(value: Date | string): string {
+function dateKey(value: Date | string | number): string {
   return new Date(value).toISOString().slice(0, 10);
 }
 
-function dayOfWeekIndex(value: Date | string): number {
-  const day = new Date(value).getDay();
-  return day === 0 ? 6 : day - 1;
-}
 
 function periodLabel(start: string, end: string): string {
   const first = new Date(start);
@@ -55,25 +67,49 @@ function periodLabel(start: string, end: string): string {
     : `${first.getDate()} ${MONTH_LABELS[first.getMonth()]} – ${last.getDate()} ${MONTH_LABELS[last.getMonth()]} ${last.getFullYear()}`;
 }
 
-function profitSupportQuery(venueId: string) {
+function profitSupportQuery(venueId: string, start: string, end: string) {
+  const boundaryStart = new Date(new Date(start).getTime() - 86_400_000);
+  const boundaryEnd = new Date(new Date(end).getTime() + 86_400_000);
+
   return {
-    venues: { $: { where: { id: venueId }, limit: 1 } },
-    shifts: {
-      $: { where: { 'venue.id': venueId }, limit: 1000 },
+    warehouses: {
+      $: { where: { 'venue.id': venueId }, limit: 100 },
+    },
+    inventorySessions: {
+      $: {
+        where: {
+          'venue.id': venueId,
+          conductedAt: { $gte: boundaryStart, $lt: boundaryEnd },
+        },
+        limit: 1000,
+      },
+      warehouse: {},
+      lines: { product: {} },
+    },
+    deliveryDocuments: {
+      $: {
+        where: {
+          'venue.id': venueId,
+          deliveryDate: { $gte: boundaryStart, $lt: boundaryEnd },
+        },
+        limit: 1000,
+      },
+      warehouse: {},
+      lines: { product: {} },
     },
   } satisfies InstaQLParams<AppSchema>;
 }
 
 async function fetchProfitData(venueId: string, start: string, end: string): Promise<ProfitData> {
   const db = getInstantClient();
-  const [ordersResult, supportResult] = await Promise.all([
+  const [ordersResult, supportResult, cashResult] = await Promise.all([
     db.queryOnce(adminDashboardPeriodPaidOrdersQuery(venueId, start, end)),
-    db.queryOnce(profitSupportQuery(venueId)),
+    db.queryOnce(profitSupportQuery(venueId, start, end)),
+    db.queryOnce(adminDashboardPeriodCashMovementsQuery(venueId, start, end)),
   ]);
 
   const revenueByDay = new Map<string, number>();
   const cogsByDay = new Map<string, number>();
-  const revenueByHour = new Map<string, number>();
   for (const order of ordersResult.data.orders ?? []) {
     const openedAt = new Date(order.openedAt);
     const day = dateKey(openedAt);
@@ -87,80 +123,136 @@ async function fetchProfitData(venueId: string, start: string, end: string): Pro
     }
     revenueByDay.set(day, (revenueByDay.get(day) ?? 0) + orderRevenue);
     cogsByDay.set(day, (cogsByDay.get(day) ?? 0) + orderCost);
-    const hourKey = `${dayOfWeekIndex(openedAt)}:${openedAt.getHours()}`;
-    revenueByHour.set(hourKey, (revenueByHour.get(hourKey) ?? 0) + orderRevenue);
   }
 
-  const laborByDay = new Map<string, number>();
-  const laborByHour = new Map<string, number>();
+  const expensesByDay = new Map<string, number>();
+  for (const movement of cashResult.data.cashMovements ?? []) {
+    if (movement.movementType !== 'expense') continue;
+    const day = dateKey(movement.occurredAt);
+    expensesByDay.set(day, (expensesByDay.get(day) ?? 0) + movement.amountTiyin / 100);
+  }
+
   const periodStart = new Date(start);
   const periodEnd = new Date(end);
-  for (const shift of supportResult.data.shifts ?? []) {
-    const shiftStart = new Date(shift.openedAt);
-    const shiftEnd = shift.closedAt ? new Date(shift.closedAt) : new Date();
-    if (shiftEnd <= periodStart || shiftStart >= periodEnd) continue;
-    const boundedStart = shiftStart < periodStart ? periodStart : shiftStart;
-    const boundedEnd = shiftEnd > periodEnd ? periodEnd : shiftEnd;
+  const postedSessions = (supportResult.data.inventorySessions ?? [])
+    .filter((session) => ['posted', 'Проведено'].includes(session.status));
+  const missingWarehouses: string[] = [];
+  const openingBoundaries: number[] = [];
+  const closingBoundaries: number[] = [];
+  let actualCogsTotal = 0;
+  let invalidActualCogs = false;
 
-    for (let cursor = new Date(boundedStart); cursor < boundedEnd;) {
-      const nextHour = new Date(cursor);
-      nextHour.setMinutes(0, 0, 0);
-      nextHour.setHours(nextHour.getHours() + 1);
-      const segmentEnd = nextHour < boundedEnd ? nextHour : boundedEnd;
-      const hours = (segmentEnd.getTime() - cursor.getTime()) / 3_600_000;
-      const day = dateKey(cursor);
-      laborByDay.set(day, (laborByDay.get(day) ?? 0) + hours);
-      const hourKey = `${dayOfWeekIndex(cursor)}:${cursor.getHours()}`;
-      laborByHour.set(hourKey, (laborByHour.get(hourKey) ?? 0) + hours);
-      cursor = segmentEnd;
+  for (const warehouse of supportResult.data.warehouses ?? []) {
+    const warehouseSessions = postedSessions
+      .filter((session) => instantOne(session.warehouse)?.id === warehouse.id)
+      .sort((a, b) => new Date(a.conductedAt).getTime() - new Date(b.conductedAt).getTime());
+    const opening = [...warehouseSessions]
+      .reverse()
+      .find((session) => new Date(session.conductedAt) <= periodStart);
+    const closing = warehouseSessions
+      .find((session) => new Date(session.conductedAt) >= periodEnd);
+    const openingTime = opening ? new Date(opening.conductedAt).getTime() : null;
+    const closingTime = closing ? new Date(closing.conductedAt).getTime() : null;
+    const boundariesMatch = openingTime != null
+      && closingTime != null
+      && opening?.id !== closing?.id
+      && periodStart.getTime() - openingTime <= 86_400_000
+      && closingTime - periodEnd.getTime() <= 86_400_000;
+
+    if (!opening || !closing || !boundariesMatch || openingTime == null || closingTime == null) {
+      missingWarehouses.push(warehouse.name);
+      continue;
     }
+
+    const inventoryValue = (session: typeof opening) => (session.lines ?? []).reduce((sum, line) => {
+      const product = instantOne(line.product);
+      const quantity = (line.actualMilli ?? 0) / 1000;
+      const unitPrice = (line.unitPriceTiyin ?? product?.costTiyin ?? 0) / 100;
+      return sum + quantity * unitPrice;
+    }, 0);
+    const deliveryValue = (supportResult.data.deliveryDocuments ?? [])
+      .filter((document) => {
+        const deliveredAt = new Date(document.deliveryDate).getTime();
+        return instantOne(document.warehouse)?.id === warehouse.id
+          && !['cancelled', 'Отменено'].includes(document.status)
+          && deliveredAt >= openingTime
+          && deliveredAt <= closingTime;
+      })
+      .reduce((documentSum, document) => documentSum + (document.lines ?? [])
+        .reduce((lineSum, line) => lineSum
+          + ((line.quantityMilli ?? 0) / 1000) * ((line.priceTiyin ?? 0) / 100), 0), 0);
+    const warehouseActualCogs = inventoryValue(opening) + deliveryValue - inventoryValue(closing);
+    if (!Number.isFinite(warehouseActualCogs) || warehouseActualCogs < 0) {
+      invalidActualCogs = true;
+      continue;
+    }
+
+    actualCogsTotal += warehouseActualCogs;
+    openingBoundaries.push(openingTime);
+    closingBoundaries.push(closingTime);
   }
 
-  const venue = supportResult.data.venues?.[0];
-  const dailyLaborCost = (venue?.dailyLaborCostTiyin ?? 0) / 100;
+  if ((supportResult.data.warehouses ?? []).length === 0) {
+    missingWarehouses.push('Склады не настроены');
+  }
+
+  const actualCogsStatus: ProfitData['actualCogsStatus'] = missingWarehouses.length > 0
+    ? 'missing_boundaries'
+    : invalidActualCogs
+      ? 'invalid'
+      : 'complete';
+  const actualCogs = actualCogsStatus === 'complete' ? actualCogsTotal : null;
   const rows: DailyProfitRow[] = [];
-  for (let cursor = new Date(start); cursor < new Date(end); cursor.setDate(cursor.getDate() + 1)) {
+
+  for (let cursor = new Date(start); cursor < periodEnd; cursor.setDate(cursor.getDate() + 1)) {
     const day = dateKey(cursor);
     const revenue = revenueByDay.get(day) ?? 0;
     const theoreticalCogs = cogsByDay.get(day) ?? 0;
-    const laborHours = laborByDay.get(day) ?? 0;
-    const laborCost = laborHours > 0 ? dailyLaborCost : 0;
+    const operatingExpenses = expensesByDay.get(day) ?? 0;
     rows.push({
       date: day,
       dayOfWeek: DAY_LABELS[cursor.getDay()],
       revenue,
       theoreticalCogs,
       actualCogs: null,
-      laborHours,
-      laborCost,
-      primeCostPct: revenue > 0 ? ((theoreticalCogs + laborCost) / revenue) * 100 : null,
-      splh: laborHours > 0 ? revenue / laborHours : null,
-      ebit: revenue > 0 ? revenue - theoreticalCogs - laborCost : null,
+      operatingExpenses,
+      laborHours: 0,
+      laborCost: 0,
+      primeCostPct: revenue > 0 ? (theoreticalCogs / revenue) * 100 : null,
+      splh: null,
+      resultBeforePayroll: revenue > 0 || operatingExpenses > 0
+        ? revenue - theoreticalCogs - operatingExpenses
+        : null,
     });
   }
 
-  const splhHeatmap: HourlySplhCell[] = [];
-  for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
-    for (let hour = 7; hour <= 23; hour++) {
-      const key = `${dayIndex}:${hour}`;
-      const revenue = revenueByHour.get(key) ?? 0;
-      const laborHours = laborByHour.get(key) ?? 0;
-      splhHeatmap.push({
-        dayIndex,
-        hour,
-        revenue,
-        laborHours,
-        splh: laborHours > 0 ? revenue / laborHours : null,
-      });
-    }
-  }
+  const revenue = rows.reduce((sum, row) => sum + row.revenue, 0);
+  const theoreticalCogs = rows.reduce((sum, row) => sum + row.theoreticalCogs, 0);
+  const operatingExpenses = rows.reduce((sum, row) => sum + row.operatingExpenses, 0);
+  const resultUsesActualCogs = actualCogs != null;
+  const cogsForResult = actualCogs ?? theoreticalCogs;
 
   return {
     rows,
-    splhHeatmap,
+    splhHeatmap: [],
     periodLabel: periodLabel(start, end),
     hourlyRate: 0,
-    dailyFixedCost: dailyLaborCost,
+    dailyFixedCost: 0,
+    revenue,
+    theoreticalCogs,
+    actualCogs,
+    actualCogsStatus,
+    actualCogsMissingWarehouses: missingWarehouses,
+    actualCogsBoundaryStart: openingBoundaries.length > 0
+      ? new Date(Math.min(...openingBoundaries)).toISOString()
+      : null,
+    actualCogsBoundaryEnd: closingBoundaries.length > 0
+      ? new Date(Math.max(...closingBoundaries)).toISOString()
+      : null,
+    operatingExpenses,
+    resultBeforePayroll: revenue - cogsForResult - operatingExpenses,
+    resultUsesActualCogs,
+    laborIncluded: false,
   };
 }
 

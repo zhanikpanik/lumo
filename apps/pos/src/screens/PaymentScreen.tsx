@@ -20,7 +20,17 @@ const CLOSE_REASONS = [
   'Другое',
 ];
 
-export const PaymentScreen: React.FC<{ navigation?: any }> = ({ navigation }) => {
+interface PaymentNavigation {
+  navigate: (screen: string) => void;
+  replace: (screen: string) => void;
+  goBack: () => void;
+}
+
+interface PaymentRoute {
+  params?: { totalAmountTiyin?: number };
+}
+
+export const PaymentScreen: React.FC<{ navigation?: PaymentNavigation; route?: PaymentRoute }> = ({ navigation, route }) => {
   const currentOrderId = usePosUiStore((s) => s.currentOrderId);
   const setCurrentOrderId = usePosUiStore((s) => s.setCurrentOrderId);
   const currentUser = useUserStore((s) => s.currentUser);
@@ -31,9 +41,16 @@ export const PaymentScreen: React.FC<{ navigation?: any }> = ({ navigation }) =>
   const [closeReason, setCloseReason] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Live order data from InstantDB
+  // InstantDB can lag one render behind the optimistic order panel. The
+  // navigation snapshot keeps the amount stable until the live row catches up.
   const order = useInstantOrder(currentOrderId ?? undefined);
-  const total = order?.totalAmount ?? 0;
+  const navigatedTotal = route?.params?.totalAmountTiyin;
+  const fallbackTotal = typeof navigatedTotal === 'number'
+    && Number.isSafeInteger(navigatedTotal)
+    && navigatedTotal > 0
+    ? navigatedTotal
+    : 0;
+  const total = order?.totalAmount && order.totalAmount > 0 ? order.totalAmount : fallbackTotal;
   // totalSom is for user-facing comparisons (cash input is in som)
   const totalSom = Math.round(total / 100);
   const canCloseWithoutPayment = can(currentUser?.role, 'closeWithoutPayment');

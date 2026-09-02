@@ -156,9 +156,9 @@ POS имеет только ограниченную device identity без envi
 
 #### Threat model offline verifier
 
-- Offline verifier — ограниченный секрет, но не эквивалент server-side password hash: после компрометации устройства атакующий может извлечь encrypted-at-rest blob и пытаться перебрать шестизначный PIN вне UI.
-- PBKDF2-SHA256 замедляет перебор, но пространство из $10^6$ PIN остаётся конечным; PIN используется для attribution сотрудника, а не как самостоятельная security boundary.
-- Риск ограничивается шестизначным PIN, platform secure storage, 24-часовым cache TTL, credential version/expiry, удалением cache при revoke и server-side device identity для каждой mutation. Отказ от локального lockout — осознанный availability tradeoff для общего POS-терминала.
+- Offline verifier — ограниченный секрет, но не эквивалент server-side password hash: после компрометации устройства атакующий может извлечь encrypted-at-rest blob и пытаться перебрать четырёхзначный PIN вне UI.
+- PBKDF2-SHA256 замедляет перебор, но пространство из $10^4$ PIN остаётся конечным; PIN используется для attribution сотрудника, а не как самостоятельная security boundary.
+- Риск ограничивается четырёхзначным PIN, platform secure storage, 24-часовым cache TTL, credential version/expiry, удалением cache при revoke и server-side device identity для каждой mutation. Отказ от локального lockout — осознанный availability tradeoff для общего POS-терминала.
 - Offline unlock разрешает только локальный вход в UI. Verifier и employee identity не могут выпустить Instant token, выбрать другой venue или вызвать trusted worker command без действующего device token.
 - Потерянное или скомпрометированное устройство нужно revoke немедленно. До reconnect локальный read-only/offline UI может оставаться доступным в пределах cache TTL; это явно принятый residual risk.
 

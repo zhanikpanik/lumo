@@ -5,7 +5,7 @@ import {
   CHART_GREEN, CHART_GREEN_SOLID, CHART_GREEN_HOVER,
   CHART_RED, CHART_RED_SOLID, CHART_RED_HOVER,
   CHART_MUTED, CHART_DARK, CHART_GRID,
-  CHART_FONT, CHART_FONT_SIZE,
+  CHART_FONT_SIZE,
   TOOLTIP_STYLE, GRID_DEFAULTS,
   axisLabelStyle, splitLineStyle,
 } from '@/lib/chartTheme';
@@ -25,7 +25,7 @@ interface Props {
   error: Error | null;
 }
 
-export function EbitChart({ rows, isPending, error }: Props) {
+export function ResultChart({ rows, isPending, error }: Props) {
   // ── Skeleton ──
   if (isPending) {
     return (
@@ -61,14 +61,13 @@ export function EbitChart({ rows, isPending, error }: Props) {
     );
   }
 
-  // Use up to 14 days
-  const chartRows = activeRows.slice(-14);
+  const chartRows = activeRows;
 
   const labels = chartRows.map((r) => {
     const d = new Date(r.date);
     return `${d.getDate()}\n${r.dayOfWeek}`;
   });
-  const values = chartRows.map((r) => r.ebit ?? 0);
+  const values = chartRows.map((r) => r.resultBeforePayroll ?? 0);
 
   // Color each bar: green for positive, red for negative
   const barColors = values.map((v) => (v >= 0 ? CHART_GREEN : CHART_RED));
@@ -85,17 +84,17 @@ export function EbitChart({ rows, isPending, error }: Props) {
         const idx = items[0]?.axisIndex ?? 0;
         const r = chartRows[idx];
         if (!r) return '';
-        const ebit = r.ebit ?? 0;
-        const isGood = ebit >= 0;
+        const result = r.resultBeforePayroll ?? 0;
+        const isGood = result >= 0;
         const color = isGood ? CHART_GREEN_SOLID : CHART_RED_SOLID;
-        const status = isGood ? 'День окупился' : 'День в минусе';
+        const status = isGood ? 'Результат положительный' : 'Результат отрицательный';
         const cogs = r.actualCogs ?? r.theoreticalCogs;
         return `
           <div style="font-weight:600;margin-bottom:4px">${r.date}, ${r.dayOfWeek}</div>
-          <div style="color:${color};font-weight:600;font-size:16px">${fmtSomSigned(ebit)} сом</div>
+          <div style="color:${color};font-weight:600;font-size:16px">${fmtSomSigned(result)} сом</div>
           <div style="margin-top:4px;color:${CHART_MUTED}">${status}</div>
           <div style="margin-top:6px;font-size:11px;color:${CHART_MUTED}">
-            Выручка ${fmtSom(r.revenue)} − Продукты ${fmtSom(cogs)} − Труд ${fmtSom(r.laborCost)} − Пост. ${fmtSom(5000)}
+            Выручка ${fmtSom(r.revenue)} − расчётная себестоимость ${fmtSom(cogs)} − расходы ${fmtSom(r.operatingExpenses)}
           </div>
         `;
       },
@@ -153,10 +152,10 @@ export function EbitChart({ rows, isPending, error }: Props) {
   return (
     <div className="bg-card rounded-lg border border-border/60 p-4 mb-6">
       <h3 className="text-sm font-semibold text-foreground mb-1">
-        Итог дня
+        Расчётный результат по дням
       </h3>
       <p className="text-xs text-muted-foreground mb-3">
-        Выручка − продукты − труд − постоянные расходы. Зелёный — в плюсе, красный — в минусе.
+        Выручка − теоретическая себестоимость − операционные расходы. ФОТ не учтён.
       </p>
       <ReactECharts option={option} style={{ height: 280 }} notMerge />
     </div>

@@ -10,6 +10,7 @@ import { Layout } from '@/components/Layout';
 import { AnalyticsPage } from '@/pages/AnalyticsNew';
 import { AnalyticsProfitPage } from '@/pages/AnalyticsProfit';
 import { Dashboard } from '@/pages/DashboardNew';
+import { LegacyDashboard } from '@/pages/LegacyDashboard';
 import { Menu } from '@/pages/Menu';
 import { Staff } from '@/pages/Staff';
 import { FloorPlan } from '@/pages/FloorPlan';
@@ -101,6 +102,7 @@ function App() {
        <Route element={<AuthGate />}>
         <Route element={<Layout />}>
          <Route path="/" element={<Dashboard />} />
+         <Route path="/legacy-dashboard" element={<LegacyDashboard />} />
          <Route path="/analytics" element={<AnalyticsPage />} />
          <Route path="/analytics-profit" element={<AnalyticsProfitPage />} />
          <Route path="/cash-shifts" element={<CashShifts />} />

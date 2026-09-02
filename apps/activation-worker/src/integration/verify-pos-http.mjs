@@ -160,6 +160,26 @@ try {
   const lineReplay = await post('/v1/pos/order-lines', linePayload);
   assert.deepEqual(lineReplay, line, 'line replay returns the original HTTP result');
 
+  const quantityPayload = {
+    operationId: `quantity-${runId}`,
+    orderId,
+    orderItemId: line.body.orderItemId,
+    actorEmployeeId: employeeId,
+    quantity: 3,
+  };
+  const updatedQuantity = await post('/v1/pos/order-lines/quantity', quantityPayload);
+  assert.equal(updatedQuantity.status, 200, JSON.stringify(updatedQuantity.body));
+  assert.equal(updatedQuantity.body.quantity, 3);
+  assert.equal(updatedQuantity.body.newTotal, 75_000);
+  const quantityReplay = await post('/v1/pos/order-lines/quantity', quantityPayload);
+  assert.deepEqual(quantityReplay, updatedQuantity, 'quantity replay returns the original HTTP result');
+  const updatedLine = await db.query({
+    orderItems: { $: { where: { id: line.body.orderItemId }, limit: 1 } },
+    orders: { $: { where: { id: orderId }, limit: 1 } },
+  });
+  assert.equal(updatedLine.orderItems[0].quantity, 3);
+  assert.equal(updatedLine.orders[0].totalAmountTiyin, 75_000);
+
   const payPayload = {
     operationId: `pay-${runId}`, orderId, shiftId, actorEmployeeId: employeeId, method: 'card',
   };

@@ -1,5 +1,11 @@
 import { useCallback } from 'react';
-import { addPosOrderLine, cancelPosOrder, removePosOrderLine, updatePosOrder } from '../data/posCommands';
+import {
+  addPosOrderLine,
+  cancelPosOrder,
+  removePosOrderLine,
+  updatePosOrder,
+  updatePosOrderLineQuantity,
+} from '../data/posCommands';
 import type { OrderItem } from '../types';
 
 interface UseInstantOrderEditorOptions {
@@ -39,6 +45,22 @@ export function useInstantOrderEditor({ orderId, actorEmployeeId, currentOrder }
     }
   }, [orderId, actorEmployeeId]);
 
+  const updateItemQuantity = useCallback(async (orderItemId: string, quantity: number) => {
+    if (!orderId) return;
+    try {
+      return await updatePosOrderLineQuantity({
+        operationId: `qty-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        orderId,
+        orderItemId,
+        actorEmployeeId,
+        quantity,
+      });
+    } catch (e) {
+      console.error('updateOrderLineQuantity failed:', e);
+      throw e;
+    }
+  }, [orderId, actorEmployeeId]);
+
   const removeItem = useCallback(async (itemId: string, _priceTiyin: number, _quantity: number) => {
     if (!orderId) return;
     const operationId = `rm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -74,10 +96,9 @@ export function useInstantOrderEditor({ orderId, actorEmployeeId, currentOrder }
   }, [orderId, actorEmployeeId]);
 
   const updateMeta = useCallback(async (updates: Record<string, unknown>) => {
-    if (!orderId) return;
+    if (!orderId) throw new Error('Нет текущего заказа');
     if (!currentOrder || currentOrder.status !== 'active') {
-      console.error('updateMeta: order is not active');
-      return;
+      throw new Error('Заказ больше не активен');
     }
     const ownerEmployeeId = typeof updates.employeeId === 'string' ? updates.employeeId : undefined;
     const guestCount = typeof updates.guestCount === 'number' ? updates.guestCount : undefined;
@@ -94,5 +115,5 @@ export function useInstantOrderEditor({ orderId, actorEmployeeId, currentOrder }
       throw e;
     }
   }, [orderId, actorEmployeeId, currentOrder]);
-  return { addItem, removeItem, deleteCurrentOrder, updateMeta };
+  return { addItem, updateItemQuantity, removeItem, deleteCurrentOrder, updateMeta };
 }

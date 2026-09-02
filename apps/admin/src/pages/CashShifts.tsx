@@ -47,6 +47,11 @@ function nowLocalISO() {
 }
 
 const TYPE_LABELS: Record<TransactionType, string> = {
+ sale: 'Продажа',
+ refund: 'Возврат',
+ cancel_refund: 'Отмена возврата',
+ float_in: 'Внесение',
+ float_out: 'Изъятие',
  income: 'Приход',
  expense: 'Расход',
  collection: 'Инкассация',
@@ -72,6 +77,11 @@ function humanizeNote(note: string | null | undefined): string {
 }
 
 const TYPE_COLOR: Record<TransactionType, string> = {
+ sale: 'text-success',
+ refund: 'text-destructive',
+ cancel_refund: 'text-success',
+ float_in: 'text-success',
+ float_out: 'text-destructive',
  income: 'text-success',
  expense: 'text-destructive',
  collection: 'text-muted-foreground',
@@ -79,9 +89,14 @@ const TYPE_COLOR: Record<TransactionType, string> = {
 };
 
 const TYPE_AMOUNT_COLOR: Record<TransactionType, string> = {
+ sale: 'text-success',
+ refund: 'text-destructive',
+ cancel_refund: 'text-success',
+ float_in: 'text-success',
+ float_out: 'text-destructive',
  income: 'text-success',
  expense: 'text-destructive',
- collection: '',
+ collection: 'text-destructive',
  other: '',
 };
 

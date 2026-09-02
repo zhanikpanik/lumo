@@ -101,7 +101,7 @@ Unique claim на `(venue, resource, version)` превращает Instant uniq
 8. Admin token существует только в worker secret store. Client transactions никогда не получают privileged credentials.
 9. Direct client writes в critical namespaces запрещены.
 10. Любая tenant query и mutation проверяет membership/device link server-side; client `where` остаётся только performance constraint.
-11. Plaintext PIN не хранится и не возвращается после установки.
+11. Plaintext PIN отсутствует в employee/device records и доступен только owner/manager через отдельный active-employee secret record; POS получает только verifier.
 12. Infrastructure error не сохраняется как final domain rejection.
 
 ## 7. Data model
@@ -231,7 +231,7 @@ Contribution создаётся в той же transaction, что payment/refun
 - `updatedAt`;
 - `expiresAt` для device cache contract.
 
-Create/reset PIN выполняется worker command. Admin передаёт новый PIN только в HTTPS request; worker создаёт verifier и никогда не сохраняет plaintext.
+Create/reset PIN выполняется worker command. Worker атомарно сохраняет versioned verifier и отдельный `employeePinSecrets` record. Secret доступен только owner/manager своего venue, только для active employee; direct client writes запрещены. Это осознанный usability/security compromise: InstantDB шифрует данные at rest, но trusted backend/admin с доступом к базе может прочитать PIN.
 
 ## 8. Authoritative command protocol
 
@@ -339,6 +339,7 @@ attrs: { allow: { create: "false" } }
 - owner/manager: только active memberships;
 - `$users`: только self;
 - PIN verifier: только active device своего venue;
+- PIN secret: только owner/manager своего venue и только для active employee;
 - operations/claims: client read запрещён по умолчанию; при необходимости POS получает result через worker.
 
 ### Client writes
@@ -350,7 +351,7 @@ attrs: { allow: { create: "false" } }
 - payments, cash/inventory movements;
 - fiscal receipts, order events, kitchen tickets;
 - stock balances и warehouse state transitions;
-- memberships, devices, authorizations и PIN credentials.
+- memberships, devices, authorizations, PIN credentials и PIN secrets.
 
 Admin catalog/draft writes разрешаются напрямую только после Sandbox tests на create, update и cross-venue relink. Если prospective link нельзя надёжно проверить documented permission API, mutation переносится в admin worker command.
 
@@ -497,7 +498,7 @@ Worker использует Admin SDK и поэтому не получает з
 1. Добавить trusted create/reset/revoke credential commands.
 2. Мигрировать активные PIN в verifier records либо потребовать controlled reset, если plaintext migration недопустима.
 3. Добавить `credentialsVersion`, cache expiry и audit events.
-4. Удалить `employees.pin` из schema, hooks, mutations, search и UI display.
+4. Удалить `employees.pin`; plaintext для admin reveal хранить отдельно в admin-only `employeePinSecrets`, не включая его в POS queries/cache.
 5. POS хранит verifier и очередь unlock attempts только в platform secure storage.
 6. Offline cache TTL — не более 24 часов; локальный lockout не применяется, чтобы ошибки одного пользователя не блокировали общий POS.
 7. Online unlock attempts отправляются сразу; offline attempts queued durably и синхронизируются после reconnect.
@@ -505,8 +506,8 @@ Worker использует Admin SDK и поэтому не получает з
 
 ### Acceptance
 
-- Instant query не возвращает plaintext PIN;
-- admin не может прочитать установленный PIN;
+- POS/device/anonymous Instant queries не возвращают plaintext PIN;
+- owner/manager может прочитать PIN только active employee своего venue;
 - reset/revoke повышает credentialsVersion;
 - offline verifier истекает в пределах 24 часов;
 - local unlock не authorizes server mutation без active device identity.
@@ -611,7 +612,7 @@ Rollback до production write cutover — previous app/client version. Посл
 - Каждая critical operation атомарно сохраняет operation, claims, state и ledger effects.
 - Replays, concurrent transitions и lost responses доказаны integration tests.
 - Нет `$inc` assumptions; stock updates защищены version claims.
-- Нет plaintext PIN.
+- Plaintext PIN отсутствует в employee/device records; admin-only secret изолирован active-employee permissions.
 - Critical direct client writes отклоняются.
 - Worker queries bounded и indexed.
 - Analytics полностью rebuildable и не блокирует POS.
@@ -644,7 +645,7 @@ Rollback до production write cutover — previous app/client version. Посл
 
 - Admin переведён с Supabase auth на Instant magic code; active venue выводится из active membership, а owner/manager role назначается server-side.
 - POS activation создаёт отдельную active device identity и custom token; device authorization можно revoke, после чего старый token перестаёт давать доступ.
-- Plaintext `employees.pin` удалён. Worker создаёт versioned PBKDF2 verifier с salt и expiry; поддержаны create/reset/deactivate и offline verification без отправки PIN в InstantDB.
+- Plaintext `employees.pin` удалён. Worker атомарно создаёт versioned PBKDF2 verifier и отдельный admin-only PIN secret; POS получает только verifier, а secret читают только owner/manager своего venue для active employee.
 - Offline unlock получил TTL и replayable audit attempts без terminal-wide lockout.
 - Tenant keys стали required/indexed для operational entities; bootstrap, backfill и audit scripts закрывают missing, ambiguous и cross-venue links.
 
@@ -678,6 +679,26 @@ Rollback до production write cutover — previous app/client version. Посл
 - `App.tsx` и `useInstantShift.ts` изменены так, чтобы venue-scoped shift query был disabled до завершения device authentication.
 - Загрузка offline PIN cache в `InstantLockScreen.tsx` перенесена после завершения employee query; промежуточный loading state больше не сохраняет пустой список сотрудников.
 - Terminal-wide PIN lockout удалён из native и Web POS: повторные ошибки остаются auditable, но не останавливают приём заказов на общем устройстве.
+
+#### Дополнительная acceptance-проверка PIN — 2026-08-11
+
+- Browser flow `admin reset PIN → POS unlock` выявил legacy claim для `employee-pin-credential`, оставшийся на той же `credentialsVersion`; worker корректно отклонял запись как `resource_conflict`.
+- `backfill-command-versions.mjs` расширен на все claim-backed resources, включая `employees`, `employeePinCredentials.credentialsVersion`, `cashMovements`, `products` и `venueDailyStats`. Повторный backfill завершился с `updated: 0`.
+- После repair два последовательных reset одного активного кассира вернули `200`, а POS принял каждый новый PIN после reactive credential sync.
+
+#### Admin PIN reveal compromise — 2026-08-11
+
+- Добавлен отдельный one-to-one `employeePinSecrets`; create/reset/update сохраняют secret в той же trusted transaction, deactivate удаляет его.
+- Permissions разрешают чтение только owner/manager своего venue и только для active employee; device, anonymous, cross-venue и direct client mutations отклоняются.
+- Admin Staff показывает PIN только по hover/focus. Сотрудники, созданные до появления secret record, отображают `Нет данных` до следующего reset PIN.
+- Development schema/permissions применены; permission matrix и trusted staff integration прошли. Browser flow подтвердил `admin reset → POS unlock`.
+- Seed scripts сохраняют monotonic `credentialsVersion`, чтобы повторный development seed не возвращал credential к уже consumed claim version.
+
+#### Четырёхзначный PIN — 2026-08-11
+
+- Shared PIN contract, admin create/reset, POS auto-submit и development fixtures переведены с шести на четыре цифры.
+- Шестизначные credentials больше не принимаются. Для существующих production-сотрудников нужен reset PIN через Staff; trusted command повышает `credentialsVersion`, после чего активные POS-устройства получают новый verifier через reactive sync.
+- Seed scripts повышают `credentialsVersion` только при фактической смене verifier и остаются idempotent при повторном запуске с тем же PIN.
 
 
 ## 24. Официальные источники

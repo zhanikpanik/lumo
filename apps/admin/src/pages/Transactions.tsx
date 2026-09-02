@@ -24,6 +24,11 @@ import { formatSom } from '@/lib/formatSom';
 import { TableToolbar } from '@/components/ui/TableToolbar';
 
 const TYPE_LABELS: Record<TransactionType, string> = {
+ sale: 'Продажа',
+ refund: 'Возврат',
+ cancel_refund: 'Отмена возврата',
+ float_in: 'Внесение',
+ float_out: 'Изъятие',
  income: 'Приход',
  expense: 'Расход',
  collection: 'Инкассация',
@@ -31,6 +36,11 @@ const TYPE_LABELS: Record<TransactionType, string> = {
 };
 
 const TYPE_COLOR: Record<TransactionType, string> = {
+ sale: 'text-green-600',
+ refund: 'text-red-600',
+ cancel_refund: 'text-green-600',
+ float_in: 'text-green-600',
+ float_out: 'text-red-600',
  income: 'text-green-600',
  expense: 'text-red-600',
  collection: 'text-muted-foreground',

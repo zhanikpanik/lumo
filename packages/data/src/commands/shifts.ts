@@ -20,6 +20,26 @@ export interface CloseShiftInput {
   clientTimestamp: string;
 }
 
+export interface ShiftState {
+  id: string;
+  status: string;
+  openedAt: string | Date;
+  closedAt?: string | Date | null;
+}
+
+export function selectCurrentOpenShift<T extends ShiftState>(shifts: readonly T[]): T | null {
+  let current: T | null = null;
+  let currentOpenedAt = Number.NEGATIVE_INFINITY;
+  for (const shift of shifts) {
+    if (shift.status !== 'open' || shift.closedAt != null) continue;
+    const openedAt = new Date(shift.openedAt).getTime();
+    if (!Number.isFinite(openedAt) || openedAt <= currentOpenedAt) continue;
+    current = shift;
+    currentOpenedAt = openedAt;
+  }
+  return current;
+}
+
 /** Open a shift. Rejected if one is already open. */
 export function openShift(
   db: CommandDatabase,

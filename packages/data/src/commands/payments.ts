@@ -521,7 +521,7 @@ export function refundedOrdersForShiftQuery(venueId: string, shiftId: string) {
       $: {
         where: {
           venue: venueId,
-          action: 'refunded',
+          action: { $in: ['refunded', 'refund_cancelled'] },
         },
       },
       order: {},
@@ -536,5 +536,5 @@ export function refundedOrdersForShiftQuery(venueId: string, shiftId: string) {
       },
       order: {},
     },
-  } as const;
+  };
 }

@@ -6,7 +6,7 @@ import { Numpad } from '../components/Numpad';
 import { Feather } from '@expo/vector-icons';
 import { useUserStore } from '../store/userStore';
 import { useInstantShift } from '../store/useInstantShift';
-import { createPosCashMovement } from '../data/posCommands';
+import { createPosCashMovement, PosCommandError } from '../data/posCommands';
 import { can, isAdmin, UserRole } from '../utils/permissions';
 
 const GAP = 10;
@@ -78,6 +78,10 @@ export const CashScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         Alert.alert('Ошибка', 'Сумма должна быть указана с точностью до тыйына.');
         return;
       }
+      if (opMode !== 'in' && amountTiyin > Math.max(expectedCash, 0)) {
+        Alert.alert('Недостаточно наличных', 'Нельзя изъять больше, чем сейчас есть в кассе.');
+        return;
+      }
       const movementType = opMode === 'collection' ? 'collection' : opMode === 'in' ? 'float_in' : 'float_out';
       await createPosCashMovement({
         operationId: `cash-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -86,7 +90,13 @@ export const CashScreen: React.FC<{ navigation: any }> = ({ navigation }) => {
         amountTiyin,
       });
     } catch (e) {
-      Alert.alert('Ошибка', 'Не удалось выполнить операцию.');
+      const insufficientCash = e instanceof PosCommandError && e.message === 'Insufficient cash available';
+      Alert.alert(
+        insufficientCash ? 'Недостаточно наличных' : 'Ошибка',
+        insufficientCash
+          ? 'Остаток кассы изменился. Проверьте сумму и повторите.'
+          : 'Не удалось выполнить операцию.',
+      );
     } finally {
       setSubmitting(false);
       cancelOp();

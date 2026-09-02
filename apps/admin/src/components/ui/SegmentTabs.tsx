@@ -2,7 +2,7 @@ import { cn } from '@/lib/utils';
 
 interface SegmentTabsProps<T extends string> {
   options: { value: T; label: string }[];
-  value: T;
+  value: T | null;
   onChange: (value: T) => void;
   className?: string;
 }

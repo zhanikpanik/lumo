@@ -132,6 +132,7 @@ export function adminEmployeesQuery(venueId: string) {
   return {
     employees: {
       $: { where: { 'venue.id': venueId } },
+      pinSecret: {},
     },
   } satisfies InstaQLParams<AppSchema>;
 }
@@ -148,21 +149,31 @@ export function adminZonesQuery(venueId: string) {
 
 export interface HistoryPageOptions {
   from?: Date;
+  to?: Date;
   limit?: number;
   offset?: number;
+}
+
+// InstaQL currently applies one range comparator per field. Prefer the upper
+// bound for a closed day; callers apply the lower bound to the returned page.
+function queryDateWhere(from?: Date, to?: Date) {
+  if (to) return { $lt: to };
+  if (from) return { $gte: from };
+  return undefined;
 }
 
 /** One bounded page of orders. Detail relations are loaded separately by order ID. */
 export function adminAllOrdersQuery(
   venueId: string,
-  { from, limit = 100, offset = 0 }: HistoryPageOptions = {},
+  { from, to, limit = 100, offset = 0 }: HistoryPageOptions = {},
 ) {
+  const dateRange = queryDateWhere(from, to);
   return {
     orders: {
       $: {
         where: {
           'venue.id': venueId,
-          ...(from ? { openedAt: { $gte: from } } : {}),
+          ...(dateRange ? { openedAt: dateRange } : {}),
         },
         order: { openedAt: 'desc' as const },
         limit,
@@ -175,7 +186,7 @@ export function adminAllOrdersQuery(
       $: {
         where: {
           'venue.id': venueId,
-          ...(from ? { createdAt: { $gte: from } } : {}),
+          ...(dateRange ? { createdAt: dateRange } : {}),
         },
         order: { createdAt: 'desc' as const },
         limit: limit * 3,
@@ -186,7 +197,7 @@ export function adminAllOrdersQuery(
       $: {
         where: {
           'venue.id': venueId,
-          ...(from ? { occurredAt: { $gte: from } } : {}),
+          ...(dateRange ? { occurredAt: dateRange } : {}),
         },
         order: { occurredAt: 'desc' as const },
         limit: limit * 20,
@@ -201,7 +212,7 @@ export function adminOrderDetailQuery(venueId: string, orderId: string) {
   return {
     orders: {
       $: { where: { id: orderId, 'venue.id': venueId }, limit: 1 },
-      items: { product: {} },
+      items: { product: {}, modifiers: {} },
       orderEvents: { $: { order: { occurredAt: 'asc' as const } } },
     },
   } satisfies InstaQLParams<AppSchema>;
@@ -433,6 +444,7 @@ export function adminDashboardOrderEventsQuery(
   } satisfies InstaQLParams<AppSchema>;
 }
 
+
 /**
  * Full inventory ledger for the venue — first page.
  * Subsequent pages use the cursor from the previous response.
@@ -455,6 +467,33 @@ export function adminDashboardInventoryPageQuery(
     inventoryMovements: {
       $: base,
       product: {},
+    },
+  } satisfies InstaQLParams<AppSchema>;
+}
+
+/**
+ * Current inventory state for the Dashboard.
+ *
+ * stockItems is the command-maintained balance snapshot, so the Dashboard
+ * does not need to replay or silently truncate the inventory ledger.
+ */
+export function adminDashboardInventoryStateQuery(venueId: string) {
+  return {
+    warehouses: {
+      $: { where: { 'venue.id': venueId } },
+    },
+    stockItems: {
+      $: { where: { venueId } },
+      product: {},
+      warehouse: {},
+    },
+    inventorySessions: {
+      $: {
+        where: { 'venue.id': venueId },
+        order: { conductedAt: 'desc' as const },
+        limit: 200,
+      },
+      warehouse: {},
     },
   } satisfies InstaQLParams<AppSchema>;
 }

@@ -187,13 +187,34 @@ await db.transact([
 
 const waiterCredentialId = det('pin', slug, 'waiter');
 const cashierCredentialId = det('pin', slug, 'cashier');
-const waiterPin = '123456';
-const cashierPin = '432198';
+const waiterPin = '1234';
+const cashierPin = '4321';
 const pinExpiresAt = new Date(Date.parse(now) + EMPLOYEE_PIN_CREDENTIAL_TTL_MS).toISOString();
 const waiterPinSalt = waiterCredentialId.replaceAll('-', '');
 const cashierPinSalt = cashierCredentialId.replaceAll('-', '');
 const waiterPinVerifier = await deriveEmployeePinVerifier(waiterPin, waiterPinSalt);
 const cashierPinVerifier = await deriveEmployeePinVerifier(cashierPin, cashierPinSalt);
+const existingPinCredentials = await db.query({
+  employeePinCredentials: {
+    $: { where: { id: { $in: [waiterCredentialId, cashierCredentialId] } } },
+  },
+});
+const existingWaiterCredential = existingPinCredentials.employeePinCredentials.find(
+  (row) => row.id === waiterCredentialId,
+);
+const existingCashierCredential = existingPinCredentials.employeePinCredentials.find(
+  (row) => row.id === cashierCredentialId,
+);
+const waiterCredentialsVersion = Math.max(
+  1,
+  (existingWaiterCredential?.credentialsVersion ?? 0)
+    + Number(existingWaiterCredential != null && existingWaiterCredential.pinVerifier !== waiterPinVerifier),
+);
+const cashierCredentialsVersion = Math.max(
+  1,
+  (existingCashierCredential?.credentialsVersion ?? 0)
+    + Number(existingCashierCredential != null && existingCashierCredential.pinVerifier !== cashierPinVerifier),
+);
 await db.transact([
   db.tx.employees[det('employee', slug, 'waiter')]
     .update({ displayName: 'Официант', role: 'waiter', status: 'active', createdAt: now })
@@ -203,10 +224,13 @@ await db.transact([
       pinSalt: waiterPinSalt,
       pinVerifier: waiterPinVerifier,
       pinLookupHash: employeePinLookupHash(VENUE_ID, waiterPin),
-      credentialsVersion: 1,
+      credentialsVersion: waiterCredentialsVersion,
       expiresAt: pinExpiresAt,
       updatedAt: now,
     })
+    .link({ employee: det('employee', slug, 'waiter') }),
+  db.tx.employeePinSecrets[det('employee-pin-secret', det('employee', slug, 'waiter'))]
+    .update({ pin: waiterPin, updatedAt: now })
     .link({ employee: det('employee', slug, 'waiter') }),
   db.tx.employees[det('employee', slug, 'cashier')]
     .update({ displayName: 'Кассир', role: 'cashier', status: 'active', createdAt: now })
@@ -216,10 +240,13 @@ await db.transact([
       pinSalt: cashierPinSalt,
       pinVerifier: cashierPinVerifier,
       pinLookupHash: employeePinLookupHash(VENUE_ID, cashierPin),
-      credentialsVersion: 1,
+      credentialsVersion: cashierCredentialsVersion,
       expiresAt: pinExpiresAt,
       updatedAt: now,
     })
+    .link({ employee: det('employee', slug, 'cashier') }),
+  db.tx.employeePinSecrets[det('employee-pin-secret', det('employee', slug, 'cashier'))]
+    .update({ pin: cashierPin, updatedAt: now })
     .link({ employee: det('employee', slug, 'cashier') }),
 ]);
 

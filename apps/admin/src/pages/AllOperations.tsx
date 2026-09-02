@@ -91,6 +91,7 @@ type OpType = 'delivery' | 'write-off' | 'transfer' | 'inventory';
 
 interface UnifiedOp {
   id: string;
+  version: number | null;
   date: string;
   warehouseId: string | null;
   warehouseName: string;
@@ -139,7 +140,7 @@ function mergeOps(
 
   for (const d of deliveries) {
     ops.push({
-      id: d.id, date: d.date, warehouseId: d.warehouse_id,
+      id: d.id, version: d.version, date: d.date, warehouseId: d.warehouse_id,
       warehouseName: d.warehouse_name || '—',
       type: 'delivery', typeLabel: TYPE_STYLE['delivery'].label,
       typeClass: TYPE_STYLE['delivery'].cls,
@@ -160,7 +161,7 @@ function mergeOps(
       0,
     );
     ops.push({
-      id: w.id, date: w.date, warehouseId: w.warehouse_id,
+      id: w.id, version: w.version, date: w.date, warehouseId: w.warehouse_id,
       warehouseName: w.warehouse_name || '—',
       type: 'write-off', typeLabel: TYPE_STYLE['write-off'].label,
       typeClass: TYPE_STYLE['write-off'].cls,
@@ -176,7 +177,7 @@ function mergeOps(
 
   for (const t of transfers) {
     ops.push({
-      id: t.id, date: t.date, warehouseId: t.fromWarehouseId,
+      id: t.id, version: t.version, date: t.date, warehouseId: t.fromWarehouseId,
       warehouseName: `${t.fromWarehouse || '—'} → ${t.toWarehouse || '—'}`,
       type: 'transfer', typeLabel: TYPE_STYLE['transfer'].label,
       typeClass: TYPE_STYLE['transfer'].cls,
@@ -192,7 +193,7 @@ function mergeOps(
 
   for (const inv of inventories) {
     ops.push({
-      id: inv.id, date: inv.date, warehouseId: inv.warehouse_id,
+      id: inv.id, version: null, date: inv.date, warehouseId: inv.warehouse_id,
       warehouseName: inv.warehouse || inv.workshop || '—',
       type: 'inventory', typeLabel: TYPE_STYLE['inventory'].label,
       typeClass: TYPE_STYLE['inventory'].cls,
@@ -288,7 +289,7 @@ export function AllOperations() {
     setSearchParams(next, { replace: true });
   }
 
-  const isCancelledStatus = (op: UnifiedOp) => op.status === 'Отменено';
+  const isCancelledStatus = (op: UnifiedOp) => op.status === 'cancelled';
 
   const summary = useMemo(() => {
     const active = filtered.filter(op => !isCancelledStatus(op));
@@ -303,7 +304,7 @@ export function AllOperations() {
     return { deliveries: dels.length, delTotal, writeOffs: wos.length, woTotal, inventories: invs.length, invTotal };
   }, [filtered]);
 
-  const columns = useMemo<ColumnDef<UnifiedOp, any>[]>(() => [
+  const columns = useMemo<ColumnDef<UnifiedOp, unknown>[]>(() => [
     {
       id: 'date',
       header: 'Дата',
@@ -362,10 +363,10 @@ export function AllOperations() {
         const op = row.original;
         return (
           <span className={`text-sm font-medium ${
-            op.status === 'Принято' || op.status === 'Проведено' ? 'text-green-600' :
-            op.status === 'В пути' ? 'text-blue-600' :
-            op.status === 'Черновик' ? 'text-amber-600' :
-            op.status === 'Отменено' ? 'text-red-600' :
+            op.status === 'received' || op.status === 'posted' ? 'text-green-600' :
+            op.status === 'in_transit' ? 'text-blue-600' :
+            op.status === 'draft' ? 'text-amber-600' :
+            op.status === 'cancelled' ? 'text-red-600' :
             'text-muted-foreground'
           }`}>
             {operationalStatusLabel(op.status)}
@@ -397,22 +398,26 @@ export function AllOperations() {
         const isCancelled = isCancelledStatus(op);
 
         // Primary action
-        const primaryAction = op.type === 'delivery' && op.status === 'В пути' ? (
+        const primaryAction = op.type === 'delivery' && (op.status === 'draft' || op.status === 'in_transit') ? (
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); receiveDelivery.mutate(op.id); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              receiveDelivery.mutate({ documentId: op.id, expectedVersion: op.version ?? 0 });
+            }}
             className="p-2 cursor-pointer rounded-md text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
             title="Принять поставку"
           >
             <PackageCheck className="w-3.5 h-3.5" />
           </button>
-        ) : (op.type === 'write-off' || op.type === 'transfer') && op.status === 'Черновик' ? (
+        ) : (op.type === 'write-off' || op.type === 'transfer') && op.status === 'draft' ? (
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              if (op.type === 'write-off') postWo.mutate(op.id);
-              else postTransfer.mutate(op.id);
+              const input = { documentId: op.id, expectedVersion: op.version ?? 0 };
+              if (op.type === 'write-off') postWo.mutate(input);
+              else postTransfer.mutate(input);
             }}
             className="p-2 cursor-pointer rounded-md text-muted-foreground hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
             title="Провести"

@@ -146,12 +146,33 @@ await db.transact([
 
 console.log('Creating employees + PIN credentials...');
 const pinExpiresAt = new Date(Date.parse(now) + EMPLOYEE_PIN_CREDENTIAL_TTL_MS).toISOString();
-const waiterPin = '123456';
-const cashierPin = '432198';
+const waiterPin = '1234';
+const cashierPin = '4321';
 const waiterPinSalt = IDs.pinWaiter.replaceAll('-', '');
 const cashierPinSalt = IDs.pinCashier.replaceAll('-', '');
 const waiterPinVerifier = await deriveEmployeePinVerifier(waiterPin, waiterPinSalt);
 const cashierPinVerifier = await deriveEmployeePinVerifier(cashierPin, cashierPinSalt);
+const existingPinCredentials = await db.query({
+  employeePinCredentials: {
+    $: { where: { id: { $in: [IDs.pinWaiter, IDs.pinCashier] } } },
+  },
+});
+const existingWaiterCredential = existingPinCredentials.employeePinCredentials.find(
+  (row) => row.id === IDs.pinWaiter,
+);
+const existingCashierCredential = existingPinCredentials.employeePinCredentials.find(
+  (row) => row.id === IDs.pinCashier,
+);
+const waiterCredentialsVersion = Math.max(
+  1,
+  (existingWaiterCredential?.credentialsVersion ?? 0)
+    + Number(existingWaiterCredential != null && existingWaiterCredential.pinVerifier !== waiterPinVerifier),
+);
+const cashierCredentialsVersion = Math.max(
+  1,
+  (existingCashierCredential?.credentialsVersion ?? 0)
+    + Number(existingCashierCredential != null && existingCashierCredential.pinVerifier !== cashierPinVerifier),
+);
 
 await db.transact([
   db.tx.employees[IDs.employeeWaiter]
@@ -162,10 +183,13 @@ await db.transact([
       pinSalt: waiterPinSalt,
       pinVerifier: waiterPinVerifier,
       pinLookupHash: employeePinLookupHash(IDs.venue, waiterPin),
-      credentialsVersion: 1,
+      credentialsVersion: waiterCredentialsVersion,
       expiresAt: pinExpiresAt,
       updatedAt: now,
     })
+    .link({ employee: IDs.employeeWaiter }),
+  db.tx.employeePinSecrets[det('employee-pin-secret', IDs.employeeWaiter)]
+    .update({ pin: waiterPin, updatedAt: now })
     .link({ employee: IDs.employeeWaiter }),
   db.tx.employees[IDs.employeeCashier]
     .update({ displayName: 'Кассир', role: 'cashier', status: 'active', createdAt: now })
@@ -175,10 +199,13 @@ await db.transact([
       pinSalt: cashierPinSalt,
       pinVerifier: cashierPinVerifier,
       pinLookupHash: employeePinLookupHash(IDs.venue, cashierPin),
-      credentialsVersion: 1,
+      credentialsVersion: cashierCredentialsVersion,
       expiresAt: pinExpiresAt,
       updatedAt: now,
     })
+    .link({ employee: IDs.employeeCashier }),
+  db.tx.employeePinSecrets[det('employee-pin-secret', IDs.employeeCashier)]
+    .update({ pin: cashierPin, updatedAt: now })
     .link({ employee: IDs.employeeCashier }),
 ]);
 

@@ -2,7 +2,7 @@ import { pbkdf2Async } from '@noble/hashes/pbkdf2.js';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { bytesToHex } from '@noble/hashes/utils.js';
 
-export const EMPLOYEE_PIN_LENGTH = 6;
+export const EMPLOYEE_PIN_LENGTH = 4;
 export const EMPLOYEE_PIN_KDF_ITERATIONS = 20_000;
 export const EMPLOYEE_PIN_CREDENTIAL_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 export const EMPLOYEE_PIN_OFFLINE_TTL_MS = 24 * 60 * 60 * 1000;

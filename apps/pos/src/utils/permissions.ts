@@ -14,6 +14,13 @@ export function can(role: UserRole, action: PermissionAction): boolean {
   return true;
 }
 export type ShiftEntryDecision = 'loading' | 'orders' | 'open-shift' | 'lock';
+export type DeviceEntryStatus = 'authenticated' | 'activation-required';
+export type ColdStartEntry = 'Activation' | 'Lock';
+
+/** A process start always requires a fresh employee PIN, even when identity was persisted. */
+export function resolveColdStartEntry(status: DeviceEntryStatus): ColdStartEntry {
+  return status === 'activation-required' ? 'Activation' : 'Lock';
+}
 
 export function resolveShiftEntry(
   role: UserRole,

@@ -28,7 +28,7 @@ function linked(value) {
 
 async function employeeById(db, employeeId) {
   const result = await db.query({
-    employees: { $: { where: { id: employeeId }, limit: 1 }, venue: {}, pinCredential: {} },
+    employees: { $: { where: { id: employeeId }, limit: 1 }, venue: {}, pinCredential: {}, pinSecret: {} },
   });
   return result.employees[0];
 }
@@ -82,6 +82,7 @@ async function createEmployee(db, adminUserId, operationId, venueId, payload) {
   const pin = nonEmptyString(payload.pin, 'pin');
   const employeeId = deterministicId('employee', `${venueId}:${operationId}`);
   const credentialId = deterministicId('employee-pin-credential', employeeId);
+  const secretId = deterministicId('employee-pin-secret', employeeId);
   const credential = await credentialFields(db, venueId, employeeId, pin, 0);
   const organizationId = await organizationIdForVenue(db, venueId);
   return runInstantCommand(
@@ -101,6 +102,9 @@ async function createEmployee(db, adminUserId, operationId, venueId, payload) {
           .link({ venue: venueId }),
         db.tx.employeePinCredentials[credentialId]
           .update(credential.fields)
+          .link({ employee: employeeId }),
+        db.tx.employeePinSecrets[secretId]
+          .update({ pin, updatedAt: credential.now })
           .link({ employee: employeeId }),
         db.tx.auditEvents[deterministicId('staff-credential-audit', `${venueId}:${operationId}`)]
           .update({
@@ -126,10 +130,13 @@ async function resetEmployeePin(db, adminUserId, operationId, venueId, payload) 
   if (!employee || employee.venueId !== venueId) throw commandError('Employee was not found', 'not_found', 404);
   const existingCredential = linked(employee.pinCredential);
   const credentialId = existingCredential?.id ?? deterministicId('employee-pin-credential', employeeId);
+  const existingSecret = linked(employee.pinSecret);
+  const secretId = existingSecret?.id ?? deterministicId('employee-pin-secret', employeeId);
   const currentVersion = Number.isSafeInteger(existingCredential?.credentialsVersion)
     ? existingCredential.credentialsVersion
     : 0;
-  const credential = await credentialFields(db, venueId, employeeId, nonEmptyString(payload.pin, 'pin'), currentVersion);
+  const pin = nonEmptyString(payload.pin, 'pin');
+  const credential = await credentialFields(db, venueId, employeeId, pin, currentVersion);
   const organizationId = await organizationIdForVenue(db, venueId);
   return runInstantCommand(
     { db, adminUserId, operationId, venueId, kind: 'reset-employee-pin', payload },
@@ -138,6 +145,9 @@ async function resetEmployeePin(db, adminUserId, operationId, venueId, payload) 
       steps: [
         db.tx.employeePinCredentials[credentialId]
           .update(credential.fields)
+          .link({ employee: employeeId }),
+        db.tx.employeePinSecrets[secretId]
+          .update({ pin, updatedAt: credential.now })
           .link({ employee: employeeId }),
         db.tx.auditEvents[deterministicId('staff-credential-audit', `${venueId}:${operationId}`)]
           .update({
@@ -169,10 +179,13 @@ async function updateEmployee(db, adminUserId, operationId, venueId, payload) {
   const currentCredentialsVersion = Number.isSafeInteger(existingCredential?.credentialsVersion)
     ? existingCredential.credentialsVersion
     : 0;
-  const credential = payload.pin
-    ? await credentialFields(db, venueId, employeeId, nonEmptyString(payload.pin, 'pin'), currentCredentialsVersion)
+  const pin = payload.pin ? nonEmptyString(payload.pin, 'pin') : null;
+  const credential = pin
+    ? await credentialFields(db, venueId, employeeId, pin, currentCredentialsVersion)
     : null;
   const credentialId = existingCredential?.id ?? deterministicId('employee-pin-credential', employeeId);
+  const existingSecret = linked(employee.pinSecret);
+  const secretId = existingSecret?.id ?? deterministicId('employee-pin-secret', employeeId);
   const now = credential?.now ?? new Date().toISOString();
   const organizationId = await organizationIdForVenue(db, venueId);
   return runInstantCommand(
@@ -198,6 +211,11 @@ async function updateEmployee(db, adminUserId, operationId, venueId, payload) {
         ...(credential ? [
           db.tx.employeePinCredentials[credentialId]
             .update(credential.fields)
+            .link({ employee: employeeId }),
+        ] : []),
+        ...(credential ? [
+          db.tx.employeePinSecrets[secretId]
+            .update({ pin, updatedAt: credential.now })
             .link({ employee: employeeId }),
         ] : []),
         db.tx.auditEvents[deterministicId('staff-profile-audit', `${venueId}:${operationId}`)]
@@ -226,6 +244,7 @@ async function deactivateEmployee(db, adminUserId, operationId, venueId, payload
   const employee = await employeeById(db, employeeId);
   if (!employee || employee.venueId !== venueId) throw commandError('Employee was not found', 'not_found', 404);
   const existingCredential = linked(employee.pinCredential);
+  const existingSecret = linked(employee.pinSecret);
   if (!existingCredential) throw commandError('Employee credential was not found', 'not_found', 404);
   const currentVersion = Number.isSafeInteger(existingCredential.credentialsVersion)
     ? existingCredential.credentialsVersion
@@ -261,6 +280,7 @@ async function deactivateEmployee(db, adminUserId, operationId, venueId, payload
           expiresAt: '1970-01-01T00:00:00.000Z',
           updatedAt: now,
         }),
+        ...(existingSecret ? [db.tx.employeePinSecrets[existingSecret.id].delete()] : []),
         db.tx.auditEvents[deterministicId('staff-credential-audit', `${venueId}:${operationId}`)]
           .update({
             venueId,
